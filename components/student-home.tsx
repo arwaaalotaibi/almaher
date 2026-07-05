@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { GOAL_META, halaqaTitle, useApp } from "@/lib/store";
 import { NameBox, Ribbon } from "./ui";
+import { NotificationsCard } from "./notifications-card";
 
 const PICK_KEY = "almaher-my-student-id";
 
@@ -137,6 +138,8 @@ export function StudentHome() {
           )}
         </p>
       </div>
+
+      <NotificationsCard halaqaIds={me.halaqaId ? [me.halaqaId] : []} />
 
       <Ribbon className="mb-6">أهدافي هذا الأسبوع</Ribbon>
 

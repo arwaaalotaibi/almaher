@@ -26,11 +26,13 @@ export function TeacherView({
   isAdmin,
   back,
   bottomExtra,
+  topExtra,
 }: {
   teacherId: string;
   isAdmin: boolean;
   back?: string;
   bottomExtra?: ReactNode;
+  topExtra?: ReactNode;
 }) {
   const router = useRouter();
   const { teachers, halaqas, students } = useApp();
@@ -76,6 +78,8 @@ export function TeacherView({
         {studentCountLabel(herStudents.length)} في{" "}
         {herHalaqas.length.toLocaleString("ar-EG")} حلقة
       </p>
+
+      {topExtra}
 
       {herHalaqas.length === 0 && (
         <div className="card rounded-2xl p-8 text-center">

@@ -61,7 +61,7 @@ export default function Home() {
       </div>
 
       {/* الأقسام */}
-      <div className="mt-6 grid grid-cols-3 gap-3">
+      <div className="mt-6 grid grid-cols-2 gap-3">
         <Link
           href="/teachers"
           className="card flex flex-col items-center gap-1.5 rounded-2xl py-4 transition active:scale-[0.97]"
@@ -71,6 +71,14 @@ export default function Home() {
           <span className="text-[11px] text-silver-600">
             {hydrated ? teachers.length.toLocaleString("ar-EG") : "…"}
           </span>
+        </Link>
+        <Link
+          href="/announcements"
+          className="card flex flex-col items-center gap-1.5 rounded-2xl py-4 transition active:scale-[0.97]"
+        >
+          <span className="text-2xl">📢</span>
+          <span className="font-kufi text-sm font-bold text-plum-800">الإشعارات</span>
+          <span className="text-[11px] text-silver-600">أرسلي للطالبات</span>
         </Link>
         <Link
           href="/honor"

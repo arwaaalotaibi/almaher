@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { studentCountLabel, useApp } from "@/lib/store";
 import { TeacherView } from "./teacher-view";
+import { NotificationsCard } from "./notifications-card";
 
 const PICK_KEY = "almaher-my-teacher-id";
 
@@ -89,6 +90,7 @@ export function TeacherHome() {
     <TeacherView
       teacherId={me.id}
       isAdmin={false}
+      topExtra={<NotificationsCard halaqaIds={me.halaqaIds} />}
       bottomExtra={
         <>
           <button

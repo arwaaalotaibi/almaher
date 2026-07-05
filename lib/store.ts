@@ -40,10 +40,18 @@ export interface Teacher {
   halaqaIds: string[];
 }
 
+export interface Announcement {
+  id: string;
+  body: string;
+  halaqaId: string; // "" = لكل الحلقات
+  createdAt: string; // ISO
+}
+
 export interface AppState {
   halaqas: Halaqa[];
   teachers: Teacher[];
   students: Student[];
+  announcements: Announcement[];
 }
 
 export const EMPTY_GOALS: Goals = { hifz: "", tathbit: "", murajaah: "" };
@@ -75,6 +83,7 @@ const SEED: AppState = {
   ],
   teachers: [],
   students: [],
+  announcements: [],
 };
 
 /* ================== المخزن المحلي (نسخة سريعة للعرض) ================== */
@@ -94,6 +103,9 @@ function load(): AppState {
         halaqas: Array.isArray(parsed.halaqas) ? parsed.halaqas : SEED.halaqas,
         teachers: Array.isArray(parsed.teachers) ? parsed.teachers : [],
         students: Array.isArray(parsed.students) ? parsed.students : [],
+        announcements: Array.isArray(parsed.announcements)
+          ? parsed.announcements
+          : [],
       };
     } else {
       cache = SEED;
@@ -173,16 +185,20 @@ function run(op: () => PromiseLike<{ error: unknown }>) {
 
 /** جلب كل البيانات من قاعدة البيانات وتحديث العرض */
 export async function pullRemote(): Promise<void> {
-  const [h, t, s] = await Promise.all([
+  const [h, t, s, a] = await Promise.all([
     supabase.from("almaher_halaqas").select("id,mosque,day").order("created_at"),
     supabase.from("almaher_teachers").select("id,name,halaqa_ids").order("created_at"),
     supabase
       .from("almaher_students")
       .select("id,name,halaqa_id,teacher_id,goals,done,note,updated_at")
       .order("created_at"),
+    supabase
+      .from("almaher_announcements")
+      .select("id,body,halaqa_id,created_at")
+      .order("created_at", { ascending: false }),
   ]);
-  if (h.error || t.error || s.error) {
-    throw h.error ?? t.error ?? s.error;
+  if (h.error || t.error || s.error || a.error) {
+    throw h.error ?? t.error ?? s.error ?? a.error;
   }
   persist({
     halaqas: (h.data ?? []) as Halaqa[],
@@ -200,6 +216,12 @@ export async function pullRemote(): Promise<void> {
       done: { ...EMPTY_DONE, ...row.done },
       note: row.note,
       updatedAt: row.updated_at,
+    })),
+    announcements: (a.data ?? []).map((row) => ({
+      id: row.id as string,
+      body: row.body as string,
+      halaqaId: (row.halaqa_id as string) ?? "",
+      createdAt: row.created_at as string,
     })),
   });
 }
@@ -220,6 +242,7 @@ function studentToRow(st: Student): StudentRow {
 /** رفع كل البيانات المحلية إلى قاعدة البيانات (استبدال كامل) */
 export async function pushAll(state: AppState): Promise<void> {
   const wipe = [
+    await supabase.from("almaher_announcements").delete().neq("id", ""),
     await supabase.from("almaher_students").delete().neq("id", ""),
     await supabase.from("almaher_teachers").delete().neq("id", ""),
     await supabase.from("almaher_halaqas").delete().neq("id", ""),
@@ -248,6 +271,17 @@ export async function pushAll(state: AppState): Promise<void> {
       .insert(state.students.map(studentToRow));
     if (error) throw error;
   }
+  if (state.announcements?.length) {
+    const { error } = await supabase.from("almaher_announcements").insert(
+      state.announcements.map((n) => ({
+        id: n.id,
+        body: n.body,
+        halaqa_id: n.halaqaId,
+        created_at: n.createdAt,
+      }))
+    );
+    if (error) throw error;
+  }
 }
 
 /* تحديث لحظي: أي تغيير من جهاز آخر يُعاد جلبه تلقائياً */
@@ -265,7 +299,12 @@ export function subscribeRealtime() {
     }, 400);
   };
   const channel = supabase.channel("almaher-sync");
-  for (const table of ["almaher_halaqas", "almaher_teachers", "almaher_students"]) {
+  for (const table of [
+    "almaher_halaqas",
+    "almaher_teachers",
+    "almaher_students",
+    "almaher_announcements",
+  ]) {
     channel.on("postgres_changes", { event: "*", schema: "public", table }, refresh);
   }
   channel.subscribe();
@@ -391,6 +430,31 @@ export const actions = {
     run(() => supabase.from("almaher_students").delete().eq("id", id));
   },
 
+  addAnnouncement(body: string, halaqaId: string) {
+    const note: Announcement = {
+      id: uid(),
+      body: body.trim(),
+      halaqaId,
+      createdAt: new Date().toISOString(),
+    };
+    setState((s) => ({ ...s, announcements: [note, ...s.announcements] }));
+    run(() =>
+      supabase.from("almaher_announcements").insert({
+        id: note.id,
+        body: note.body,
+        halaqa_id: note.halaqaId,
+        created_at: note.createdAt,
+      })
+    );
+  },
+  removeAnnouncement(id: string) {
+    setState((s) => ({
+      ...s,
+      announcements: s.announcements.filter((n) => n.id !== id),
+    }));
+    run(() => supabase.from("almaher_announcements").delete().eq("id", id));
+  },
+
   exportJSON(): string {
     return JSON.stringify(load(), null, 2);
   },
@@ -404,6 +468,9 @@ export const actions = {
         halaqas: parsed.halaqas,
         teachers: Array.isArray(parsed.teachers) ? parsed.teachers : [],
         students: parsed.students,
+        announcements: Array.isArray(parsed.announcements)
+          ? parsed.announcements
+          : [],
       };
       persist(state);
       pushAll(state).catch(() => syncAlert());
@@ -435,4 +502,37 @@ export function arabicCount(n: number, single: string, dual: string, plural: str
 
 export function studentCountLabel(n: number): string {
   return arabicCount(n, "طالبة واحدة", "طالبتان", "طالبات");
+}
+
+/** الإشعارات التي تخصّ مجموعة حلقات معيّنة (بالإضافة إلى إشعارات «الكل») */
+export function announcementsFor(
+  all: Announcement[],
+  halaqaIds: string[]
+): Announcement[] {
+  return all.filter((n) => n.halaqaId === "" || halaqaIds.includes(n.halaqaId));
+}
+
+const SEEN_KEY = "almaher-notif-seen";
+
+/** آخر وقت شاهدت فيه الإشعارات على هذا الجهاز */
+export function getNotifSeen(): number {
+  if (typeof window === "undefined") return 0;
+  return Number(window.localStorage.getItem(SEEN_KEY) ?? 0);
+}
+
+export function markNotifSeen() {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(SEEN_KEY, String(Date.now()));
+  }
+}
+
+export function countUnseen(list: Announcement[], seen: number): number {
+  return list.filter((n) => new Date(n.createdAt).getTime() > seen).length;
+}
+
+export function formatNotifDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("ar-u-ca-gregory-nu-arab", {
+    day: "numeric",
+    month: "long",
+  });
 }
