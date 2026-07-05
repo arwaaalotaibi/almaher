@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Cairo, Reem_Kufi } from "next/font/google";
+import { AuthGate } from "@/components/auth-gate";
 import "./globals.css";
 
 const cairo = Cairo({
@@ -26,7 +27,9 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ar" dir="rtl" className={`${cairo.variable} ${kufi.variable}`}>
-      <body className="pattern-bg font-body antialiased">{children}</body>
+      <body className="pattern-bg font-body antialiased">
+        <AuthGate>{children}</AuthGate>
+      </body>
     </html>
   );
 }

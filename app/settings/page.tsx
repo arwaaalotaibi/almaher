@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { actions, halaqaTitle, useApp, WEEK_DAYS } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
 import {
   DangerBtn,
   Field,
@@ -75,14 +76,36 @@ export default function SettingsPage() {
         </p>
       </section>
 
+      {/* الحساب */}
+      <section className="card mb-4 rounded-2xl p-4">
+        <h2 className="mb-1 font-kufi text-lg font-bold text-plum-800">
+          ☁️ قاعدة البيانات
+        </h2>
+        <p className="mb-3 text-sm text-silver-600">
+          البيانات مشتركة ومتزامنة لحظياً بين كل أجهزة المعلّمات.
+        </p>
+        <button
+          type="button"
+          onClick={async () => {
+            if (window.confirm("تسجيل الخروج من هذا الجهاز؟")) {
+              await supabase.auth.signOut();
+              window.location.reload();
+            }
+          }}
+          className="card w-full rounded-xl py-2.5 text-sm font-bold text-plum-700"
+        >
+          🚪 تسجيل الخروج
+        </button>
+      </section>
+
       {/* النسخ الاحتياطي */}
       <section className="card mb-4 rounded-2xl p-4">
         <h2 className="mb-1 font-kufi text-lg font-bold text-plum-800">
           💾 النسخ الاحتياطي
         </h2>
         <p className="mb-3 text-sm text-silver-600">
-          البيانات محفوظة على هذا الجهاز. صدّري نسخة دورياً، أو انقليها لجهاز آخر
-          بالاستيراد.
+          نسخة إضافية للاحتياط: التصدير يحفظ ملفاً، والاستيراد يستبدل بيانات
+          الجميع بمحتوى الملف.
         </p>
         <div className="grid grid-cols-2 gap-2">
           <PrimaryBtn onClick={exportBackup}>⬇️ تصدير نسخة</PrimaryBtn>
@@ -118,7 +141,7 @@ export default function SettingsPage() {
 
       <DangerBtn
         onClick={() => {
-          if (window.confirm("مسح كل البيانات والبدء من جديد؟ لا يمكن التراجع!")) {
+          if (window.confirm("مسح كل البيانات من قاعدة البيانات لكل الأجهزة والبدء من جديد؟ لا يمكن التراجع!")) {
             actions.resetAll();
           }
         }}

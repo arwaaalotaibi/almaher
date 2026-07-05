@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { supabase } from "./supabase";
 
 /* ================== الأنواع ================== */
 
@@ -65,8 +66,6 @@ export const WEEK_DAYS = [
   "السبت",
 ];
 
-/* ================== البيانات الابتدائية ================== */
-
 const SEED: AppState = {
   halaqas: [
     { id: "bahar-mon", mosque: "مسجد البحر", day: "الاثنين" },
@@ -78,7 +77,7 @@ const SEED: AppState = {
   students: [],
 };
 
-/* ================== المخزن (localStorage) ================== */
+/* ================== المخزن المحلي (نسخة سريعة للعرض) ================== */
 
 const KEY = "almaher-v1";
 let cache: AppState | null = null;
@@ -138,22 +137,162 @@ export function uid(): string {
     : Math.random().toString(36).slice(2);
 }
 
-/* ================== إجراءات ================== */
+/* ================== المزامنة مع قاعدة البيانات ================== */
+
+interface StudentRow {
+  id: string;
+  name: string;
+  halaqa_id: string;
+  teacher_id: string;
+  goals: Goals;
+  done: GoalsDone;
+  note: string;
+  updated_at: string;
+}
+
+function syncAlert() {
+  if (typeof window !== "undefined") {
+    window.alert("تعذّر حفظ التغيير في قاعدة البيانات — تأكدي من الإنترنت وأعيدي المحاولة");
+  }
+}
+
+/** ينفّذ عملية بعيدة، وينبّه عند الفشل (التعديل المحلي يبقى ظاهراً) */
+function run(op: () => PromiseLike<{ error: unknown }>) {
+  Promise.resolve(op())
+    .then(({ error }) => {
+      if (error) {
+        console.error(error);
+        syncAlert();
+      }
+    })
+    .catch((e) => {
+      console.error(e);
+      syncAlert();
+    });
+}
+
+/** جلب كل البيانات من قاعدة البيانات وتحديث العرض */
+export async function pullRemote(): Promise<void> {
+  const [h, t, s] = await Promise.all([
+    supabase.from("almaher_halaqas").select("id,mosque,day").order("created_at"),
+    supabase.from("almaher_teachers").select("id,name,halaqa_ids").order("created_at"),
+    supabase
+      .from("almaher_students")
+      .select("id,name,halaqa_id,teacher_id,goals,done,note,updated_at")
+      .order("created_at"),
+  ]);
+  if (h.error || t.error || s.error) {
+    throw h.error ?? t.error ?? s.error;
+  }
+  persist({
+    halaqas: (h.data ?? []) as Halaqa[],
+    teachers: (t.data ?? []).map((row) => ({
+      id: row.id as string,
+      name: row.name as string,
+      halaqaIds: Array.isArray(row.halaqa_ids) ? (row.halaqa_ids as string[]) : [],
+    })),
+    students: ((s.data ?? []) as StudentRow[]).map((row) => ({
+      id: row.id,
+      name: row.name,
+      halaqaId: row.halaqa_id,
+      teacherId: row.teacher_id,
+      goals: { ...EMPTY_GOALS, ...row.goals },
+      done: { ...EMPTY_DONE, ...row.done },
+      note: row.note,
+      updatedAt: row.updated_at,
+    })),
+  });
+}
+
+function studentToRow(st: Student): StudentRow {
+  return {
+    id: st.id,
+    name: st.name,
+    halaqa_id: st.halaqaId,
+    teacher_id: st.teacherId,
+    goals: st.goals,
+    done: st.done,
+    note: st.note ?? "",
+    updated_at: st.updatedAt ?? new Date().toISOString(),
+  };
+}
+
+/** رفع كل البيانات المحلية إلى قاعدة البيانات (استبدال كامل) */
+export async function pushAll(state: AppState): Promise<void> {
+  const wipe = [
+    await supabase.from("almaher_students").delete().neq("id", ""),
+    await supabase.from("almaher_teachers").delete().neq("id", ""),
+    await supabase.from("almaher_halaqas").delete().neq("id", ""),
+  ];
+  for (const { error } of wipe) if (error) throw error;
+
+  if (state.halaqas.length) {
+    const { error } = await supabase
+      .from("almaher_halaqas")
+      .insert(state.halaqas.map((h) => ({ id: h.id, mosque: h.mosque, day: h.day })));
+    if (error) throw error;
+  }
+  if (state.teachers.length) {
+    const { error } = await supabase.from("almaher_teachers").insert(
+      state.teachers.map((t) => ({
+        id: t.id,
+        name: t.name,
+        halaqa_ids: t.halaqaIds,
+      }))
+    );
+    if (error) throw error;
+  }
+  if (state.students.length) {
+    const { error } = await supabase
+      .from("almaher_students")
+      .insert(state.students.map(studentToRow));
+    if (error) throw error;
+  }
+}
+
+/* تحديث لحظي: أي تغيير من جهاز آخر يُعاد جلبه تلقائياً */
+let realtimeStarted = false;
+export function subscribeRealtime() {
+  if (realtimeStarted) return;
+  realtimeStarted = true;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const refresh = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      pullRemote().catch(() => {
+        /* بدون إنترنت — نبقى على النسخة المحلية */
+      });
+    }, 400);
+  };
+  const channel = supabase.channel("almaher-sync");
+  for (const table of ["almaher_halaqas", "almaher_teachers", "almaher_students"]) {
+    channel.on("postgres_changes", { event: "*", schema: "public", table }, refresh);
+  }
+  channel.subscribe();
+}
+
+/* ================== الإجراءات (محلي فوري + حفظ بعيد) ================== */
 
 export const actions = {
   addHalaqa(mosque: string, day: string) {
-    setState((s) => ({
-      ...s,
-      halaqas: [...s.halaqas, { id: uid(), mosque: mosque.trim(), day }],
-    }));
+    const halaqa: Halaqa = { id: uid(), mosque: mosque.trim(), day };
+    setState((s) => ({ ...s, halaqas: [...s.halaqas, halaqa] }));
+    run(() => supabase.from("almaher_halaqas").insert(halaqa));
   },
   updateHalaqa(id: string, patch: Partial<Halaqa>) {
     setState((s) => ({
       ...s,
       halaqas: s.halaqas.map((h) => (h.id === id ? { ...h, ...patch } : h)),
     }));
+    run(() =>
+      supabase
+        .from("almaher_halaqas")
+        .update({ mosque: patch.mosque, day: patch.day })
+        .eq("id", id)
+    );
   },
   removeHalaqa(id: string) {
+    const affected = getState().teachers.filter((t) => t.halaqaIds.includes(id));
     setState((s) => ({
       ...s,
       halaqas: s.halaqas.filter((h) => h.id !== id),
@@ -163,21 +302,44 @@ export const actions = {
         halaqaIds: t.halaqaIds.filter((hid) => hid !== id),
       })),
     }));
+    // حذف الحلقة يحذف طالباتها تلقائياً في قاعدة البيانات (cascade)
+    run(() => supabase.from("almaher_halaqas").delete().eq("id", id));
+    for (const t of affected) {
+      run(() =>
+        supabase
+          .from("almaher_teachers")
+          .update({ halaqa_ids: t.halaqaIds.filter((hid) => hid !== id) })
+          .eq("id", t.id)
+      );
+    }
   },
 
   addTeacher(name: string, halaqaIds: string[]) {
-    const id = uid();
-    setState((s) => ({
-      ...s,
-      teachers: [...s.teachers, { id, name: name.trim(), halaqaIds }],
-    }));
-    return id;
+    const teacher: Teacher = { id: uid(), name: name.trim(), halaqaIds };
+    setState((s) => ({ ...s, teachers: [...s.teachers, teacher] }));
+    run(() =>
+      supabase.from("almaher_teachers").insert({
+        id: teacher.id,
+        name: teacher.name,
+        halaqa_ids: teacher.halaqaIds,
+      })
+    );
+    return teacher.id;
   },
   updateTeacher(id: string, patch: Partial<Teacher>) {
     setState((s) => ({
       ...s,
       teachers: s.teachers.map((t) => (t.id === id ? { ...t, ...patch } : t)),
     }));
+    run(() =>
+      supabase
+        .from("almaher_teachers")
+        .update({
+          ...(patch.name !== undefined && { name: patch.name }),
+          ...(patch.halaqaIds !== undefined && { halaqa_ids: patch.halaqaIds }),
+        })
+        .eq("id", id)
+    );
   },
   removeTeacher(id: string) {
     setState((s) => ({
@@ -187,40 +349,46 @@ export const actions = {
         st.teacherId === id ? { ...st, teacherId: "" } : st
       ),
     }));
+    run(() =>
+      supabase.from("almaher_students").update({ teacher_id: "" }).eq("teacher_id", id)
+    );
+    run(() => supabase.from("almaher_teachers").delete().eq("id", id));
   },
 
   addStudent(name: string, halaqaId: string, teacherId: string) {
-    setState((s) => ({
-      ...s,
-      students: [
-        ...s.students,
-        {
-          id: uid(),
-          name: name.trim(),
-          halaqaId,
-          teacherId,
-          goals: { ...EMPTY_GOALS },
-          done: { ...EMPTY_DONE },
-          updatedAt: new Date().toISOString(),
-        },
-      ],
-    }));
+    const student: Student = {
+      id: uid(),
+      name: name.trim(),
+      halaqaId,
+      teacherId,
+      goals: { ...EMPTY_GOALS },
+      done: { ...EMPTY_DONE },
+      updatedAt: new Date().toISOString(),
+    };
+    setState((s) => ({ ...s, students: [...s.students, student] }));
+    run(() => supabase.from("almaher_students").insert(studentToRow(student)));
   },
   updateStudent(id: string, patch: Partial<Student>) {
+    const updatedAt = new Date().toISOString();
     setState((s) => ({
       ...s,
       students: s.students.map((st) =>
-        st.id === id
-          ? { ...st, ...patch, updatedAt: new Date().toISOString() }
-          : st
+        st.id === id ? { ...st, ...patch, updatedAt } : st
       ),
     }));
+    const st = getState().students.find((x) => x.id === id);
+    if (st) {
+      run(() =>
+        supabase.from("almaher_students").update(studentToRow(st)).eq("id", id)
+      );
+    }
   },
   removeStudent(id: string) {
     setState((s) => ({
       ...s,
       students: s.students.filter((st) => st.id !== id),
     }));
+    run(() => supabase.from("almaher_students").delete().eq("id", id));
   },
 
   exportJSON(): string {
@@ -232,18 +400,22 @@ export const actions = {
       if (!Array.isArray(parsed.halaqas) || !Array.isArray(parsed.students)) {
         return false;
       }
-      persist({
+      const state: AppState = {
         halaqas: parsed.halaqas,
         teachers: Array.isArray(parsed.teachers) ? parsed.teachers : [],
         students: parsed.students,
-      });
+      };
+      persist(state);
+      pushAll(state).catch(() => syncAlert());
       return true;
     } catch {
       return false;
     }
   },
   resetAll() {
-    persist(structuredClone(SEED));
+    const seed = structuredClone(SEED);
+    persist(seed);
+    pushAll(seed).catch(() => syncAlert());
   },
 };
 
