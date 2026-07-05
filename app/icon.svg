@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <rect width="200" height="200" rx="44" fill="#f2efec"/>
+  <path d="M62 128 L62 68 Q62 45 100 31 Q138 45 138 68 L138 128" fill="none" stroke="#7d5a6c" stroke-width="7" stroke-linecap="round"/>
+  <path d="M100 145 C84 136 64 135 52 141 L52 170 C64 166 84 165 100 173 Z" fill="#f6f4f1" stroke="#5d3f4e" stroke-width="4" stroke-linejoin="round"/>
+  <clipPath id="f"><path d="M100 145 C116 136 136 135 148 141 L148 170 C136 166 116 165 100 173 Z"/></clipPath>
+  <g clip-path="url(#f)">
+    <rect x="100" y="132" width="50" height="15" fill="#007a3d"/>
+    <rect x="100" y="145.5" width="50" height="13" fill="#ffffff"/>
+    <rect x="100" y="158" width="50" height="16" fill="#ce1126"/>
+    <polygon points="100,132 114,142 114,164 100,174" fill="#1f1a17"/>
+  </g>
+  <path d="M100 145 C116 136 136 135 148 141 L148 170 C136 166 116 165 100 173 Z" fill="none" stroke="#5d3f4e" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M100 145 L100 173" stroke="#5d3f4e" stroke-width="3"/>
+</svg>

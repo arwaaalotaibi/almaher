@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import { useApp } from "@/lib/store";
 import { Field, inputCls, PageHeader, PrimaryBtn, useHydrated } from "@/components/ui";
+import { AssocLogo } from "@/components/logo";
 
 const TITLE_CHIPS = [
   "لوحة الشرف",
@@ -364,20 +365,9 @@ export default function HonorPage() {
                     className="h-24 object-contain"
                   />
                 ) : (
-                  !logos.mosque && (
-                    <div className="flex h-24 w-24 flex-col items-center justify-center rounded-full border-2 border-plum-200 bg-white">
-                      <span className="font-kufi text-2xl font-bold text-plum-700">
-                        الماهر
-                      </span>
-                    </div>
-                  )
+                  <AssocLogo className="h-32" />
                 )}
               </div>
-              {!logos.assoc && (
-                <p className="mb-4 -mt-2 text-xs font-bold text-silver-600">
-                  جمعية الماهر بالقرآن وعلومه
-                </p>
-              )}
 
               <h2 className="font-kufi text-5xl font-bold leading-tight text-plum-800">
                 {title}

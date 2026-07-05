@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { halaqaTitle, studentCountLabel, useApp } from "@/lib/store";
+import { studentCountLabel, useApp } from "@/lib/store";
 import { Ribbon, useHydrated } from "@/components/ui";
+import { AssocLogo } from "@/components/logo";
 
 export default function Home() {
   const { halaqas, students, teachers } = useApp();
@@ -12,9 +13,7 @@ export default function Home() {
     <main className="mx-auto max-w-2xl px-4 pb-16 pt-10">
       {/* الترويسة — بأسلوب البوستر */}
       <div className="mb-2 text-center">
-        <div className="mx-auto mb-3 flex h-20 w-20 items-center justify-center rounded-full border-2 border-plum-200 bg-white shadow-sm">
-          <span className="font-kufi text-3xl font-bold text-plum-700">الماهر</span>
-        </div>
+        <AssocLogo withWordmark={false} className="mx-auto mb-2 h-28" />
         <h1 className="font-kufi text-4xl font-bold tracking-tight text-plum-800">
           الماهر
         </h1>
