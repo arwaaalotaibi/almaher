@@ -1,6 +1,6 @@
 /**
- * شعار جمعية الماهر بالقرآن وعلومه — رسم SVG مستوحى من الشعار الرسمي:
- * قوس محراب رمادي، بداخله «الماهر»، وتحته كتاب مفتوح صفحته بألوان علم الكويت.
+ * شعار جمعية الماهر بالقرآن وعلومه — رسم SVG مطابق لتكوين الشعار الرسمي:
+ * قوس مدبّب رمادي بداخله «الماهر»، كتاب مفتوح بنفسجي، وتحته شريطا علم الكويت.
  */
 export function AssocLogo({
   className = "",
@@ -11,99 +11,89 @@ export function AssocLogo({
 }) {
   return (
     <svg
-      viewBox={`0 0 200 ${withWordmark ? 224 : 178}`}
+      viewBox={`0 0 200 ${withWordmark ? 232 : 186}`}
       className={className}
       role="img"
       aria-label="جمعية الماهر بالقرآن وعلومه"
     >
-      {/* قوس المحراب */}
+      <defs>
+        <linearGradient id="am-arch" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#b7b7a9" />
+          <stop offset="1" stopColor="#7e7f6d" />
+        </linearGradient>
+        <clipPath id="am-ribL">
+          <path d="M100 154 L40 139 L52 152 L40 165 L100 180 Z" />
+        </clipPath>
+        <clipPath id="am-ribR">
+          <path d="M100 154 L160 139 L148 152 L160 165 L100 180 Z" />
+        </clipPath>
+      </defs>
+
+      {/* القوس المدبّب */}
       <path
-        d="M62 128 L62 60 Q62 37 100 23 Q138 37 138 60 L138 128"
-        fill="none"
-        stroke="#918b84"
-        strokeWidth="4"
-        strokeLinecap="round"
-      />
-      <path
-        d="M69 128 L69 62 Q69 44 100 32 Q131 44 131 62 L131 128"
-        fill="none"
-        stroke="#b2aca4"
-        strokeWidth="2"
-        strokeLinecap="round"
+        d="M58 132 L58 64 Q58 36 82 22 L100 6 L118 22 Q142 36 142 64 L142 132 L124 132 L124 66 Q124 47 110 39 L100 30 L90 39 Q76 47 76 66 L76 132 Z"
+        fill="url(#am-arch)"
       />
 
       {/* الماهر داخل القوس */}
       <text
         x="100"
-        y="97"
+        y="112"
         textAnchor="middle"
         fontFamily="var(--font-kufi), var(--font-cairo), sans-serif"
         fontWeight="700"
-        fontSize="27"
-        fill="#7d5a6c"
+        fontSize="20"
+        textLength="44"
+        lengthAdjust="spacingAndGlyphs"
+        fill="#5e5e52"
       >
         الماهر
       </text>
 
-      {/* الكتاب المفتوح */}
-      <defs>
-        {/* الصفحة اليمنى (جهة البداية بالعربي) — علم الكويت */}
-        <clipPath id="flagPage">
-          <path d="M100 141 C116 132 136 131 148 137 L148 166 C136 162 116 161 100 169 Z" />
-        </clipPath>
-      </defs>
+      {/* الكتاب المفتوح البنفسجي */}
+      <path d="M100 132 C76 121 52 115 34 113 L34 127 C52 129 76 135 100 146 Z" fill="#7b5a6e" />
+      <path d="M100 132 C124 121 148 115 166 113 L166 127 C148 129 124 135 100 146 Z" fill="#7b5a6e" />
+      <path d="M100 146 C78 136 56 131 40 129 L40 134 C58 136 80 141 100 152 Z" fill="#eceae5" />
+      <path d="M100 146 C122 136 144 131 160 129 L160 134 C142 136 120 141 100 152 Z" fill="#eceae5" />
 
-      {/* الصفحة اليسرى — أسطر */}
-      <path
-        d="M100 141 C84 132 64 131 52 137 L52 166 C64 162 84 161 100 169 Z"
-        fill="#f6f4f1"
-        stroke="#6e6862"
-        strokeWidth="2.5"
-        strokeLinejoin="round"
-      />
-      <path d="M62 142 C72 139 84 139 94 143" stroke="#b2aca4" strokeWidth="2" fill="none" strokeLinecap="round" />
-      <path d="M62 149 C72 146 84 146 94 150" stroke="#b2aca4" strokeWidth="2" fill="none" strokeLinecap="round" />
-      <path d="M62 156 C72 153 84 153 94 157" stroke="#b2aca4" strokeWidth="2" fill="none" strokeLinecap="round" />
-
-      {/* الصفحة اليمنى — علم الكويت */}
-      <g clipPath="url(#flagPage)">
-        <rect x="100" y="128" width="50" height="14.5" fill="#007a3d" />
-        <rect x="100" y="141.5" width="50" height="13" fill="#ffffff" />
-        <rect x="100" y="154" width="50" height="16" fill="#ce1126" />
-        <polygon points="100,128 114,138 114,160 100,170" fill="#1f1a17" />
+      {/* شريطا علم الكويت */}
+      <g clipPath="url(#am-ribL)">
+        <path d="M100 154 L40 139 L40 147.7 L100 162.7 Z" fill="#3f7d4f" />
+        <path d="M100 162.7 L40 147.7 L40 156.3 L100 171.3 Z" fill="#ffffff" stroke="#d8d5cf" strokeWidth="0.5" />
+        <path d="M100 171.3 L40 156.3 L40 165 L100 180 Z" fill="#b23a45" />
       </g>
-      <path
-        d="M100 141 C116 132 136 131 148 137 L148 166 C136 162 116 161 100 169 Z"
-        fill="none"
-        stroke="#6e6862"
-        strokeWidth="2.5"
-        strokeLinejoin="round"
-      />
-      {/* وسط الكتاب */}
-      <path d="M100 141 L100 169" stroke="#6e6862" strokeWidth="2" />
+      <g clipPath="url(#am-ribR)">
+        <path d="M100 154 L160 139 L160 147.7 L100 162.7 Z" fill="#3f7d4f" />
+        <path d="M100 162.7 L160 147.7 L160 156.3 L100 171.3 Z" fill="#ffffff" stroke="#d8d5cf" strokeWidth="0.5" />
+        <path d="M100 171.3 L160 156.3 L160 165 L100 180 Z" fill="#b23a45" />
+      </g>
+      <polygon points="100,157 92,155 100,172 108,155" fill="#26251f" />
+      <path d="M100 146 L94 143.5 L100 153 L106 143.5 Z" fill="#ffffff" />
 
       {withWordmark && (
         <>
           <text
             x="100"
-            y="194"
+            y="205"
             textAnchor="middle"
             fontFamily="var(--font-kufi), var(--font-cairo), sans-serif"
-            fontWeight="600"
-            fontSize="14"
-            fill="#6b655f"
+            fontWeight="700"
+            fontSize="16"
+            textLength="176"
+            lengthAdjust="spacingAndGlyphs"
+            fill="#1f1e1a"
           >
             جمعية الماهر بالقرآن وعلومه
           </text>
           <text
             x="100"
-            y="210"
+            y="222"
             textAnchor="middle"
             fontFamily="var(--font-cairo), sans-serif"
             fontWeight="600"
-            fontSize="8.5"
-            letterSpacing="2"
-            fill="#a39c93"
+            fontSize="9"
+            letterSpacing="2.5"
+            fill="#8a857e"
           >
             Almahr BilQuran
           </text>
