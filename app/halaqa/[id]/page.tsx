@@ -52,6 +52,7 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [newTeacher, setNewTeacher] = useState("");
+  const [showCodes, setShowCodes] = useState(false);
 
   if (!hydrated) {
     return <main className="mx-auto max-w-2xl px-4 pt-10" />;
@@ -99,9 +100,19 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
         </p>
       )}
 
-      <p className="mb-5 mt-3 text-center text-sm font-bold text-silver-600">
+      <p className="mb-3 mt-3 text-center text-sm font-bold text-silver-600">
         {studentCountLabel(halaqaStudents.length)}
       </p>
+
+      {halaqaStudents.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowCodes(true)}
+          className="mx-auto mb-5 block rounded-full bg-plum-100 px-4 py-1.5 text-xs font-bold text-plum-700"
+        >
+          🔑 عرض أرقام الدخول
+        </button>
+      )}
 
       {halaqaStudents.length === 0 && (
         <div className="card rounded-2xl p-8 text-center">
@@ -200,6 +211,33 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
           >
             حذف هذه الحلقة نهائياً
           </DangerBtn>
+        </div>
+      </Sheet>
+
+      {/* أرقام الدخول للتوزيع */}
+      <Sheet
+        open={showCodes}
+        onClose={() => setShowCodes(false)}
+        title="🔑 أرقام دخول الطالبات"
+      >
+        <p className="mb-3 text-sm text-silver-600">
+          كل طالبة تدخل التطبيق باختيار «الطالبات» ثم كتابة رمزها.
+        </p>
+        <div className="grid gap-2">
+          {halaqaStudents.map((s) => (
+            <div
+              key={s.id}
+              className="flex items-center justify-between rounded-xl bg-cream px-4 py-2.5"
+            >
+              <span className="text-sm font-bold text-plum-800">{s.name}</span>
+              <span
+                className="font-kufi text-lg font-bold tracking-[0.15em] text-plum-700"
+                dir="ltr"
+              >
+                {s.code || "—"}
+              </span>
+            </div>
+          ))}
         </div>
       </Sheet>
 

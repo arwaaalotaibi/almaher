@@ -26,6 +26,7 @@ export function StudentSheet({
   const [goals, setGoals] = useState<Goals>({ hifz: "", tathbit: "", murajaah: "" });
   const [done, setDone] = useState<GoalsDone>({ hifz: false, tathbit: false, murajaah: false });
   const [note, setNote] = useState("");
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (student) {
@@ -77,6 +78,34 @@ export function StudentSheet({
           onChange={(e) => setName(e.target.value)}
         />
       </Field>
+
+      {student.code && (
+        <div className="mb-3 flex items-center justify-between rounded-2xl bg-plum-50 px-4 py-3">
+          <div>
+            <p className="text-xs font-bold text-plum-700">🔑 رمز دخول الطالبة</p>
+            <p
+              className="font-kufi text-2xl font-bold tracking-[0.2em] text-plum-800"
+              dir="ltr"
+            >
+              {student.code}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard?.writeText(student.code).then(
+                () => setCopied(true),
+                () => setCopied(false)
+              );
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            }}
+            className="rounded-xl bg-plum-600 px-4 py-2 text-sm font-bold text-white"
+          >
+            {copied ? "تم النسخ ✓" : "نسخ"}
+          </button>
+        </div>
+      )}
 
       <div className="mb-1 grid grid-cols-2 gap-3">
         <Field label="المعلّمة" icon="👩‍🏫">

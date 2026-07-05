@@ -22,6 +22,7 @@ export interface Student {
   name: string;
   halaqaId: string;
   teacherId: string; // "" = بدون معلّمة بعد
+  code: string; // رمز الدخول الخاص بالطالبة (٦ أرقام)
   goals: Goals;
   done: GoalsDone;
   note?: string;
@@ -143,6 +144,9 @@ export function useApp(): AppState {
   return useSyncExternalStore(subscribe, load, () => SEED);
 }
 
+/** مفتاح تخزين هوية الطالبة على الجهاز (تُضبط عند الدخول بالرمز) */
+export const STUDENT_PICK_KEY = "almaher-my-student-id";
+
 export function uid(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
@@ -156,6 +160,7 @@ interface StudentRow {
   name: string;
   halaqa_id: string;
   teacher_id: string;
+  code: string;
   goals: Goals;
   done: GoalsDone;
   note: string;
@@ -190,7 +195,7 @@ export async function pullRemote(): Promise<void> {
     supabase.from("almaher_teachers").select("id,name,halaqa_ids").order("created_at"),
     supabase
       .from("almaher_students")
-      .select("id,name,halaqa_id,teacher_id,goals,done,note,updated_at")
+      .select("id,name,halaqa_id,teacher_id,code,goals,done,note,updated_at")
       .order("created_at"),
     supabase
       .from("almaher_announcements")
@@ -212,6 +217,7 @@ export async function pullRemote(): Promise<void> {
       name: row.name,
       halaqaId: row.halaqa_id,
       teacherId: row.teacher_id,
+      code: row.code ?? "",
       goals: { ...EMPTY_GOALS, ...row.goals },
       done: { ...EMPTY_DONE, ...row.done },
       note: row.note,
@@ -232,11 +238,22 @@ function studentToRow(st: Student): StudentRow {
     name: st.name,
     halaqa_id: st.halaqaId,
     teacher_id: st.teacherId,
+    code: st.code,
     goals: st.goals,
     done: st.done,
     note: st.note ?? "",
     updated_at: st.updatedAt ?? new Date().toISOString(),
   };
+}
+
+/** رمز دخول رقمي فريد من ٦ خانات للطالبة */
+export function genStudentCode(existing: Student[]): string {
+  const used = new Set(existing.map((s) => s.code).filter(Boolean));
+  let c = "";
+  do {
+    c = String(Math.floor(100000 + Math.random() * 900000));
+  } while (used.has(c));
+  return c;
 }
 
 /** رفع كل البيانات المحلية إلى قاعدة البيانات (استبدال كامل) */
@@ -400,6 +417,7 @@ export const actions = {
       name: name.trim(),
       halaqaId,
       teacherId,
+      code: genStudentCode(getState().students),
       goals: { ...EMPTY_GOALS },
       done: { ...EMPTY_DONE },
       updatedAt: new Date().toISOString(),

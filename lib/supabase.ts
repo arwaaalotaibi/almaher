@@ -9,10 +9,13 @@ export const ROLE_EMAILS: Record<Role, string> = {
   student: "taliba@almahr.org",
 };
 
+// حساب القراءة المشترك للطالبات — الدخول الفعلي يكون برمز كل طالبة
+export const STUDENT_PASSWORD = "Taliba@1447";
+
 export const ROLE_META: Record<Role, { label: string; icon: string; hint: string }> = {
   admin: { label: "الإدارة", icon: "🗝️", hint: "إدارة الحلقات والمعلّمات والطالبات" },
   teacher: { label: "المعلّمات", icon: "👩‍🏫", hint: "إدخال بيانات طالباتك وأهدافهن" },
-  student: { label: "الطالبات", icon: "🌸", hint: "مشاهدة أهدافك الأسبوعية" },
+  student: { label: "الطالبات", icon: "🌸", hint: "أدخلي رمزك الخاص من الإدارة" },
 };
 
 export function roleFromEmail(email: string | null | undefined): Role | null {

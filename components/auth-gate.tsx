@@ -11,10 +11,17 @@ import {
   ROLE_EMAILS,
   ROLE_META,
   roleFromEmail,
+  STUDENT_PASSWORD,
   supabase,
   type Role,
 } from "@/lib/supabase";
-import { getState, pullRemote, pushAll, subscribeRealtime } from "@/lib/store";
+import {
+  getState,
+  pullRemote,
+  pushAll,
+  STUDENT_PICK_KEY,
+  subscribeRealtime,
+} from "@/lib/store";
 import { inputCls, PrimaryBtn } from "./ui";
 
 const RoleContext = createContext<Role>("student");
@@ -91,9 +98,43 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async () => {
-    if (!password || busy) return;
+    if (!password.trim() || busy) return;
     setBusy(true);
     setError("");
+
+    // الطالبة: تدخل برمزها الخاص بدل كلمة مرور مشتركة
+    if (role === "student") {
+      const { error: err } = await supabase.auth.signInWithPassword({
+        email: ROLE_EMAILS.student,
+        password: STUDENT_PASSWORD,
+      });
+      if (err) {
+        setBusy(false);
+        setError("تعذّر الاتصال، حاولي لاحقاً");
+        return;
+      }
+      try {
+        await pullRemote();
+      } catch {
+        setBusy(false);
+        setError("تعذّر الاتصال بالإنترنت");
+        return;
+      }
+      const code = password.trim();
+      const me = getState().students.find((s) => s.code === code);
+      if (!me) {
+        await supabase.auth.signOut();
+        setBusy(false);
+        setError("الرمز غير صحيح");
+        return;
+      }
+      window.localStorage.setItem(STUDENT_PICK_KEY, me.id);
+      setBusy(false);
+      setStatus("loading");
+      void init("student");
+      return;
+    }
+
     const { error: err } = await supabase.auth.signInWithPassword({
       email: ROLE_EMAILS[role],
       password,
@@ -132,6 +173,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
                 onClick={() => {
                   setRole(r);
                   setError("");
+                  setPassword("");
                 }}
                 className={`flex flex-col items-center gap-1 rounded-2xl border-2 py-3 transition ${
                   role === r
@@ -163,9 +205,16 @@ export function AuthGate({ children }: { children: ReactNode }) {
             }}
           >
             <input
-              type="password"
-              className={`${inputCls} mb-3 text-center`}
-              placeholder={`كلمة مرور ${ROLE_META[role].label}`}
+              type={role === "student" ? "text" : "password"}
+              inputMode={role === "student" ? "numeric" : undefined}
+              className={`${inputCls} mb-3 text-center ${
+                role === "student" ? "tracking-[0.3em] text-lg" : ""
+              }`}
+              placeholder={
+                role === "student"
+                  ? "رمز الطالبة"
+                  : `كلمة مرور ${ROLE_META[role].label}`
+              }
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />

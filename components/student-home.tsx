@@ -2,21 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { GOAL_META, halaqaTitle, useApp } from "@/lib/store";
-import { NameBox, Ribbon } from "./ui";
+import {
+  GOAL_META,
+  halaqaTitle,
+  STUDENT_PICK_KEY,
+  useApp,
+} from "@/lib/store";
+import { Ribbon } from "./ui";
 import { NotificationsCard } from "./notifications-card";
 
-const PICK_KEY = "almaher-my-student-id";
-
-/** شاشة الطالبة: تختار حلقتها واسمها مرة واحدة ثم ترى أهدافها (قراءة فقط) */
+/** شاشة الطالبة: تدخل برمزها فتُعرض أهدافها مباشرة (قراءة فقط) */
 export function StudentHome() {
   const { halaqas, teachers, students } = useApp();
   const [myId, setMyId] = useState<string | null>(null);
-  const [halaqaPick, setHalaqaPick] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setMyId(window.localStorage.getItem(PICK_KEY));
+    setMyId(window.localStorage.getItem(STUDENT_PICK_KEY));
     setReady(true);
   }, []);
 
@@ -24,92 +26,38 @@ export function StudentHome() {
 
   const me = students.find((s) => s.id === myId);
 
-  const logoutBtn = (
-    <button
-      type="button"
-      onClick={async () => {
-        await supabase.auth.signOut();
-        window.location.reload();
-      }}
-      className="mx-auto mt-8 block text-sm font-bold text-silver-600 underline"
-    >
-      🚪 تسجيل الخروج
-    </button>
-  );
+  const logout = async () => {
+    window.localStorage.removeItem(STUDENT_PICK_KEY);
+    await supabase.auth.signOut();
+    window.location.reload();
+  };
 
-  /* اختيار الحلقة ثم الاسم */
+  // رمز لم يعد له بيانات (حُذفت الطالبة مثلاً)
   if (!me) {
-    const pool = halaqaPick
-      ? students.filter((s) => s.halaqaId === halaqaPick)
-      : [];
     return (
       <main className="mx-auto max-w-2xl px-4 pb-16 pt-10">
-        <div className="mb-6 text-center">
+        <div className="card mx-auto max-w-sm rounded-3xl p-6 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="الماهر" className="mx-auto mb-3 h-16 w-auto" />
-          <h1 className="font-kufi text-2xl font-bold text-plum-800">
-            أهلاً بك طالبتنا 🌸
-          </h1>
-          <p className="mt-1 text-sm text-silver-600">
-            {halaqaPick ? "اختاري اسمك" : "اختاري حلقتك أولاً"}
+          <p className="text-3xl">🔑</p>
+          <p className="mt-2 font-kufi font-bold text-plum-800">
+            لم نجد بياناتك
           </p>
+          <p className="mt-1 text-sm text-silver-600">
+            تواصلي مع الإدارة للحصول على رمزك، ثم أدخليه من جديد
+          </p>
+          <button
+            type="button"
+            onClick={logout}
+            className="mt-5 text-sm font-bold text-plum-700 underline"
+          >
+            الدخول برمز آخر
+          </button>
         </div>
-
-        {!halaqaPick ? (
-          <div className="grid gap-3">
-            {halaqas.map((h) => (
-              <button
-                key={h.id}
-                type="button"
-                onClick={() => setHalaqaPick(h.id)}
-                className="name-box rounded-xl px-5 py-4 text-start font-kufi text-lg font-semibold text-white transition active:scale-[0.99]"
-              >
-                🕌 {halaqaTitle(h)}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <>
-            <button
-              type="button"
-              onClick={() => setHalaqaPick(null)}
-              className="mb-4 text-sm font-bold text-plum-700 underline"
-            >
-              → تغيير الحلقة
-            </button>
-            {pool.length === 0 ? (
-              <div className="card rounded-2xl p-8 text-center">
-                <p className="text-3xl">⏳</p>
-                <p className="mt-2 font-kufi font-bold text-plum-800">
-                  لا توجد أسماء في هذه الحلقة بعد
-                </p>
-                <p className="mt-1 text-sm text-silver-600">
-                  اطلبي من معلّمتك إضافة اسمك أولاً
-                </p>
-              </div>
-            ) : (
-              <div className="grid gap-2.5 sm:grid-cols-2">
-                {pool.map((s) => (
-                  <NameBox
-                    key={s.id}
-                    onClick={() => {
-                      window.localStorage.setItem(PICK_KEY, s.id);
-                      setMyId(s.id);
-                    }}
-                  >
-                    {s.name}
-                  </NameBox>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-        {logoutBtn}
       </main>
     );
   }
 
-  /* بطاقة الأهداف */
   const halaqa = halaqas.find((h) => h.id === me.halaqaId);
   const teacher = teachers.find((t) => t.id === me.teacherId);
   const updatedLabel = me.updatedAt
@@ -179,16 +127,11 @@ export function StudentHome() {
 
       <button
         type="button"
-        onClick={() => {
-          window.localStorage.removeItem(PICK_KEY);
-          setMyId(null);
-          setHalaqaPick(null);
-        }}
-        className="mx-auto mt-8 block text-sm font-bold text-plum-700 underline"
+        onClick={logout}
+        className="mx-auto mt-8 block text-sm font-bold text-silver-600 underline"
       >
-        🔄 لستُ {me.name}؟ تغيير الاسم
+        🚪 تسجيل الخروج
       </button>
-      {logoutBtn}
     </main>
   );
 }
