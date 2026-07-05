@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { studentCountLabel, useApp } from "@/lib/store";
 import { Ribbon, useHydrated } from "@/components/ui";
-import { AssocLogo } from "@/components/logo";
 
 export default function Home() {
   const { halaqas, students, teachers } = useApp();
@@ -13,13 +12,15 @@ export default function Home() {
     <main className="mx-auto max-w-2xl px-4 pb-16 pt-10">
       {/* الترويسة — بأسلوب البوستر */}
       <div className="mb-2 text-center">
-        <AssocLogo withWordmark={false} className="mx-auto mb-2 h-28" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/logo.png"
+          alt="جمعية الماهر بالقرآن وعلومه"
+          className="mx-auto mb-4 h-20 w-auto"
+        />
         <h1 className="font-kufi text-4xl font-bold tracking-tight text-plum-800">
           الماهر
         </h1>
-        <p className="mt-1 text-sm font-semibold text-silver-600">
-          جمعية الماهر بالقرآن وعلومه
-        </p>
       </div>
 
       <Ribbon className="my-6">حلقات التحفيظ</Ribbon>

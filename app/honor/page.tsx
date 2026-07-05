@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import { useApp } from "@/lib/store";
 import { Field, inputCls, PageHeader, PrimaryBtn, useHydrated } from "@/components/ui";
-import { AssocLogo } from "@/components/logo";
 
 const TITLE_CHIPS = [
   "لوحة الشرف",
@@ -365,7 +364,12 @@ export default function HonorPage() {
                     className="h-24 object-contain"
                   />
                 ) : (
-                  <AssocLogo className="h-32" />
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src="/logo.png"
+                    alt="جمعية الماهر بالقرآن وعلومه"
+                    className="h-20 object-contain"
+                  />
                 )}
               </div>
 
