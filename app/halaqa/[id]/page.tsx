@@ -177,7 +177,7 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
             className={inputCls}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="الاسم الثلاثي كما في الإعلان"
+            placeholder="الاسم الثلاثي"
             autoFocus
           />
         </Field>
