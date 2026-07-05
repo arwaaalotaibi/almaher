@@ -16,11 +16,8 @@ export default function Home() {
         <img
           src="/logo.png"
           alt="جمعية الماهر بالقرآن وعلومه"
-          className="mx-auto mb-4 h-20 w-auto"
+          className="mx-auto mb-2 h-24 w-auto"
         />
-        <h1 className="font-kufi text-4xl font-bold tracking-tight text-plum-800">
-          الماهر
-        </h1>
       </div>
 
       <Ribbon className="my-6">حلقات التحفيظ</Ribbon>
