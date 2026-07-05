@@ -1,22 +1,96 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import { useApp } from "@/lib/store";
 import { Field, inputCls, PageHeader, PrimaryBtn, useHydrated } from "@/components/ui";
 
-const TITLES = ["لوحة الشرف", "متميزات الأسبوع", "لوحة الإتقان", "خاتمات القرآن"];
+const TITLE_CHIPS = [
+  "لوحة الشرف",
+  "متميزات الأسبوع الأول",
+  "متميزات الأسبوع الثاني",
+  "متميزات الأسبوع الثالث",
+  "لوحة الإتقان",
+  "خاتمات القرآن",
+];
+
+const POSTER_W = 720;
+const LOGOS_KEY = "almaher-logos-v1";
+
+interface Logos {
+  assoc?: string; // شعار الجمعية (dataURL)
+  mosque?: string; // شعار المسجد (dataURL)
+}
+
+function loadLogos(): Logos {
+  try {
+    return JSON.parse(window.localStorage.getItem(LOGOS_KEY) ?? "{}") as Logos;
+  } catch {
+    return {};
+  }
+}
+
+/** تصغير الصورة قبل الحفظ حتى لا تمتلئ مساحة التخزين */
+async function fileToSmallDataUrl(file: File): Promise<string> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = document.createElement("img");
+    await new Promise<void>((res, rej) => {
+      img.onload = () => res();
+      img.onerror = () => rej(new Error("bad image"));
+      img.src = url;
+    });
+    const max = 360;
+    const k = Math.min(1, max / Math.max(img.width, img.height));
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(img.width * k));
+    c.height = Math.max(1, Math.round(img.height * k));
+    c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+    return c.toDataURL("image/png");
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 
 export default function HonorPage() {
   const { halaqas, students } = useApp();
   const hydrated = useHydrated();
 
-  const [title, setTitle] = useState(TITLES[0]);
-  const [subtitle, setSubtitle] = useState("دورة الفصل الثاني ١٤٤٧ هـ / ٢٠٢٦ م");
+  const [title, setTitle] = useState("لوحة الشرف");
+  const [subtitle, setSubtitle] = useState("الدورة الصيفية ١٤٤٨ هـ / ٢٠٢٦ م");
   const [halaqaId, setHalaqaId] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
+  const [outlined, setOutlined] = useState(false);
+  const [logos, setLogos] = useState<Logos>({});
   const [busy, setBusy] = useState(false);
+
   const posterRef = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const assocRef = useRef<HTMLInputElement>(null);
+  const mosqueRef = useRef<HTMLInputElement>(null);
+  const [scale, setScale] = useState(1);
+  const [posterH, setPosterH] = useState(0);
+
+  useEffect(() => setLogos(loadLogos()), []);
+
+  // مقياس المعاينة حسب عرض الشاشة
+  useEffect(() => {
+    const update = () =>
+      setScale(Math.min(1, (wrapRef.current?.clientWidth ?? POSTER_W) / POSTER_W));
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [hydrated]);
+
+  // ارتفاع البوستر الفعلي (يتغيّر مع عدد الأسماء)
+  useEffect(() => {
+    const node = posterRef.current;
+    if (!node) return;
+    const ro = new ResizeObserver(() => setPosterH(node.offsetHeight));
+    ro.observe(node);
+    setPosterH(node.offsetHeight);
+    return () => ro.disconnect();
+  }, [hydrated]);
 
   const halaqa = halaqas.find((h) => h.id === halaqaId) ?? halaqas[0];
   const pool = useMemo(
@@ -31,6 +105,32 @@ export default function HonorPage() {
     setPicked((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
+
+  const saveLogo = async (key: keyof Logos, file: File) => {
+    try {
+      const dataUrl = await fileToSmallDataUrl(file);
+      const next = { ...logos, [key]: dataUrl };
+      setLogos(next);
+      try {
+        window.localStorage.setItem(LOGOS_KEY, JSON.stringify(next));
+      } catch {
+        /* مساحة ممتلئة — يبقى الشعار لهذه الجلسة فقط */
+      }
+    } catch {
+      window.alert("تعذّر قراءة الصورة");
+    }
+  };
+
+  const clearLogo = (key: keyof Logos) => {
+    const next = { ...logos };
+    delete next[key];
+    setLogos(next);
+    try {
+      window.localStorage.setItem(LOGOS_KEY, JSON.stringify(next));
+    } catch {
+      /* نتجاهل */
+    }
+  };
 
   const exportPng = async (share: boolean) => {
     if (!posterRef.current || busy) return;
@@ -68,17 +168,38 @@ export default function HonorPage() {
       </p>
 
       <div className="card mb-5 rounded-2xl p-4">
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="عنوان اللوحة" icon="🏅">
-            <select
-              className={inputCls}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+        <Field label="عنوان اللوحة" icon="🏅">
+          <input
+            className={inputCls}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </Field>
+        <div className="-mt-1 mb-3 flex flex-wrap gap-1.5">
+          {TITLE_CHIPS.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => {
+                setTitle(t);
+                setOutlined(t.includes("متميزات"));
+              }}
+              className={`rounded-full px-3 py-1 text-xs font-bold transition ${
+                title === t ? "bg-plum-600 text-white" : "bg-cream text-silver-600"
+              }`}
             >
-              {TITLES.map((t) => (
-                <option key={t}>{t}</option>
-              ))}
-            </select>
+              {t}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="السطر الثاني (الدورة)" icon="🗓️">
+            <input
+              className={inputCls}
+              value={subtitle}
+              onChange={(e) => setSubtitle(e.target.value)}
+            />
           </Field>
           <Field label="الحلقة" icon="🕌">
             <select
@@ -97,13 +218,81 @@ export default function HonorPage() {
             </select>
           </Field>
         </div>
-        <Field label="السطر الثاني (الدورة)" icon="🗓️">
-          <input
-            className={inputCls}
-            value={subtitle}
-            onChange={(e) => setSubtitle(e.target.value)}
-          />
-        </Field>
+
+        {/* شكل الصناديق */}
+        <div className="mb-3 flex items-center gap-2">
+          <span className="text-sm font-bold text-plum-700">🎨 شكل الأسماء:</span>
+          <button
+            type="button"
+            onClick={() => setOutlined(false)}
+            className={`rounded-full px-3 py-1 text-xs font-bold ${
+              !outlined ? "bg-plum-600 text-white" : "bg-cream text-silver-600"
+            }`}
+          >
+            🟪 معبّأة
+          </button>
+          <button
+            type="button"
+            onClick={() => setOutlined(true)}
+            className={`rounded-full px-3 py-1 text-xs font-bold ${
+              outlined ? "name-box-outline" : "bg-cream text-silver-600"
+            }`}
+          >
+            ⬜ مفرّغة
+          </button>
+        </div>
+
+        {/* الشعارات */}
+        <div className="mb-3 grid grid-cols-2 gap-2">
+          {(
+            [
+              { key: "assoc", label: "شعار الجمعية", ref: assocRef },
+              { key: "mosque", label: "شعار المسجد", ref: mosqueRef },
+            ] as const
+          ).map(({ key, label, ref }) => (
+            <div key={key} className="rounded-xl bg-cream px-3 py-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-plum-700">🖼️ {label}</span>
+                {logos[key] ? (
+                  <button
+                    type="button"
+                    onClick={() => clearLogo(key)}
+                    className="text-xs font-bold text-red-600"
+                  >
+                    إزالة ✕
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => ref.current?.click()}
+                    className="rounded-full bg-plum-100 px-2.5 py-0.5 text-xs font-bold text-plum-700"
+                  >
+                    + رفع
+                  </button>
+                )}
+              </div>
+              {logos[key] && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logos[key]}
+                  alt={label}
+                  className="mx-auto mt-1 h-10 object-contain"
+                />
+              )}
+              <input
+                ref={ref}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) saveLogo(key, f);
+                  e.target.value = "";
+                }}
+              />
+            </div>
+          ))}
+        </div>
 
         <p className="mb-1 text-sm font-bold text-plum-700">🌸 الأسماء</p>
         {pool.length === 0 ? (
@@ -139,63 +328,105 @@ export default function HonorPage() {
         )}
       </div>
 
-      {/* المعاينة */}
-      <div className="overflow-x-auto rounded-2xl border border-cream-dark bg-white p-3">
-        <div className="mx-auto w-fit">
+      {/* المعاينة — بوستر بمقاس ثابت يتصغّر ليناسب الشاشة */}
+      <div
+        ref={wrapRef}
+        className="overflow-hidden rounded-2xl border border-cream-dark bg-white p-0"
+      >
+        <div style={{ height: posterH ? posterH * scale : undefined }}>
           <div
-            ref={posterRef}
-            className="pattern-bg relative w-[420px] px-8 py-10 text-center"
+            style={{
+              transform: `scale(${scale})`,
+              transformOrigin: "top right",
+              width: POSTER_W,
+            }}
           >
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border-2 border-plum-200 bg-white">
-              <span className="font-kufi text-xl font-bold text-plum-700">
-                الماهر
-              </span>
-            </div>
-            <p className="mb-3 text-[11px] font-bold text-silver-600">
-              جمعية الماهر بالقرآن وعلومه
-            </p>
-            <h2 className="font-kufi text-4xl font-bold text-plum-800">{title}</h2>
-            {subtitle && (
-              <p className="mt-2 font-kufi text-base font-semibold text-plum-700">
-                {subtitle}
-              </p>
-            )}
-            {halaqa && (
-              <div className="ribbon mx-auto mt-5 w-fit rounded-xl px-7 py-2">
-                <span className="font-kufi text-base font-semibold text-white">
-                  حلقات {halaqa.mosque}
-                </span>
+            <div
+              ref={posterRef}
+              className="pattern-bg relative text-center"
+              style={{ width: POSTER_W, padding: "56px 48px 40px" }}
+            >
+              {/* الشعارات */}
+              <div className="mb-6 flex items-center justify-center gap-10">
+                {logos.mosque && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={logos.mosque}
+                    alt="شعار المسجد"
+                    className="h-24 object-contain"
+                  />
+                )}
+                {logos.assoc ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={logos.assoc}
+                    alt="شعار الجمعية"
+                    className="h-24 object-contain"
+                  />
+                ) : (
+                  !logos.mosque && (
+                    <div className="flex h-24 w-24 flex-col items-center justify-center rounded-full border-2 border-plum-200 bg-white">
+                      <span className="font-kufi text-2xl font-bold text-plum-700">
+                        الماهر
+                      </span>
+                    </div>
+                  )
+                )}
               </div>
-            )}
-            {halaqa?.day && (
-              <div className="mx-auto mt-2 w-fit rounded-lg bg-plum-800 px-5 py-1">
-                <span className="font-kufi text-sm font-semibold text-white">
-                  حلقات {halaqa.day}
-                </span>
-              </div>
-            )}
-            <div className="mt-7 grid grid-cols-2 gap-3">
-              {names.length === 0 && (
-                <p className="col-span-2 py-6 text-sm text-silver-500">
-                  اختاري الأسماء من الأعلى ✨
+              {!logos.assoc && (
+                <p className="mb-4 -mt-2 text-xs font-bold text-silver-600">
+                  جمعية الماهر بالقرآن وعلومه
                 </p>
               )}
-              {names.map((n, i) => (
-                <div
-                  key={i}
-                  className={`name-box rounded-md px-3 py-2.5 font-kufi text-sm font-medium text-white ${
-                    names.length % 2 === 1 && i === names.length - 1
-                      ? "col-span-2 mx-auto w-1/2"
-                      : ""
-                  }`}
-                >
-                  {n}
+
+              <h2 className="font-kufi text-5xl font-bold leading-tight text-plum-800">
+                {title}
+              </h2>
+              {subtitle && (
+                <p className="mt-3 font-kufi text-2xl font-semibold text-plum-700">
+                  {subtitle}
+                </p>
+              )}
+
+              {halaqa && (
+                <div className="ribbon ribbon-shape mx-auto mt-8 w-fit px-14 py-2.5">
+                  <span className="font-kufi text-2xl font-semibold text-white drop-shadow-sm">
+                    حلقات {halaqa.mosque}
+                  </span>
                 </div>
-              ))}
+              )}
+              {halaqa?.day && (
+                <div className="mx-auto mt-3 w-fit rounded-xl bg-plum-800 px-8 py-1.5">
+                  <span className="font-kufi text-lg font-semibold text-white">
+                    حلقات {halaqa.day}
+                  </span>
+                </div>
+              )}
+
+              {/* الأسماء — ٣ أعمدة مع توسيط الصف الأخير */}
+              <div className="mt-10 flex flex-wrap justify-center gap-x-4 gap-y-5">
+                {names.length === 0 && (
+                  <p className="py-8 text-lg text-silver-500">
+                    اختاري الأسماء من الأعلى ✨
+                  </p>
+                )}
+                {names.map((n, i) => (
+                  <div
+                    key={i}
+                    className={`flex min-h-12 items-center justify-center rounded-md px-2 font-kufi text-base font-semibold ${
+                      outlined ? "name-box-outline" : "name-box text-white"
+                    }`}
+                    style={{ width: 194 }}
+                  >
+                    {n}
+                  </div>
+                ))}
+              </div>
+
+              <p className="mt-12 text-sm font-bold text-silver-600">
+                📷 Maher.quran2
+              </p>
             </div>
-            <p className="mt-8 text-[11px] font-bold text-silver-600">
-              📷 Maher.quran2
-            </p>
           </div>
         </div>
       </div>

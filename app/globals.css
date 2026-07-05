@@ -50,6 +50,18 @@ body {
   box-shadow: 0 2px 5px rgba(77, 51, 64, 0.22);
 }
 
+/* شريط بأطراف مدبّبة مثل شارة البوستر */
+.ribbon-shape {
+  clip-path: polygon(0 50%, 3.5% 0, 96.5% 0, 100% 50%, 96.5% 100%, 3.5% 100%);
+}
+
+/* صندوق اسم مفرّغ — نمط «متميزات الأسبوع» */
+.name-box-outline {
+  background: #ffffff;
+  border: 2px solid var(--color-plum-900);
+  color: var(--color-plum-900);
+}
+
 .card {
   background: #ffffff;
   border: 1px solid var(--color-cream-dark);
