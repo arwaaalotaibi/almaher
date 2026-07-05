@@ -52,7 +52,17 @@ async function fileToSmallDataUrl(file: File): Promise<string> {
   }
 }
 
+import { RoleOnly } from "@/components/admin-only";
+
 export default function HonorPage() {
+  return (
+    <RoleOnly roles={["admin", "teacher"]}>
+      <HonorInner />
+    </RoleOnly>
+  );
+}
+
+function HonorInner() {
   const { halaqas, students } = useApp();
   const hydrated = useHydrated();
 
@@ -162,7 +172,7 @@ export default function HonorPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
-      <PageHeader title="لوحة الشرف" />
+      <PageHeader title="لوحة الشرف" back="/" />
       <p className="mb-5 -mt-2 text-sm text-silver-600">
         اختاري الحلقة والأسماء، ويطلع لك إعلان جاهز بهوية الجمعية 🎨
       </p>

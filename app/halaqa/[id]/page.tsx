@@ -21,11 +21,21 @@ import {
 } from "@/components/ui";
 import { GoalDots, StudentSheet } from "@/components/student-sheet";
 
+import { RoleOnly } from "@/components/admin-only";
+
 export default function HalaqaPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
+  return (
+    <RoleOnly roles={["admin"]}>
+      <HalaqaInner params={params} />
+    </RoleOnly>
+  );
+}
+
+function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const { halaqas, teachers, students } = useApp();
@@ -49,7 +59,7 @@ export default function HalaqaPage({
   if (!halaqa) {
     return (
       <main className="mx-auto max-w-2xl px-4 pt-10">
-        <PageHeader title="الحلقة غير موجودة" />
+        <PageHeader title="الحلقة غير موجودة" back="/" />
       </main>
     );
   }
@@ -79,7 +89,7 @@ export default function HalaqaPage({
 
   return (
     <main className="mx-auto max-w-2xl px-4 pb-28 pt-8">
-      <PageHeader title={halaqa.mosque} />
+      <PageHeader title={halaqa.mosque} back="/" />
       <Ribbon className="mb-1">حلقات {halaqa.mosque}</Ribbon>
       {halaqa.day && (
         <p className="mb-4 mt-2 text-center">

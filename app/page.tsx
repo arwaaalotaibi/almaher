@@ -3,10 +3,17 @@
 import Link from "next/link";
 import { studentCountLabel, useApp } from "@/lib/store";
 import { Ribbon, useHydrated } from "@/components/ui";
+import { useRole } from "@/components/auth-gate";
+import { TeacherHome } from "@/components/teacher-home";
+import { StudentHome } from "@/components/student-home";
 
 export default function Home() {
+  const role = useRole();
   const { halaqas, students, teachers } = useApp();
   const hydrated = useHydrated();
+
+  if (role === "teacher") return <TeacherHome />;
+  if (role === "student") return <StudentHome />;
 
   return (
     <main className="mx-auto max-w-2xl px-4 pb-16 pt-10">

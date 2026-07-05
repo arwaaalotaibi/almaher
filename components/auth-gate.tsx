@@ -1,20 +1,41 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
-import { LOGIN_EMAIL, supabase } from "@/lib/supabase";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  ROLE_EMAILS,
+  ROLE_META,
+  roleFromEmail,
+  supabase,
+  type Role,
+} from "@/lib/supabase";
 import { getState, pullRemote, pushAll, subscribeRealtime } from "@/lib/store";
 import { inputCls, PrimaryBtn } from "./ui";
 
+const RoleContext = createContext<Role>("student");
+
+/** دور المستخدمة الحالية: admin | teacher | student */
+export function useRole(): Role {
+  return useContext(RoleContext);
+}
+
 type Status = "loading" | "login" | "ready";
 
-/** بوابة الدخول: كلمة مرور واحدة للجمعية، ثم مزامنة البيانات */
+/** بوابة الدخول: ثلاث شاشات — إدارة، معلّمات، طالبات */
 export function AuthGate({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
+  const [role, setRole] = useState<Role>("teacher");
+  const [activeRole, setActiveRole] = useState<Role>("student");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const init = async () => {
+  const init = async (r: Role) => {
     const localBefore = getState();
     let pulled = false;
     try {
@@ -24,26 +45,31 @@ export function AuthGate({ children }: { children: ReactNode }) {
       /* بدون إنترنت — نعرض النسخة المحفوظة على الجهاز */
     }
     if (pulled) {
-      const now = getState();
-      const remoteEmpty = now.teachers.length === 0 && now.students.length === 0;
-      const localHasData =
-        localBefore.teachers.length > 0 || localBefore.students.length > 0;
-      if (remoteEmpty && localHasData) {
-        if (
-          window.confirm(
-            "وجدتُ بيانات محفوظة على هذا الجهاز فقط.\nأنقلها إلى قاعدة البيانات المشتركة ليراها الجميع؟"
-          )
-        ) {
-          try {
-            await pushAll(localBefore);
-            await pullRemote();
-          } catch {
-            window.alert("تعذّر نقل البيانات — أعيدي المحاولة لاحقاً من الإعدادات (استيراد)");
+      if (r === "admin") {
+        const now = getState();
+        const remoteEmpty = now.teachers.length === 0 && now.students.length === 0;
+        const localHasData =
+          localBefore.teachers.length > 0 || localBefore.students.length > 0;
+        if (remoteEmpty && localHasData) {
+          if (
+            window.confirm(
+              "وجدتُ بيانات محفوظة على هذا الجهاز فقط.\nأنقلها إلى قاعدة البيانات المشتركة ليراها الجميع؟"
+            )
+          ) {
+            try {
+              await pushAll(localBefore);
+              await pullRemote();
+            } catch {
+              window.alert(
+                "تعذّر نقل البيانات — أعيدي المحاولة لاحقاً من الإعدادات (استيراد)"
+              );
+            }
           }
         }
       }
       subscribeRealtime();
     }
+    setActiveRole(r);
     setStatus("ready");
   };
 
@@ -51,8 +77,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
     let mounted = true;
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
-      if (data.session) {
-        void init();
+      const r = roleFromEmail(data.session?.user.email);
+      if (data.session && r) {
+        void init(r);
       } else {
         setStatus("login");
       }
@@ -68,7 +95,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     setBusy(true);
     setError("");
     const { error: err } = await supabase.auth.signInWithPassword({
-      email: LOGIN_EMAIL,
+      email: ROLE_EMAILS[role],
       password,
     });
     setBusy(false);
@@ -77,7 +104,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       return;
     }
     setStatus("loading");
-    void init();
+    void init(role);
   };
 
   if (status === "loading") {
@@ -92,16 +119,43 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   if (status === "login") {
     return (
-      <main className="flex min-h-dvh items-center justify-center px-4">
+      <main className="flex min-h-dvh items-center justify-center px-4 py-8">
         <div className="card w-full max-w-sm rounded-3xl p-6 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="الماهر" className="mx-auto mb-4 h-20 w-auto" />
-          <h1 className="font-kufi text-2xl font-bold text-plum-800">
-            دخول المعلّمات
+          <img src="/logo.png" alt="الماهر" className="mx-auto mb-5 h-20 w-auto" />
+
+          <div className="mb-4 grid grid-cols-3 gap-2">
+            {(Object.keys(ROLE_META) as Role[]).map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => {
+                  setRole(r);
+                  setError("");
+                }}
+                className={`flex flex-col items-center gap-1 rounded-2xl border-2 py-3 transition ${
+                  role === r
+                    ? "border-plum-600 bg-plum-50"
+                    : "border-cream-dark bg-cream/40"
+                }`}
+              >
+                <span className="text-2xl">{ROLE_META[r].icon}</span>
+                <span
+                  className={`font-kufi text-sm font-bold ${
+                    role === r ? "text-plum-800" : "text-silver-600"
+                  }`}
+                >
+                  {ROLE_META[r].label}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <h1 className="font-kufi text-xl font-bold text-plum-800">
+            دخول {ROLE_META[role].label}
           </h1>
-          <p className="mb-5 mt-1 text-sm text-silver-600">
-            أدخلي كلمة مرور الجمعية مرة واحدة على هذا الجهاز
-          </p>
+          <p className="mb-4 mt-1 text-sm text-silver-600">{ROLE_META[role].hint}</p>
+
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -111,14 +165,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
             <input
               type="password"
               className={`${inputCls} mb-3 text-center`}
-              placeholder="كلمة المرور"
+              placeholder={`كلمة مرور ${ROLE_META[role].label}`}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              autoFocus
             />
-            {error && (
-              <p className="mb-3 text-sm font-bold text-red-600">{error}</p>
-            )}
+            {error && <p className="mb-3 text-sm font-bold text-red-600">{error}</p>}
             <PrimaryBtn type="submit">{busy ? "لحظة…" : "دخول"}</PrimaryBtn>
           </form>
         </div>
@@ -126,5 +177,5 @@ export function AuthGate({ children }: { children: ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return <RoleContext.Provider value={activeRole}>{children}</RoleContext.Provider>;
 }

@@ -12,7 +12,17 @@ import {
   useHydrated,
 } from "@/components/ui";
 
+import { RoleOnly } from "@/components/admin-only";
+
 export default function TeachersPage() {
+  return (
+    <RoleOnly roles={["admin"]}>
+      <TeachersInner />
+    </RoleOnly>
+  );
+}
+
+function TeachersInner() {
   const { teachers, halaqas, students } = useApp();
   const hydrated = useHydrated();
   const [adding, setAdding] = useState(false);
@@ -36,7 +46,7 @@ export default function TeachersPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 pb-28 pt-8">
-      <PageHeader title="المعلّمات" />
+      <PageHeader title="المعلّمات" back="/" />
 
       {teachers.length === 0 ? (
         <div className="card rounded-2xl p-8 text-center">

@@ -13,7 +13,17 @@ import {
   useHydrated,
 } from "@/components/ui";
 
+import { RoleOnly } from "@/components/admin-only";
+
 export default function SettingsPage() {
+  return (
+    <RoleOnly roles={["admin"]}>
+      <SettingsInner />
+    </RoleOnly>
+  );
+}
+
+function SettingsInner() {
   const { halaqas, students, teachers } = useApp();
   const hydrated = useHydrated();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -43,7 +53,7 @@ export default function SettingsPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
-      <PageHeader title="الإعدادات" />
+      <PageHeader title="الإعدادات" back="/" />
 
       {/* الحلقات */}
       <section className="card mb-4 rounded-2xl p-4">

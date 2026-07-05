@@ -42,17 +42,19 @@ export function NameBox({
   );
 }
 
-/* رأس الصفحات الداخلية مع زر رجوع */
-export function PageHeader({ title, back = "/" }: { title: string; back?: string }) {
+/* رأس الصفحات الداخلية مع زر رجوع اختياري */
+export function PageHeader({ title, back }: { title: string; back?: string }) {
   return (
     <header className="mb-5 flex items-center gap-3">
-      <Link
-        href={back}
-        className="card flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg text-plum-700"
-        aria-label="رجوع"
-      >
-        →
-      </Link>
+      {back && (
+        <Link
+          href={back}
+          className="card flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg text-plum-700"
+          aria-label="رجوع"
+        >
+          →
+        </Link>
+      )}
       <h1 className="font-kufi text-2xl font-bold text-plum-800">{title}</h1>
     </header>
   );
