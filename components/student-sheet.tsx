@@ -1,0 +1,188 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import {
+  actions,
+  GOAL_META,
+  useApp,
+  type Goals,
+  type GoalsDone,
+  type Student,
+} from "@/lib/store";
+import { DangerBtn, Field, inputCls, PrimaryBtn, Sheet } from "./ui";
+
+/** نافذة بيانات الطالبة: الاسم + المعلّمة + الأهداف الثلاثة */
+export function StudentSheet({
+  student,
+  onClose,
+}: {
+  student: Student | null;
+  onClose: () => void;
+}) {
+  const { teachers, halaqas } = useApp();
+  const [name, setName] = useState("");
+  const [teacherId, setTeacherId] = useState("");
+  const [halaqaId, setHalaqaId] = useState("");
+  const [goals, setGoals] = useState<Goals>({ hifz: "", tathbit: "", murajaah: "" });
+  const [done, setDone] = useState<GoalsDone>({ hifz: false, tathbit: false, murajaah: false });
+  const [note, setNote] = useState("");
+
+  useEffect(() => {
+    if (student) {
+      setName(student.name);
+      setTeacherId(student.teacherId);
+      setHalaqaId(student.halaqaId);
+      setGoals({ ...student.goals });
+      setDone({ ...student.done });
+      setNote(student.note ?? "");
+    }
+  }, [student]);
+
+  if (!student) return null;
+
+  const save = () => {
+    if (!name.trim()) return;
+    actions.updateStudent(student.id, {
+      name: name.trim(),
+      teacherId,
+      halaqaId,
+      goals,
+      done,
+      note: note.trim(),
+    });
+    onClose();
+  };
+
+  const remove = () => {
+    if (window.confirm(`حذف الطالبة «${student.name}»؟`)) {
+      actions.removeStudent(student.id);
+      onClose();
+    }
+  };
+
+  const updatedLabel = student.updatedAt
+    ? new Date(student.updatedAt).toLocaleDateString("ar-u-ca-gregory-nu-arab", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : null;
+
+  return (
+    <Sheet open onClose={onClose} title="بيانات الطالبة">
+      <Field label="اسم الطالبة" icon="🌸">
+        <input
+          className={inputCls}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+      </Field>
+
+      <div className="mb-1 grid grid-cols-2 gap-3">
+        <Field label="المعلّمة" icon="👩‍🏫">
+          <select
+            className={inputCls}
+            value={teacherId}
+            onChange={(e) => setTeacherId(e.target.value)}
+          >
+            <option value="">بدون معلّمة</option>
+            {teachers.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="الحلقة" icon="🕌">
+          <select
+            className={inputCls}
+            value={halaqaId}
+            onChange={(e) => setHalaqaId(e.target.value)}
+          >
+            {halaqas.map((h) => (
+              <option key={h.id} value={h.id}>
+                {h.mosque} {h.day && `— ${h.day}`}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
+      <div className="mb-3 rounded-2xl bg-plum-50 p-3">
+        <p className="mb-2 font-kufi text-sm font-bold text-plum-800">
+          أهداف هذا الأسبوع
+        </p>
+        {GOAL_META.map(({ key, label, icon }) => (
+          <div key={key} className="mb-2 last:mb-0">
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-sm font-bold text-plum-700">
+                {icon} {label}
+              </span>
+              <label className="flex cursor-pointer items-center gap-1.5 text-xs font-bold text-plum-600">
+                <input
+                  type="checkbox"
+                  checked={done[key]}
+                  onChange={(e) => setDone({ ...done, [key]: e.target.checked })}
+                  className="h-4 w-4 accent-plum-600"
+                />
+                تمّ ✅
+              </label>
+            </div>
+            <input
+              className={inputCls}
+              placeholder="مثال: سورة الملك ١ – ١٥"
+              value={goals[key]}
+              onChange={(e) => setGoals({ ...goals, [key]: e.target.value })}
+            />
+          </div>
+        ))}
+      </div>
+
+      <Field label="ملاحظات" icon="📝">
+        <textarea
+          className={`${inputCls} min-h-16`}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
+      </Field>
+
+      {updatedLabel && (
+        <p className="mb-3 text-center text-xs text-silver-600">
+          آخر تحديث: {updatedLabel}
+        </p>
+      )}
+
+      <PrimaryBtn onClick={save}>حفظ البيانات</PrimaryBtn>
+      <div className="mt-2">
+        <DangerBtn onClick={remove}>حذف الطالبة</DangerBtn>
+      </div>
+    </Sheet>
+  );
+}
+
+/** شارات حالة الأهداف الصغيرة على صندوق الطالبة */
+export function GoalDots({ student }: { student: Student }) {
+  return (
+    <span className="flex items-center justify-center gap-1 text-[11px]">
+      {GOAL_META.map(({ key, icon }) => {
+        const has = Boolean(student.goals[key]?.trim());
+        const isDone = student.done[key];
+        return (
+          <span
+            key={key}
+            className={`rounded-full px-1 ${
+              isDone
+                ? "bg-white/90"
+                : has
+                  ? "bg-white/40"
+                  : "bg-white/10 opacity-40 grayscale"
+            }`}
+            title={key}
+          >
+            {icon}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
