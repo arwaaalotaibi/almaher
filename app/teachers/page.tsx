@@ -45,7 +45,7 @@ function TeachersInner() {
   };
 
   return (
-    <main className="mx-auto max-w-2xl px-4 pb-28 pt-8">
+    <main className="mx-auto max-w-2xl px-4 pb-40 pt-8">
       <PageHeader title="المعلّمات" back="/" />
 
       {teachers.length === 0 ? (
@@ -95,7 +95,7 @@ function TeachersInner() {
         </div>
       )}
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-cream-dark bg-white/90 p-3 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-20 z-40 border-y border-cream-dark bg-white/90 p-3 backdrop-blur">
         <div className="mx-auto max-w-2xl">
           <PrimaryBtn onClick={() => setAdding(true)}>+ إضافة معلّمة</PrimaryBtn>
         </div>

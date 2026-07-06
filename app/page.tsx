@@ -10,14 +10,14 @@ import { StudentHome } from "@/components/student-home";
 
 export default function Home() {
   const role = useRole();
-  const { halaqas, students, teachers } = useApp();
+  const { halaqas, students } = useApp();
   const hydrated = useHydrated();
 
   if (role === "teacher") return <TeacherHome />;
   if (role === "student") return <StudentHome />;
 
   return (
-    <main className="mx-auto max-w-2xl px-4 pb-16 pt-10">
+    <main className="mx-auto max-w-2xl px-4 pb-28 pt-10">
       {/* الترويسة — بأسلوب البوستر */}
       <div className="mb-2 text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -61,18 +61,8 @@ export default function Home() {
         })}
       </div>
 
-      {/* الأقسام */}
+      {/* أقسام إضافية (البقية في الشريط السفلي) */}
       <div className="mt-6 grid grid-cols-2 gap-3">
-        <Link
-          href="/teachers"
-          className="card flex flex-col items-center gap-1.5 rounded-2xl py-4 transition active:scale-[0.97]"
-        >
-          <span className="text-2xl">👩‍🏫</span>
-          <span className="font-kufi text-sm font-bold text-plum-800">المعلّمات</span>
-          <span className="text-[11px] text-silver-600">
-            {hydrated ? teachers.length.toLocaleString("ar-EG") : "…"}
-          </span>
-        </Link>
         <Link
           href="/announcements"
           className="card flex flex-col items-center gap-1.5 rounded-2xl py-4 transition active:scale-[0.97]"
@@ -88,14 +78,6 @@ export default function Home() {
           <span className="text-2xl">🏅</span>
           <span className="font-kufi text-sm font-bold text-plum-800">لوحة الشرف</span>
           <span className="text-[11px] text-silver-600">صمّمي إعلاناً</span>
-        </Link>
-        <Link
-          href="/settings"
-          className="card flex flex-col items-center gap-1.5 rounded-2xl py-4 transition active:scale-[0.97]"
-        >
-          <span className="text-2xl">⚙️</span>
-          <span className="font-kufi text-sm font-bold text-plum-800">الإعدادات</span>
-          <span className="text-[11px] text-silver-600">حلقات ونسخ</span>
         </Link>
       </div>
 

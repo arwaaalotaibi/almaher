@@ -52,7 +52,7 @@ function SettingsInner() {
   };
 
   return (
-    <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
+    <main className="mx-auto max-w-2xl px-4 pb-28 pt-8">
       <PageHeader title="الإعدادات" back="/" />
 
       {/* الحلقات */}

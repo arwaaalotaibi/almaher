@@ -24,6 +24,7 @@ import {
   subscribeRealtime,
 } from "@/lib/store";
 import { inputCls, PrimaryBtn } from "./ui";
+import { BottomNav } from "./bottom-nav";
 
 const RoleContext = createContext<Role>("student");
 
@@ -229,5 +230,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
     );
   }
 
-  return <RoleContext.Provider value={activeRole}>{children}</RoleContext.Provider>;
+  return (
+    <RoleContext.Provider value={activeRole}>
+      {children}
+      <BottomNav />
+    </RoleContext.Provider>
+  );
 }
