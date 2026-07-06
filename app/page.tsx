@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { studentCountLabel, useApp } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
 import { Ribbon, useHydrated } from "@/components/ui";
 import { useRole } from "@/components/auth-gate";
 import { TeacherHome } from "@/components/teacher-home";
@@ -98,7 +99,18 @@ export default function Home() {
         </Link>
       </div>
 
-      <p className="mt-10 text-center text-xs text-silver-500">
+      <button
+        type="button"
+        onClick={async () => {
+          await supabase.auth.signOut();
+          window.location.reload();
+        }}
+        className="mx-auto mt-8 block text-sm font-bold text-plum-700 underline"
+      >
+        🔄 تبديل الحساب / تسجيل الخروج
+      </button>
+
+      <p className="mt-6 text-center text-xs text-silver-500">
         📷 Maher.quran2
       </p>
     </main>
