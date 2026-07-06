@@ -5,17 +5,8 @@ import { supabase } from "./supabase";
 
 /* ================== الأنواع ================== */
 
-export interface Goals {
-  hifz: string; // هدف الحفظ الجديد
-  tathbit: string; // هدف التثبيت
-  murajaah: string; // هدف المراجعة
-}
-
-export interface GoalsDone {
-  hifz: boolean;
-  tathbit: boolean;
-  murajaah: boolean;
-}
+export type Goals = Record<string, string>;
+export type GoalsDone = Record<string, boolean>;
 
 export interface Student {
   id: string;
@@ -23,6 +14,7 @@ export interface Student {
   halaqaId: string;
   teacherId: string; // "" = بدون معلّمة بعد
   code: string; // رمز الدخول الخاص بالطالبة (٦ أرقام)
+  track: TrackKey; // مسار الطالبة: حفظ / قراءة / تجويد
   goals: Goals;
   done: GoalsDone;
   note?: string;
@@ -55,14 +47,51 @@ export interface AppState {
   announcements: Announcement[];
 }
 
-export const EMPTY_GOALS: Goals = { hifz: "", tathbit: "", murajaah: "" };
-export const EMPTY_DONE: GoalsDone = { hifz: false, tathbit: false, murajaah: false };
+export const EMPTY_GOALS: Goals = {};
+export const EMPTY_DONE: GoalsDone = {};
 
-export const GOAL_META = [
-  { key: "hifz", label: "هدف الحفظ", icon: "📖" },
-  { key: "tathbit", label: "هدف التثبيت", icon: "📌" },
-  { key: "murajaah", label: "هدف المراجعة", icon: "🔁" },
-] as const;
+/* ================== المسارات وأهداف كل مسار ================== */
+
+export type TrackKey = "hifz" | "qiraah" | "tajweed";
+
+export const TRACKS: TrackKey[] = ["hifz", "qiraah", "tajweed"];
+
+export const TRACK_META: Record<TrackKey, { label: string; icon: string }> = {
+  hifz: { label: "الحفظ", icon: "📖" },
+  qiraah: { label: "القراءة", icon: "📚" },
+  tajweed: { label: "التجويد", icon: "📗" },
+};
+
+export interface GoalItem {
+  key: string;
+  label: string;
+  icon: string;
+}
+
+/** أهداف كل مسار — مسار الحفظ يبقى: حفظ + تثبيت + مراجعة */
+export const TRACK_GOALS: Record<TrackKey, GoalItem[]> = {
+  hifz: [
+    { key: "hifz", label: "هدف الحفظ", icon: "📖" },
+    { key: "tathbit", label: "هدف التثبيت", icon: "📌" },
+    { key: "murajaah", label: "هدف المراجعة", icon: "🔁" },
+  ],
+  qiraah: [
+    { key: "qiraah", label: "هدف القراءة", icon: "📚" },
+    { key: "murajaah", label: "هدف المراجعة", icon: "🔁" },
+  ],
+  tajweed: [
+    { key: "tajweed", label: "درس التجويد", icon: "📗" },
+    { key: "tajweed_apply", label: "التطبيق", icon: "✍️" },
+  ],
+};
+
+export function trackMeta(track: string) {
+  return TRACK_META[(track as TrackKey)] ?? TRACK_META.hifz;
+}
+
+export function goalItems(track: string): GoalItem[] {
+  return TRACK_GOALS[(track as TrackKey)] ?? TRACK_GOALS.hifz;
+}
 
 export const WEEK_DAYS = [
   "",
@@ -169,6 +198,7 @@ interface StudentRow {
   halaqa_id: string;
   teacher_id: string;
   code: string;
+  track: string;
   goals: Goals;
   done: GoalsDone;
   note: string;
@@ -203,7 +233,7 @@ export async function pullRemote(): Promise<void> {
     supabase.from("almaher_teachers").select("id,name,halaqa_ids").order("created_at"),
     supabase
       .from("almaher_students")
-      .select("id,name,halaqa_id,teacher_id,code,goals,done,note,updated_at")
+      .select("id,name,halaqa_id,teacher_id,code,track,goals,done,note,updated_at")
       .order("created_at"),
     supabase
       .from("almaher_announcements")
@@ -226,6 +256,7 @@ export async function pullRemote(): Promise<void> {
       halaqaId: row.halaqa_id,
       teacherId: row.teacher_id,
       code: row.code ?? "",
+      track: (row.track as TrackKey) ?? "hifz",
       goals: { ...EMPTY_GOALS, ...row.goals },
       done: { ...EMPTY_DONE, ...row.done },
       note: row.note,
@@ -247,6 +278,7 @@ function studentToRow(st: Student): StudentRow {
     halaqa_id: st.halaqaId,
     teacher_id: st.teacherId,
     code: st.code,
+    track: st.track ?? "hifz",
     goals: st.goals,
     done: st.done,
     note: st.note ?? "",
@@ -426,6 +458,7 @@ export const actions = {
       halaqaId,
       teacherId,
       code: genStudentCode(getState().students),
+      track: "hifz",
       goals: { ...EMPTY_GOALS },
       done: { ...EMPTY_DONE },
       updatedAt: new Date().toISOString(),

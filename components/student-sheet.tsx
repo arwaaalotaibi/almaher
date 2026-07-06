@@ -3,11 +3,14 @@
 import { useEffect, useState } from "react";
 import {
   actions,
-  GOAL_META,
+  goalItems,
+  TRACKS,
+  TRACK_META,
   useApp,
   type Goals,
   type GoalsDone,
   type Student,
+  type TrackKey,
 } from "@/lib/store";
 import { DangerBtn, Field, inputCls, PrimaryBtn, Sheet } from "./ui";
 
@@ -26,6 +29,7 @@ export function StudentSheet({
   const [goals, setGoals] = useState<Goals>({ hifz: "", tathbit: "", murajaah: "" });
   const [done, setDone] = useState<GoalsDone>({ hifz: false, tathbit: false, murajaah: false });
   const [note, setNote] = useState("");
+  const [track, setTrack] = useState<TrackKey>("hifz");
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -33,6 +37,7 @@ export function StudentSheet({
       setName(student.name);
       setTeacherId(student.teacherId);
       setHalaqaId(student.halaqaId);
+      setTrack(student.track ?? "hifz");
       setGoals({ ...student.goals });
       setDone({ ...student.done });
       setNote(student.note ?? "");
@@ -47,6 +52,7 @@ export function StudentSheet({
       name: name.trim(),
       teacherId,
       halaqaId,
+      track,
       goals,
       done,
       note: note.trim(),
@@ -137,11 +143,38 @@ export function StudentSheet({
         </Field>
       </div>
 
+      <div className="mb-3">
+        <p className="mb-1 block text-sm font-bold text-plum-700">🛤️ المسار</p>
+        <div className="grid grid-cols-3 gap-2">
+          {TRACKS.map((tk) => (
+            <button
+              key={tk}
+              type="button"
+              onClick={() => setTrack(tk)}
+              className={`flex flex-col items-center gap-1 rounded-xl border-2 py-2.5 transition ${
+                track === tk
+                  ? "border-plum-600 bg-plum-50"
+                  : "border-cream-dark bg-cream/40"
+              }`}
+            >
+              <span className="text-xl">{TRACK_META[tk].icon}</span>
+              <span
+                className={`font-kufi text-sm font-bold ${
+                  track === tk ? "text-plum-800" : "text-silver-600"
+                }`}
+              >
+                {TRACK_META[tk].label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="mb-3 rounded-2xl bg-plum-50 p-3">
         <p className="mb-2 font-kufi text-sm font-bold text-plum-800">
-          أهداف هذا الأسبوع
+          أهداف مسار {TRACK_META[track].label} هذا الأسبوع
         </p>
-        {GOAL_META.map(({ key, label, icon }) => (
+        {goalItems(track).map(({ key, label, icon }) => (
           <div key={key} className="mb-2 last:mb-0">
             <div className="mb-1 flex items-center justify-between">
               <span className="text-sm font-bold text-plum-700">
@@ -150,7 +183,7 @@ export function StudentSheet({
               <label className="flex cursor-pointer items-center gap-1.5 text-xs font-bold text-plum-600">
                 <input
                   type="checkbox"
-                  checked={done[key]}
+                  checked={done[key] ?? false}
                   onChange={(e) => setDone({ ...done, [key]: e.target.checked })}
                   className="h-4 w-4 accent-plum-600"
                 />
@@ -160,7 +193,7 @@ export function StudentSheet({
             <input
               className={inputCls}
               placeholder="مثال: سورة الملك ١ – ١٥"
-              value={goals[key]}
+              value={goals[key] ?? ""}
               onChange={(e) => setGoals({ ...goals, [key]: e.target.value })}
             />
           </div>
@@ -193,7 +226,7 @@ export function StudentSheet({
 export function GoalDots({ student }: { student: Student }) {
   return (
     <span className="flex items-center justify-center gap-1 text-[11px]">
-      {GOAL_META.map(({ key, icon }) => {
+      {goalItems(student.track).map(({ key, icon }) => {
         const has = Boolean(student.goals[key]?.trim());
         const isDone = student.done[key];
         return (
