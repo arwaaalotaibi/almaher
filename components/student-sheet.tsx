@@ -143,32 +143,19 @@ export function StudentSheet({
         </Field>
       </div>
 
-      <div className="mb-3">
-        <p className="mb-1 block text-sm font-bold text-plum-700">🛤️ المسار</p>
-        <div className="grid grid-cols-3 gap-2">
+      <Field label="المسار" icon="🛤️">
+        <select
+          className={inputCls}
+          value={track}
+          onChange={(e) => setTrack(e.target.value as TrackKey)}
+        >
           {TRACKS.map((tk) => (
-            <button
-              key={tk}
-              type="button"
-              onClick={() => setTrack(tk)}
-              className={`flex flex-col items-center gap-1 rounded-xl border-2 py-2.5 transition ${
-                track === tk
-                  ? "border-plum-600 bg-plum-50"
-                  : "border-cream-dark bg-cream/40"
-              }`}
-            >
-              <span className="text-xl">{TRACK_META[tk].icon}</span>
-              <span
-                className={`font-kufi text-sm font-bold ${
-                  track === tk ? "text-plum-800" : "text-silver-600"
-                }`}
-              >
-                {TRACK_META[tk].label}
-              </span>
-            </button>
+            <option key={tk} value={tk}>
+              {TRACK_META[tk].icon} مسار {TRACK_META[tk].label}
+            </option>
           ))}
-        </div>
-      </div>
+        </select>
+      </Field>
 
       <div className="mb-3 rounded-2xl bg-plum-50 p-3">
         <p className="mb-2 font-kufi text-sm font-bold text-plum-800">
