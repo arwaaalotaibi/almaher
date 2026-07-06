@@ -3,15 +3,24 @@
 import { useEffect, useState } from "react";
 import {
   actions,
+  CoursePlan,
+  EMPTY_PLAN,
   goalItems,
+  normalizeDigits,
+  PLAN_FIELDS,
+  SESSION_KINDS,
+  sessionKindMeta,
   TRACKS,
   TRACK_META,
+  uid,
   useApp,
   type Goals,
   type GoalsDone,
+  type SessionLog,
   type Student,
   type TrackKey,
 } from "@/lib/store";
+import { SURAHS } from "@/lib/surahs";
 import { DangerBtn, Field, inputCls, PrimaryBtn, Sheet } from "./ui";
 
 /** نافذة بيانات الطالبة: الاسم + المعلّمة + الأهداف الثلاثة */
@@ -30,7 +39,15 @@ export function StudentSheet({
   const [done, setDone] = useState<GoalsDone>({ hifz: false, tathbit: false, murajaah: false });
   const [note, setNote] = useState("");
   const [track, setTrack] = useState<TrackKey>("hifz");
+  const [plan, setPlan] = useState<CoursePlan>({ ...EMPTY_PLAN });
+  const [sessions, setSessions] = useState<SessionLog[]>([]);
   const [copied, setCopied] = useState(false);
+
+  // مسودّة إنجاز اللقاء
+  const [sKind, setSKind] = useState<string>("hifz");
+  const [sSurah, setSSurah] = useState("");
+  const [sFrom, setSFrom] = useState("");
+  const [sTo, setSTo] = useState("");
 
   useEffect(() => {
     if (student) {
@@ -38,11 +55,37 @@ export function StudentSheet({
       setTeacherId(student.teacherId);
       setHalaqaId(student.halaqaId);
       setTrack(student.track ?? "hifz");
+      setPlan({ ...EMPTY_PLAN, ...student.plan });
+      setSessions(student.sessions ?? []);
       setGoals({ ...student.goals });
       setDone({ ...student.done });
       setNote(student.note ?? "");
+      setSKind("hifz");
+      setSSurah("");
+      setSFrom("");
+      setSTo("");
     }
   }, [student]);
+
+  const addSession = () => {
+    if (!sSurah.trim()) return;
+    setSessions([
+      {
+        id: uid(),
+        date: new Date().toISOString(),
+        kind: sKind,
+        surah: sSurah.trim(),
+        fromAyah: normalizeDigits(sFrom),
+        toAyah: normalizeDigits(sTo),
+      },
+      ...sessions,
+    ]);
+    setSSurah("");
+    setSFrom("");
+    setSTo("");
+  };
+
+  const planNum = (v: string) => Math.max(0, Number(normalizeDigits(v)) || 0);
 
   if (!student) return null;
 
@@ -53,6 +96,8 @@ export function StudentSheet({
       teacherId,
       halaqaId,
       track,
+      plan,
+      sessions,
       goals,
       done,
       note: note.trim(),
@@ -185,6 +230,124 @@ export function StudentSheet({
             />
           </div>
         ))}
+      </div>
+
+      {/* خطة الكورس */}
+      <div className="mb-3 rounded-2xl border border-cream-dark p-3">
+        <p className="mb-2 font-kufi text-sm font-bold text-plum-800">
+          📋 خطة الكورس
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          {PLAN_FIELDS.map(({ key, label, icon }) => (
+            <label key={key} className="block">
+              <span className="mb-1 block text-xs font-bold text-plum-700">
+                {icon} {label}
+              </span>
+              <input
+                className={inputCls}
+                inputMode="numeric"
+                placeholder="٠"
+                value={plan[key] || ""}
+                onChange={(e) =>
+                  setPlan({ ...plan, [key]: planNum(e.target.value) })
+                }
+              />
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* سجل إنجاز اللقاءات */}
+      <div className="mb-3 rounded-2xl border border-cream-dark p-3">
+        <p className="mb-2 font-kufi text-sm font-bold text-plum-800">
+          ✅ إنجاز اللقاءات ({sessions.length.toLocaleString("ar-EG")}
+          {plan.meetings ? ` من ${plan.meetings.toLocaleString("ar-EG")}` : ""})
+        </p>
+
+        {/* إضافة إنجاز لقاء جديد */}
+        <div className="mb-2 rounded-xl bg-plum-50 p-2.5">
+          <div className="mb-2 flex gap-1.5">
+            {SESSION_KINDS.map((k) => (
+              <button
+                key={k.key}
+                type="button"
+                onClick={() => setSKind(k.key)}
+                className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition ${
+                  sKind === k.key
+                    ? "bg-plum-600 text-white"
+                    : "bg-white text-silver-600"
+                }`}
+              >
+                {k.icon} {k.label}
+              </button>
+            ))}
+          </div>
+          <input
+            className={`${inputCls} mb-2`}
+            list="surah-list"
+            placeholder="السورة"
+            value={sSurah}
+            onChange={(e) => setSSurah(e.target.value)}
+          />
+          <datalist id="surah-list">
+            {SURAHS.map((s) => (
+              <option key={s} value={s} />
+            ))}
+          </datalist>
+          <div className="mb-2 grid grid-cols-2 gap-2">
+            <input
+              className={inputCls}
+              inputMode="numeric"
+              placeholder="من آية"
+              value={sFrom}
+              onChange={(e) => setSFrom(e.target.value)}
+            />
+            <input
+              className={inputCls}
+              inputMode="numeric"
+              placeholder="إلى آية"
+              value={sTo}
+              onChange={(e) => setSTo(e.target.value)}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={addSession}
+            className="w-full rounded-xl bg-plum-600 py-2 text-sm font-bold text-white"
+          >
+            ➕ تسجيل إنجاز اللقاء
+          </button>
+        </div>
+
+        {/* قائمة الإنجازات */}
+        {sessions.map((s, i) => {
+          const km = sessionKindMeta(s.kind);
+          return (
+            <div
+              key={s.id}
+              className="mb-1.5 flex items-center justify-between rounded-lg bg-cream px-3 py-2 text-sm"
+            >
+              <span className="font-bold text-plum-800">
+                {km.icon} {s.surah}
+                {s.fromAyah && (
+                  <span dir="ltr" className="text-silver-600">
+                    {" "}
+                    {s.fromAyah}
+                    {s.toAyah ? `-${s.toAyah}` : ""}
+                  </span>
+                )}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSessions(sessions.filter((x) => x.id !== s.id))}
+                className="text-xs font-bold text-red-600"
+                aria-label="حذف"
+              >
+                ✕
+              </button>
+            </div>
+          );
+        })}
       </div>
 
       <Field label="ملاحظات" icon="📝">

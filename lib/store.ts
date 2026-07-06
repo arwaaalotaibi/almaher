@@ -8,6 +8,32 @@ import { supabase } from "./supabase";
 export type Goals = Record<string, string>;
 export type GoalsDone = Record<string, boolean>;
 
+/** خطة الكورس الخاصة بالطالبة */
+export interface CoursePlan {
+  meetings: number; // عدد اللقاءات
+  hifz: number; // صفحات الحفظ
+  tathbit: number; // صفحات التثبيت
+  murajaah: number; // صفحات المراجعة
+}
+
+export const EMPTY_PLAN: CoursePlan = {
+  meetings: 0,
+  hifz: 0,
+  tathbit: 0,
+  murajaah: 0,
+};
+
+/** إنجاز لقاء واحد — السورة والآيات */
+export interface SessionLog {
+  id: string;
+  date: string; // ISO
+  kind: string; // نوع الإنجاز: hifz | tathbit | murajaah
+  surah: string; // اسم السورة
+  fromAyah: string; // من آية
+  toAyah: string; // إلى آية
+  note?: string;
+}
+
 export interface Student {
   id: string;
   name: string;
@@ -15,6 +41,8 @@ export interface Student {
   teacherId: string; // "" = بدون معلّمة بعد
   code: string; // رمز الدخول الخاص بالطالبة (٦ أرقام)
   track: TrackKey; // مسار الطالبة: حفظ / قراءة / تجويد
+  plan: CoursePlan; // خطة الكورس
+  sessions: SessionLog[]; // سجل إنجاز اللقاءات
   goals: Goals;
   done: GoalsDone;
   note?: string;
@@ -92,6 +120,24 @@ export function trackMeta(track: string) {
 export function goalItems(track: string): GoalItem[] {
   return TRACK_GOALS[(track as TrackKey)] ?? TRACK_GOALS.hifz;
 }
+
+/* أنواع إنجاز اللقاء */
+export const SESSION_KINDS = [
+  { key: "hifz", label: "حفظ", icon: "📖" },
+  { key: "tathbit", label: "تثبيت", icon: "📌" },
+  { key: "murajaah", label: "مراجعة", icon: "🔁" },
+] as const;
+
+export function sessionKindMeta(k: string) {
+  return SESSION_KINDS.find((x) => x.key === k) ?? SESSION_KINDS[0];
+}
+
+export const PLAN_FIELDS = [
+  { key: "meetings", label: "عدد اللقاءات", icon: "📅" },
+  { key: "hifz", label: "صفحات الحفظ", icon: "📖" },
+  { key: "tathbit", label: "صفحات التثبيت", icon: "📌" },
+  { key: "murajaah", label: "صفحات المراجعة", icon: "🔁" },
+] as const;
 
 export const WEEK_DAYS = [
   "",
@@ -199,6 +245,8 @@ interface StudentRow {
   teacher_id: string;
   code: string;
   track: string;
+  plan: CoursePlan;
+  sessions: SessionLog[];
   goals: Goals;
   done: GoalsDone;
   note: string;
@@ -233,7 +281,7 @@ export async function pullRemote(): Promise<void> {
     supabase.from("almaher_teachers").select("id,name,halaqa_ids").order("created_at"),
     supabase
       .from("almaher_students")
-      .select("id,name,halaqa_id,teacher_id,code,track,goals,done,note,updated_at")
+      .select("id,name,halaqa_id,teacher_id,code,track,plan,sessions,goals,done,note,updated_at")
       .order("created_at"),
     supabase
       .from("almaher_announcements")
@@ -257,6 +305,8 @@ export async function pullRemote(): Promise<void> {
       teacherId: row.teacher_id,
       code: row.code ?? "",
       track: (row.track as TrackKey) ?? "hifz",
+      plan: { ...EMPTY_PLAN, ...row.plan },
+      sessions: Array.isArray(row.sessions) ? row.sessions : [],
       goals: { ...EMPTY_GOALS, ...row.goals },
       done: { ...EMPTY_DONE, ...row.done },
       note: row.note,
@@ -279,6 +329,8 @@ function studentToRow(st: Student): StudentRow {
     teacher_id: st.teacherId,
     code: st.code,
     track: st.track ?? "hifz",
+    plan: st.plan ?? EMPTY_PLAN,
+    sessions: st.sessions ?? [],
     goals: st.goals,
     done: st.done,
     note: st.note ?? "",
@@ -459,6 +511,8 @@ export const actions = {
       teacherId,
       code: genStudentCode(getState().students),
       track: "hifz",
+      plan: { ...EMPTY_PLAN },
+      sessions: [],
       goals: { ...EMPTY_GOALS },
       done: { ...EMPTY_DONE },
       updatedAt: new Date().toISOString(),

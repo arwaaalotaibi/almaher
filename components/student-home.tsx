@@ -5,6 +5,8 @@ import { supabase } from "@/lib/supabase";
 import {
   goalItems,
   halaqaTitle,
+  PLAN_FIELDS,
+  sessionKindMeta,
   STUDENT_PICK_KEY,
   trackMeta,
   useApp,
@@ -123,8 +125,83 @@ export function StudentHome() {
         })}
       </div>
 
+      {/* خطة الكورس */}
+      {(me.plan?.meetings || me.plan?.hifz || me.plan?.tathbit || me.plan?.murajaah) ? (
+        <>
+          <Ribbon className="mb-4 mt-8">خطة الكورس</Ribbon>
+          <div className="card rounded-2xl p-4">
+            {me.plan.meetings > 0 && (
+              <div className="mb-3">
+                <div className="mb-1 flex items-center justify-between text-sm font-bold">
+                  <span className="text-plum-800">📅 اللقاءات المنجزة</span>
+                  <span className="text-plum-700">
+                    {(me.sessions?.length ?? 0).toLocaleString("ar-EG")} /{" "}
+                    {me.plan.meetings.toLocaleString("ar-EG")}
+                  </span>
+                </div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-cream-dark">
+                  <div
+                    className="h-full rounded-full bg-plum-600"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        ((me.sessions?.length ?? 0) / me.plan.meetings) * 100
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+            <div className="grid grid-cols-3 gap-2 text-center">
+              {PLAN_FIELDS.filter((f) => f.key !== "meetings").map((f) => (
+                <div key={f.key} className="rounded-xl bg-plum-50 py-2">
+                  <p className="text-lg font-bold text-plum-800">
+                    {(me.plan[f.key] ?? 0).toLocaleString("ar-EG")}
+                  </p>
+                  <p className="text-[11px] font-bold text-silver-600">
+                    {f.icon} {f.label.replace("صفحات ", "")}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : null}
+
+      {/* سجل الإنجاز */}
+      {me.sessions && me.sessions.length > 0 && (
+        <>
+          <Ribbon className="mb-4 mt-8">سجل إنجازي</Ribbon>
+          <div className="grid gap-2">
+            {me.sessions.map((s) => {
+              const km = sessionKindMeta(s.kind);
+              return (
+                <div
+                  key={s.id}
+                  className="card flex items-center justify-between rounded-xl px-4 py-3"
+                >
+                  <span className="font-kufi text-base font-bold text-plum-800">
+                    {km.icon} {s.surah}
+                    {s.fromAyah && (
+                      <span dir="ltr" className="font-normal text-silver-600">
+                        {" "}
+                        {s.fromAyah}
+                        {s.toAyah ? `-${s.toAyah}` : ""}
+                      </span>
+                    )}
+                  </span>
+                  <span className="rounded-full bg-plum-100 px-2.5 py-0.5 text-[11px] font-bold text-plum-700">
+                    {km.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
       {updatedLabel && (
-        <p className="mt-4 text-center text-xs text-silver-600">
+        <p className="mt-6 text-center text-xs text-silver-600">
           آخر تحديث: {updatedLabel}
         </p>
       )}
