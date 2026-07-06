@@ -147,6 +147,14 @@ export function useApp(): AppState {
 /** مفتاح تخزين هوية الطالبة على الجهاز (تُضبط عند الدخول بالرمز) */
 export const STUDENT_PICK_KEY = "almaher-my-student-id";
 
+/** توحيد الأرقام العربية والفارسية إلى إنجليزية + إزالة الفراغات */
+export function normalizeDigits(input: string): string {
+  return input
+    .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
+    .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
+    .replace(/\s+/g, "");
+}
+
 export function uid(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()

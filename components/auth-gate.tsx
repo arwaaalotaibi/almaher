@@ -17,6 +17,7 @@ import {
 } from "@/lib/supabase";
 import {
   getState,
+  normalizeDigits,
   pullRemote,
   pushAll,
   STUDENT_PICK_KEY,
@@ -120,8 +121,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
         setError("تعذّر الاتصال بالإنترنت");
         return;
       }
-      const code = password.trim();
-      const me = getState().students.find((s) => s.code === code);
+      const code = normalizeDigits(password);
+      const me = getState().students.find(
+        (s) => normalizeDigits(s.code) === code
+      );
       if (!me) {
         await supabase.auth.signOut();
         setBusy(false);
