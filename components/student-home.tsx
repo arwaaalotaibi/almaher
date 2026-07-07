@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import {
+  buildSchedule,
+  currentSessionIndex,
+  formatSchedDate,
   goalItems,
   halaqaTitle,
   PLAN_FIELDS,
@@ -10,6 +13,8 @@ import {
   STUDENT_PICK_KEY,
   useApp,
 } from "@/lib/store";
+
+const ar = (n: number) => n.toLocaleString("ar-EG");
 import Link from "next/link";
 import { Ribbon } from "./ui";
 import { NotificationsCard } from "./notifications-card";
@@ -71,6 +76,11 @@ export function StudentHome() {
 
   const halaqa = halaqas.find((h) => h.id === me.halaqaId);
   const teacher = teachers.find((t) => t.id === me.teacherId);
+  const schedule = halaqa ? buildSchedule(halaqa, me.plan) : null;
+  const curIdx = schedule ? currentSessionIndex(schedule) : 0;
+  const passed = schedule ? (curIdx > 0 ? curIdx - 1 : schedule.length) : 0;
+  const totalFaces =
+    (me.plan?.hifz ?? 0) + (me.plan?.tathbit ?? 0) + (me.plan?.murajaah ?? 0);
   const updatedLabel = me.updatedAt
     ? new Date(me.updatedAt).toLocaleDateString("ar-u-ca-gregory-nu-arab", {
         day: "numeric",
@@ -184,48 +194,155 @@ export function StudentHome() {
             })}
           </div>
 
-          {/* خطة الكورس */}
-          {me.plan?.meetings ||
-          me.plan?.hifz ||
-          me.plan?.tathbit ||
-          me.plan?.murajaah ? (
+          {/* خطة الفصل — جدول مولّد تلقائياً */}
+          {schedule ? (
             <>
-              <Ribbon className="mb-4 mt-8">خطة الكورس</Ribbon>
-              <div className="card rounded-2xl p-4">
-                {me.plan.meetings > 0 && (
-                  <div className="mb-3">
-                    <div className="mb-1 flex items-center justify-between text-sm font-bold">
-                      <span className="text-plum-800">📅 اللقاءات المنجزة</span>
-                      <span className="text-plum-700">
-                        {(me.sessions?.length ?? 0).toLocaleString("ar-EG")} /{" "}
-                        {me.plan.meetings.toLocaleString("ar-EG")}
-                      </span>
-                    </div>
-                    <div className="h-2.5 overflow-hidden rounded-full bg-cream-dark">
-                      <div
-                        className="h-full rounded-full bg-plum-600"
-                        style={{
-                          width: `${Math.min(
-                            100,
-                            ((me.sessions?.length ?? 0) / me.plan.meetings) * 100
-                          )}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  {PLAN_FIELDS.filter((f) => f.key !== "meetings").map((f) => (
-                    <div key={f.key} className="rounded-xl bg-plum-50 py-2">
+              <Ribbon className="mb-4 mt-8">خطة الفصل</Ribbon>
+
+              {/* التقدّم في الفصل */}
+              <div className="card mb-3 rounded-2xl p-4">
+                <div className="mb-1 flex items-center justify-between text-sm font-bold">
+                  <span className="text-plum-800">📅 لقاءات الفصل</span>
+                  <span className="text-plum-700">
+                    {ar(passed)} / {ar(schedule.length)}
+                  </span>
+                </div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-cream-dark">
+                  <div
+                    className="h-full rounded-full bg-plum-600"
+                    style={{ width: `${(passed / schedule.length) * 100}%` }}
+                  />
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                  {[
+                    { l: "حفظ", v: me.plan.hifz, i: "📖" },
+                    { l: "تثبيت", v: me.plan.tathbit, i: "📌" },
+                    { l: "مراجعة", v: me.plan.murajaah, i: "🔁" },
+                  ].map((x) => (
+                    <div key={x.l} className="rounded-xl bg-plum-50 py-2">
                       <p className="text-lg font-bold text-plum-800">
-                        {(me.plan[f.key] ?? 0).toLocaleString("ar-EG")}
+                        {ar(x.v ?? 0)}
                       </p>
                       <p className="text-[11px] font-bold text-silver-600">
-                        {f.icon} {f.label.replace("صفحات ", "")}
+                        {x.i} {x.l} (وجه)
                       </p>
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* مطلوب اللقاء القادم */}
+              {curIdx > 0 ? (
+                (() => {
+                  const s = schedule[curIdx - 1];
+                  return (
+                    <div className="mb-3 rounded-2xl border-2 border-plum-500 bg-plum-50 p-4">
+                      <div className="flex items-center justify-between">
+                        <span className="font-kufi text-base font-bold text-plum-800">
+                          📌 مطلوب اللقاء القادم
+                        </span>
+                        <span className="rounded-full bg-plum-600 px-2.5 py-0.5 text-xs font-bold text-white">
+                          لقاء {ar(s.n)} · {formatSchedDate(s.date)}
+                        </span>
+                      </div>
+                      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                        {[
+                          { l: "حفظ", v: s.hifz, i: "📖" },
+                          { l: "تثبيت", v: s.tathbit, i: "📌" },
+                          { l: "مراجعة", v: s.murajaah, i: "🔁" },
+                        ].map((x) => (
+                          <div
+                            key={x.l}
+                            className="rounded-xl bg-white py-2 shadow-sm"
+                          >
+                            <p className="text-xl font-bold text-plum-700">
+                              {ar(x.v)}
+                            </p>
+                            <p className="text-[11px] font-bold text-silver-600">
+                              {x.i} {x.l}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="mt-2 text-center text-[11px] text-silver-600">
+                        عدد الأوجه المطلوبة في هذا اللقاء
+                      </p>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div className="mb-3 rounded-2xl bg-plum-50 p-4 text-center font-kufi text-sm font-bold text-plum-700">
+                  🎉 اكتمل الفصل — أحسنتِ!
+                </div>
+              )}
+
+              {/* الجدول الكامل */}
+              <div className="card overflow-hidden rounded-2xl">
+                <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-0 text-center text-xs">
+                  <div className="bg-plum-800 py-2 font-kufi font-bold text-white">
+                    لقاء
+                  </div>
+                  <div className="bg-plum-800 py-2 font-kufi font-bold text-white">
+                    التاريخ
+                  </div>
+                  <div className="bg-plum-800 py-2 font-kufi font-bold text-white">
+                    📖
+                  </div>
+                  <div className="bg-plum-800 py-2 font-kufi font-bold text-white">
+                    📌
+                  </div>
+                  <div className="bg-plum-800 py-2 font-kufi font-bold text-white">
+                    🔁
+                  </div>
+                  {schedule.map((s) => {
+                    const isCur = s.n === curIdx;
+                    const cell = isCur
+                      ? "bg-plum-100 font-bold text-plum-800"
+                      : "text-ink";
+                    return (
+                      <div key={s.n} className="contents">
+                        <div className={`border-t border-cream-dark py-2 ${cell}`}>
+                          {ar(s.n)}
+                        </div>
+                        <div
+                          className={`border-t border-cream-dark py-2 ${cell}`}
+                        >
+                          {formatSchedDate(s.date)}
+                        </div>
+                        <div className={`border-t border-cream-dark py-2 ${cell}`}>
+                          {s.hifz ? ar(s.hifz) : "—"}
+                        </div>
+                        <div className={`border-t border-cream-dark py-2 ${cell}`}>
+                          {s.tathbit ? ar(s.tathbit) : "—"}
+                        </div>
+                        <div className={`border-t border-cream-dark py-2 ${cell}`}>
+                          {s.murajaah ? ar(s.murajaah) : "—"}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          ) : totalFaces > 0 ? (
+            <>
+              <Ribbon className="mb-4 mt-8">خطة الفصل</Ribbon>
+              <div className="card rounded-2xl p-4">
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  {PLAN_FIELDS.map((f) => (
+                    <div key={f.key} className="rounded-xl bg-plum-50 py-2">
+                      <p className="text-lg font-bold text-plum-800">
+                        {ar(me.plan[f.key] ?? 0)}
+                      </p>
+                      <p className="text-[11px] font-bold text-silver-600">
+                        {f.icon} {f.label.replace("أوجه ", "")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-3 text-center text-xs text-silver-600">
+                  لم تُحدَّد مواعيد الفصل بعد — سيظهر الجدول فور تحديدها
+                </p>
               </div>
             </>
           ) : null}

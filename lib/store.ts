@@ -53,6 +53,8 @@ export interface Halaqa {
   id: string;
   mosque: string; // مسجد البحر
   day: string; // الاثنين — قد يكون فارغاً
+  termStart: string; // تاريخ بداية الفصل (ISO yyyy-mm-dd) — قد يكون فارغاً
+  termSessions: number; // عدد لقاءات الفصل
 }
 
 export interface Teacher {
@@ -142,12 +144,104 @@ export function sessionKindMeta(k: string) {
   return SESSION_KINDS.find((x) => x.key === k) ?? SESSION_KINDS[0];
 }
 
+/* حقول خطة الطالبة بالأوجه (عدد اللقاءات يأتي من الحلقة) */
 export const PLAN_FIELDS = [
-  { key: "meetings", label: "عدد اللقاءات", icon: "📅" },
-  { key: "hifz", label: "صفحات الحفظ", icon: "📖" },
-  { key: "tathbit", label: "صفحات التثبيت", icon: "📌" },
-  { key: "murajaah", label: "صفحات المراجعة", icon: "🔁" },
+  { key: "hifz", label: "أوجه الحفظ", icon: "📖" },
+  { key: "tathbit", label: "أوجه التثبيت", icon: "📌" },
+  { key: "murajaah", label: "أوجه المراجعة", icon: "🔁" },
 ] as const;
+
+/* ================== مولّد جدول الفصل (العقل الذكي) ==================
+   من: تاريخ بداية الفصل + يوم الحلقة + عدد اللقاءات + أوجه الخطة
+   يُنتج: تاريخ كل لقاء + المطلوب فيه (حفظ/تثبيت/مراجعة) موزّعاً بذكاء. */
+
+export interface ScheduleRow {
+  n: number; // رقم اللقاء
+  date: Date; // تاريخ اللقاء
+  hifz: number; // أوجه الحفظ في هذا اللقاء
+  tathbit: number;
+  murajaah: number;
+  cumHifz: number; // التراكمي حتى هذا اللقاء
+  cumTathbit: number;
+  cumMurajaah: number;
+}
+
+function dayNameToDow(day: string): number {
+  // WEEK_DAYS: ["", "الأحد"(1)...] → getDay: الأحد=0 ⇒ index-1
+  const i = WEEK_DAYS.indexOf(day);
+  return i > 0 ? i - 1 : -1;
+}
+
+/** يوزّع مجموعاً على n خطوة توزيعاً متساوياً قدر الإمكان (تراكمي مدوّر) */
+function spread(total: number, n: number): number[] {
+  const out: number[] = [];
+  let prev = 0;
+  for (let i = 1; i <= n; i++) {
+    const cum = Math.round((total * i) / n);
+    out.push(cum - prev);
+    prev = cum;
+  }
+  return out;
+}
+
+export function buildSchedule(
+  halaqa: Pick<Halaqa, "day" | "termStart" | "termSessions">,
+  plan: CoursePlan
+): ScheduleRow[] | null {
+  const n = halaqa.termSessions;
+  const dow = dayNameToDow(halaqa.day);
+  if (!halaqa.termStart || n < 1 || dow < 0) return null;
+
+  const start = new Date(`${halaqa.termStart}T00:00:00`);
+  if (isNaN(start.getTime())) return null;
+
+  // أول لقاء: أول يوم موافق ليوم الحلقة في/بعد تاريخ البداية
+  const first = new Date(start);
+  while (first.getDay() !== dow) first.setDate(first.getDate() + 1);
+
+  const h = spread(plan.hifz || 0, n);
+  const t = spread(plan.tathbit || 0, n);
+  const m = spread(plan.murajaah || 0, n);
+
+  const rows: ScheduleRow[] = [];
+  let ch = 0,
+    ct = 0,
+    cm = 0;
+  for (let i = 0; i < n; i++) {
+    const date = new Date(first);
+    date.setDate(first.getDate() + i * 7);
+    ch += h[i];
+    ct += t[i];
+    cm += m[i];
+    rows.push({
+      n: i + 1,
+      date,
+      hifz: h[i],
+      tathbit: t[i],
+      murajaah: m[i],
+      cumHifz: ch,
+      cumTathbit: ct,
+      cumMurajaah: cm,
+    });
+  }
+  return rows;
+}
+
+/** رقم اللقاء الحالي/القادم بالنسبة لليوم (1-based)، و0 إن انتهى الفصل */
+export function currentSessionIndex(rows: ScheduleRow[]): number {
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  const upcoming = rows.find((r) => r.date.getTime() >= new Date().setHours(0, 0, 0, 0));
+  return upcoming ? upcoming.n : 0;
+}
+
+export function formatSchedDate(d: Date): string {
+  return d.toLocaleDateString("ar-u-ca-gregory-nu-arab", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+}
 
 export const WEEK_DAYS = [
   "",
@@ -162,10 +256,10 @@ export const WEEK_DAYS = [
 
 const SEED: AppState = {
   halaqas: [
-    { id: "bahar-mon", mosque: "مسجد البحر", day: "الاثنين" },
-    { id: "yaqout", mosque: "مسجد الياقوت", day: "" },
-    { id: "bahar-wed", mosque: "مسجد البحر", day: "الأربعاء" },
-    { id: "ibn-taymiyyah", mosque: "مسجد ابن تيمية", day: "" },
+    { id: "bahar-mon", mosque: "مسجد البحر", day: "الاثنين", termStart: "", termSessions: 0 },
+    { id: "yaqout", mosque: "مسجد الياقوت", day: "", termStart: "", termSessions: 0 },
+    { id: "bahar-wed", mosque: "مسجد البحر", day: "الأربعاء", termStart: "", termSessions: 0 },
+    { id: "ibn-taymiyyah", mosque: "مسجد ابن تيمية", day: "", termStart: "", termSessions: 0 },
   ],
   teachers: [],
   students: [],
@@ -289,7 +383,10 @@ function run(op: () => PromiseLike<{ error: unknown }>) {
 /** جلب كل البيانات من قاعدة البيانات وتحديث العرض */
 export async function pullRemote(): Promise<void> {
   const [h, t, s, a, b] = await Promise.all([
-    supabase.from("almaher_halaqas").select("id,mosque,day").order("created_at"),
+    supabase
+      .from("almaher_halaqas")
+      .select("id,mosque,day,term_start,term_sessions")
+      .order("created_at"),
     supabase.from("almaher_teachers").select("id,name,halaqa_ids").order("created_at"),
     supabase
       .from("almaher_students")
@@ -308,7 +405,13 @@ export async function pullRemote(): Promise<void> {
     throw h.error ?? t.error ?? s.error ?? a.error ?? b.error;
   }
   persist({
-    halaqas: (h.data ?? []) as Halaqa[],
+    halaqas: (h.data ?? []).map((row) => ({
+      id: row.id as string,
+      mosque: row.mosque as string,
+      day: (row.day as string) ?? "",
+      termStart: (row.term_start as string) ?? "",
+      termSessions: (row.term_sessions as number) ?? 0,
+    })),
     teachers: (t.data ?? []).map((row) => ({
       id: row.id as string,
       name: row.name as string,
@@ -385,7 +488,15 @@ export async function pushAll(state: AppState): Promise<void> {
   if (state.halaqas.length) {
     const { error } = await supabase
       .from("almaher_halaqas")
-      .insert(state.halaqas.map((h) => ({ id: h.id, mosque: h.mosque, day: h.day })));
+      .insert(
+        state.halaqas.map((h) => ({
+          id: h.id,
+          mosque: h.mosque,
+          day: h.day,
+          term_start: h.termStart ?? "",
+          term_sessions: h.termSessions ?? 0,
+        }))
+      );
     if (error) throw error;
   }
   if (state.teachers.length) {
@@ -448,9 +559,21 @@ export function subscribeRealtime() {
 
 export const actions = {
   addHalaqa(mosque: string, day: string) {
-    const halaqa: Halaqa = { id: uid(), mosque: mosque.trim(), day };
+    const halaqa: Halaqa = {
+      id: uid(),
+      mosque: mosque.trim(),
+      day,
+      termStart: "",
+      termSessions: 0,
+    };
     setState((s) => ({ ...s, halaqas: [...s.halaqas, halaqa] }));
-    run(() => supabase.from("almaher_halaqas").insert(halaqa));
+    run(() =>
+      supabase.from("almaher_halaqas").insert({
+        id: halaqa.id,
+        mosque: halaqa.mosque,
+        day: halaqa.day,
+      })
+    );
   },
   updateHalaqa(id: string, patch: Partial<Halaqa>) {
     setState((s) => ({
@@ -460,7 +583,14 @@ export const actions = {
     run(() =>
       supabase
         .from("almaher_halaqas")
-        .update({ mosque: patch.mosque, day: patch.day })
+        .update({
+          ...(patch.mosque !== undefined && { mosque: patch.mosque }),
+          ...(patch.day !== undefined && { day: patch.day }),
+          ...(patch.termStart !== undefined && { term_start: patch.termStart }),
+          ...(patch.termSessions !== undefined && {
+            term_sessions: patch.termSessions,
+          }),
+        })
         .eq("id", id)
     );
   },

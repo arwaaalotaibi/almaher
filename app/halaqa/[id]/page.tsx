@@ -4,8 +4,10 @@ import { use, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   actions,
+  normalizeDigits,
   studentCountLabel,
   useApp,
+  WEEK_DAYS,
   type Student,
 } from "@/lib/store";
 import {
@@ -103,6 +105,68 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
       <p className="mb-3 mt-3 text-center text-sm font-bold text-silver-600">
         {studentCountLabel(halaqaStudents.length)}
       </p>
+
+      {/* إعدادات الفصل — تُضبط مرة وتُطبَّق على جدول كل طالبة */}
+      <div className="card mb-4 rounded-2xl p-4">
+        <p className="mb-3 font-kufi text-sm font-bold text-plum-800">
+          📅 خطة الفصل
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold text-plum-700">
+              يوم الحلقة
+            </span>
+            <select
+              className={inputCls}
+              value={halaqa.day}
+              onChange={(e) => actions.updateHalaqa(id, { day: e.target.value })}
+            >
+              {WEEK_DAYS.map((d) => (
+                <option key={d} value={d}>
+                  {d || "غير محدد"}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold text-plum-700">
+              بداية الفصل
+            </span>
+            <input
+              type="date"
+              className={inputCls}
+              value={halaqa.termStart}
+              onChange={(e) =>
+                actions.updateHalaqa(id, { termStart: e.target.value })
+              }
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold text-plum-700">
+              عدد اللقاءات
+            </span>
+            <input
+              type="text"
+              inputMode="numeric"
+              className={inputCls}
+              placeholder="٠"
+              value={halaqa.termSessions || ""}
+              onChange={(e) =>
+                actions.updateHalaqa(id, {
+                  termSessions: Math.max(
+                    0,
+                    Number(normalizeDigits(e.target.value)) || 0
+                  ),
+                })
+              }
+            />
+          </label>
+        </div>
+        <p className="mt-2 text-[11px] text-silver-600">
+          أوجه الحفظ/التثبيت/المراجعة لكل طالبة تُدخل من بيانات الطالبة، ويولّد
+          النظام جدولها تلقائياً.
+        </p>
+      </div>
 
       {halaqaStudents.length > 0 && (
         <button

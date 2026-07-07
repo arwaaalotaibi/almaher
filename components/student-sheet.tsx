@@ -212,19 +212,22 @@ export function StudentSheet({
         ))}
       </div>
 
-      {/* خطة الكورس */}
+      {/* خطة الفصل بالأوجه */}
       <div className="mb-3 rounded-2xl border border-cream-dark p-3">
-        <p className="mb-2 font-kufi text-sm font-bold text-plum-800">
-          📋 خطة الكورس
+        <p className="mb-1 font-kufi text-sm font-bold text-plum-800">
+          📋 خطة الفصل (بالأوجه)
         </p>
-        <div className="grid grid-cols-2 gap-2">
+        <p className="mb-2 text-[11px] text-silver-600">
+          إجمالي أوجه الفصل — يوزّعها النظام على اللقاءات تلقائياً
+        </p>
+        <div className="grid grid-cols-3 gap-2">
           {PLAN_FIELDS.map(({ key, label, icon }) => (
             <label key={key} className="block">
               <span className="mb-1 block text-xs font-bold text-plum-700">
-                {icon} {label}
+                {icon} {label.replace("أوجه ", "")}
               </span>
               <input
-                className={inputCls}
+                className={`${inputCls} text-center`}
                 inputMode="numeric"
                 placeholder="٠"
                 value={plan[key] || ""}
