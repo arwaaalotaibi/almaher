@@ -1,16 +1,20 @@
 import type { Metadata, Viewport } from "next";
-import { Cairo, Reem_Kufi } from "next/font/google";
+import { Amiri, Noto_Naskh_Arabic } from "next/font/google";
 import { AuthGate } from "@/components/auth-gate";
 import "./globals.css";
 
-const cairo = Cairo({
+// خط كلاسيكي نسخي أنيق للعناوين (نفس خط الطباعة)
+const amiri = Amiri({
   subsets: ["arabic", "latin"],
-  variable: "--font-cairo",
+  weight: ["400", "700"],
+  variable: "--font-amiri",
 });
 
-const kufi = Reem_Kufi({
-  subsets: ["arabic", "latin"],
-  variable: "--font-kufi",
+// نسخي واضح جداً على الشاشة للنصوص
+const naskh = Noto_Naskh_Arabic({
+  subsets: ["arabic"],
+  weight: ["400", "500", "700"],
+  variable: "--font-naskh",
 });
 
 export const metadata: Metadata = {
@@ -26,7 +30,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ar" dir="rtl" className={`${cairo.variable} ${kufi.variable}`}>
+    <html lang="ar" dir="rtl" className={`${amiri.variable} ${naskh.variable}`}>
       <body className="pattern-bg font-body antialiased">
         <AuthGate>{children}</AuthGate>
       </body>

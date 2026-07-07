@@ -18,8 +18,9 @@
   --color-gold: #a8894f;
   --color-ink: #453039;
 
-  --font-body: var(--font-cairo), sans-serif;
-  --font-kufi: var(--font-kufi), var(--font-cairo), sans-serif;
+  /* خطوط كلاسيكية نسخية واضحة في كل البرنامج */
+  --font-body: var(--font-naskh), "Noto Naskh Arabic", "Geeza Pro", serif;
+  --font-kufi: var(--font-amiri), var(--font-naskh), "Geeza Pro", serif;
 }
 
 html {
