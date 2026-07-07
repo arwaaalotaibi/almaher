@@ -8,12 +8,13 @@ import { supabase } from "./supabase";
 export type Goals = Record<string, string>;
 export type GoalsDone = Record<string, boolean>;
 
-/** خطة الكورس الخاصة بالطالبة */
+/** خطة الفصل الخاصة بالطالبة */
 export interface CoursePlan {
-  meetings: number; // عدد اللقاءات
-  hifz: number; // صفحات الحفظ
-  tathbit: number; // صفحات التثبيت
-  murajaah: number; // صفحات المراجعة
+  meetings: number; // (قديم — غير مستخدم)
+  hifz: number; // أوجه الحفظ
+  tathbit: number; // أوجه التثبيت
+  murajaah: number; // أوجه المراجعة
+  start?: string; // بداية الحفظ (سورة/جزء/موضع)
 }
 
 export const EMPTY_PLAN: CoursePlan = {
@@ -21,6 +22,7 @@ export const EMPTY_PLAN: CoursePlan = {
   hifz: 0,
   tathbit: 0,
   murajaah: 0,
+  start: "",
 };
 
 /** حصّة واحدة — أوجه الحفظ/التثبيت/المراجعة (+ تفصيل السورة اختياري) */

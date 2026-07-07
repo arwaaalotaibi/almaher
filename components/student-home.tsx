@@ -6,7 +6,6 @@ import {
   buildSchedule,
   currentSessionIndex,
   formatSchedDate,
-  goalItems,
   halaqaTitle,
   PLAN_FIELDS,
   segDateLabel,
@@ -195,35 +194,16 @@ export function StudentHome() {
       {/* شاشة القرآن */}
       {tab === "quran" && (
         <section>
-          <Ribbon className="mb-6">أهدافي هذا الأسبوع</Ribbon>
-
-          <div className="grid gap-3">
-            {goalItems("hifz").map(({ key, label, icon }) => {
-              const text = me.goals[key]?.trim();
-              const isDone = me.done[key];
-              return (
-                <div key={key} className="card rounded-2xl p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="font-kufi text-base font-bold text-plum-800">
-                      {icon} {label}
-                    </span>
-                    {isDone && (
-                      <span className="rounded-full bg-plum-600 px-3 py-0.5 text-xs font-bold text-white">
-                        تمّ ✅
-                      </span>
-                    )}
-                  </div>
-                  <p
-                    className={`mt-2 text-lg ${
-                      text ? "font-semibold text-ink" : "text-sm text-silver-500"
-                    }`}
-                  >
-                    {text || "لم يُحدَّد بعد — تابعي مع معلّمتك"}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
+          {me.plan?.start?.trim() && (
+            <div className="mb-3 flex items-center justify-between rounded-2xl bg-plum-600 px-4 py-3">
+              <span className="font-kufi text-sm font-bold text-white">
+                📖 بداية الحفظ
+              </span>
+              <span className="font-kufi text-lg font-bold text-white">
+                {me.plan.start}
+              </span>
+            </div>
+          )}
 
           {/* خطة الفصل — جدول مولّد تلقائياً */}
           {schedule ? (
@@ -377,42 +357,6 @@ export function StudentHome() {
               </div>
             </>
           ) : null}
-
-          {/* سجل الحصص */}
-          {me.sessions && me.sessions.length > 0 && (
-            <>
-              <Ribbon className="mb-4 mt-8">سجل حصصي</Ribbon>
-              <div className="grid gap-2">
-                {me.sessions.map((s, i) => (
-                  <div
-                    key={s.id}
-                    className="card flex items-center justify-between rounded-xl px-4 py-3"
-                  >
-                    <span className="flex items-center gap-3 font-kufi text-sm font-bold text-plum-800">
-                      <span className="rounded-full bg-plum-100 px-2 py-0.5 text-[11px] text-plum-700">
-                        حصة {ar(me.sessions!.length - i)}
-                      </span>
-                      {(s.hifz ?? 0) > 0 && <span>📖 {ar(s.hifz!)}</span>}
-                      {(s.tathbit ?? 0) > 0 && <span>📌 {ar(s.tathbit!)}</span>}
-                      {(s.murajaah ?? 0) > 0 && <span>🔁 {ar(s.murajaah!)}</span>}
-                      {s.surah && (
-                        <span className="text-xs font-normal text-silver-600">
-                          {s.surah}
-                          {s.fromAyah && (
-                            <span dir="ltr">
-                              {" "}
-                              {s.fromAyah}
-                              {s.toAyah ? `-${s.toAyah}` : ""}
-                            </span>
-                          )}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
 
           {updatedLabel && (
             <p className="mt-6 text-center text-xs text-silver-600">

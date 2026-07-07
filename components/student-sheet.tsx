@@ -5,65 +5,15 @@ import {
   actions,
   CoursePlan,
   EMPTY_PLAN,
-  goalItems,
   normalizeDigits,
   PLAN_FIELDS,
-  uid,
   useApp,
-  type Goals,
-  type GoalsDone,
-  type SessionLog,
   type Student,
 } from "@/lib/store";
 import { SURAHS } from "@/lib/surahs";
 import { DangerBtn, Field, inputCls, PrimaryBtn, Sheet } from "./ui";
 
-/** عدّاد سريع بأزرار +/− للأوجه */
-function Stepper({
-  icon,
-  label,
-  value,
-  onChange,
-  hint,
-}: {
-  icon: string;
-  label: string;
-  value: number;
-  onChange: (n: number) => void;
-  hint?: string;
-}) {
-  return (
-    <div className="rounded-xl bg-white p-2 text-center shadow-sm">
-      <p className="text-xs font-bold text-plum-700">
-        {icon} {label}
-      </p>
-      {hint && <p className="text-[9px] text-silver-500">{hint}</p>}
-      <div className="mt-1 flex items-center justify-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => onChange(Math.max(0, value - 1))}
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-cream text-lg font-bold text-plum-700 active:scale-95"
-          aria-label="نقص"
-        >
-          −
-        </button>
-        <span className="w-6 font-kufi text-xl font-bold text-plum-800">
-          {value.toLocaleString("ar-EG")}
-        </span>
-        <button
-          type="button"
-          onClick={() => onChange(value + 1)}
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-plum-600 text-lg font-bold text-white active:scale-95"
-          aria-label="زيادة"
-        >
-          +
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/** نافذة بيانات الطالبة: الاسم + المعلّمة + الأهداف الثلاثة */
+/** نافذة بيانات الطالبة: الاسم + المعلّمة + بداية الحفظ + خطة الفصل */
 export function StudentSheet({
   student,
   onClose,
@@ -75,20 +25,9 @@ export function StudentSheet({
   const [name, setName] = useState("");
   const [teacherId, setTeacherId] = useState("");
   const [halaqaId, setHalaqaId] = useState("");
-  const [goals, setGoals] = useState<Goals>({ hifz: "", tathbit: "", murajaah: "" });
-  const [done, setDone] = useState<GoalsDone>({ hifz: false, tathbit: false, murajaah: false });
   const [note, setNote] = useState("");
   const [plan, setPlan] = useState<CoursePlan>({ ...EMPTY_PLAN });
-  const [sessions, setSessions] = useState<SessionLog[]>([]);
   const [copied, setCopied] = useState(false);
-
-  // مسودّة الحصّة (أوجه) — التثبيت يُعبّأ تلقائياً بحفظ الحصة السابقة
-  const [sHifz, setSHifz] = useState(0);
-  const [sTathbit, setSTathbit] = useState(0);
-  const [sMuraj, setSMuraj] = useState(0);
-  const [sSurah, setSSurah] = useState("");
-  const [sFrom, setSFrom] = useState("");
-  const [sTo, setSTo] = useState("");
 
   useEffect(() => {
     if (student) {
@@ -96,43 +35,9 @@ export function StudentSheet({
       setTeacherId(student.teacherId);
       setHalaqaId(student.halaqaId);
       setPlan({ ...EMPTY_PLAN, ...student.plan });
-      setSessions(student.sessions ?? []);
-      setGoals({ ...student.goals });
-      setDone({ ...student.done });
       setNote(student.note ?? "");
-      setSHifz(0);
-      // تثبيت هذه الحصة = حفظ الحصة الفائتة تلقائياً
-      setSTathbit(student.sessions?.[0]?.hifz ?? 0);
-      setSMuraj(0);
-      setSSurah("");
-      setSFrom("");
-      setSTo("");
     }
   }, [student]);
-
-  const addSession = () => {
-    if (!sHifz && !sTathbit && !sMuraj && !sSurah.trim()) return;
-    setSessions([
-      {
-        id: uid(),
-        date: new Date().toISOString(),
-        hifz: sHifz,
-        tathbit: sTathbit,
-        murajaah: sMuraj,
-        surah: sSurah.trim(),
-        fromAyah: normalizeDigits(sFrom),
-        toAyah: normalizeDigits(sTo),
-      },
-      ...sessions,
-    ]);
-    // الحصة القادمة: تثبيتها = حفظ هذه الحصة
-    setSTathbit(sHifz);
-    setSHifz(0);
-    setSMuraj(0);
-    setSSurah("");
-    setSFrom("");
-    setSTo("");
-  };
 
   const planNum = (v: string) => Math.max(0, Number(normalizeDigits(v)) || 0);
 
@@ -145,9 +50,6 @@ export function StudentSheet({
       teacherId,
       halaqaId,
       plan,
-      sessions,
-      goals,
-      done,
       note: note.trim(),
     });
     onClose();
@@ -236,35 +138,20 @@ export function StudentSheet({
         </Field>
       </div>
 
-      <div className="mb-3 rounded-2xl bg-plum-50 p-3">
-        <p className="mb-2 font-kufi text-sm font-bold text-plum-800">
-          أهداف هذا الأسبوع
-        </p>
-        {goalItems("hifz").map(({ key, label, icon }) => (
-          <div key={key} className="mb-2 last:mb-0">
-            <div className="mb-1 flex items-center justify-between">
-              <span className="text-sm font-bold text-plum-700">
-                {icon} {label}
-              </span>
-              <label className="flex cursor-pointer items-center gap-1.5 text-xs font-bold text-plum-600">
-                <input
-                  type="checkbox"
-                  checked={done[key] ?? false}
-                  onChange={(e) => setDone({ ...done, [key]: e.target.checked })}
-                  className="h-4 w-4 accent-plum-600"
-                />
-                تمّ ✅
-              </label>
-            </div>
-            <input
-              className={inputCls}
-              placeholder="مثال: سورة الملك ١ – ١٥"
-              value={goals[key] ?? ""}
-              onChange={(e) => setGoals({ ...goals, [key]: e.target.value })}
-            />
-          </div>
-        ))}
-      </div>
+      <Field label="بداية الحفظ" icon="📖">
+        <input
+          className={inputCls}
+          list="surah-list"
+          placeholder="مثال: سورة الملك · جزء عمّ · صفحة ٥٨٢"
+          value={plan.start ?? ""}
+          onChange={(e) => setPlan({ ...plan, start: e.target.value })}
+        />
+        <datalist id="surah-list">
+          {SURAHS.map((s) => (
+            <option key={s} value={s} />
+          ))}
+        </datalist>
+      </Field>
 
       {/* خطة الفصل بالأوجه */}
       <div className="mb-3 rounded-2xl border border-cream-dark p-3">
@@ -294,111 +181,6 @@ export function StudentSheet({
         </div>
       </div>
 
-      {/* تسجيل سريع للحصص بالأوجه */}
-      <div className="mb-3 rounded-2xl border border-cream-dark p-3">
-        <p className="mb-0.5 font-kufi text-sm font-bold text-plum-800">
-          ⚡ تسجيل الحصة (بالأوجه)
-        </p>
-        <p className="mb-2 text-[11px] text-silver-600">
-          التثبيت يُعبّأ تلقائياً بحفظ الحصة السابقة ✨
-        </p>
-
-        <div className="mb-2 rounded-xl bg-plum-50 p-2.5">
-          <div className="grid grid-cols-3 gap-2">
-            <Stepper icon="📖" label="حفظ" value={sHifz} onChange={setSHifz} />
-            <Stepper
-              icon="📌"
-              label="تثبيت"
-              value={sTathbit}
-              onChange={setSTathbit}
-              hint="الحصة الفائتة"
-            />
-            <Stepper icon="🔁" label="مراجعة" value={sMuraj} onChange={setSMuraj} />
-          </div>
-
-          <details className="mt-2">
-            <summary className="cursor-pointer text-[11px] font-bold text-plum-700">
-              + تفاصيل السورة (اختياري)
-            </summary>
-            <input
-              className={`${inputCls} mb-2 mt-2`}
-              list="surah-list"
-              placeholder="السورة"
-              value={sSurah}
-              onChange={(e) => setSSurah(e.target.value)}
-            />
-            <datalist id="surah-list">
-              {SURAHS.map((s) => (
-                <option key={s} value={s} />
-              ))}
-            </datalist>
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                className={inputCls}
-                inputMode="numeric"
-                placeholder="من آية"
-                value={sFrom}
-                onChange={(e) => setSFrom(e.target.value)}
-              />
-              <input
-                className={inputCls}
-                inputMode="numeric"
-                placeholder="إلى آية"
-                value={sTo}
-                onChange={(e) => setSTo(e.target.value)}
-              />
-            </div>
-          </details>
-
-          <button
-            type="button"
-            onClick={addSession}
-            className="mt-2 w-full rounded-xl bg-plum-600 py-2.5 text-sm font-bold text-white"
-          >
-            ➕ تسجيل الحصة
-          </button>
-        </div>
-
-        {/* سجل الحصص */}
-        {sessions.length > 0 && (
-          <p className="mb-1 text-xs font-bold text-plum-700">
-            سجل الحصص ({sessions.length.toLocaleString("ar-EG")})
-          </p>
-        )}
-        {sessions.map((s) => (
-          <div
-            key={s.id}
-            className="mb-1.5 flex items-center justify-between rounded-lg bg-cream px-3 py-2 text-sm"
-          >
-            <span className="flex flex-wrap items-center gap-2 font-bold text-plum-800">
-              {(s.hifz ?? 0) > 0 && <span>📖 {s.hifz}</span>}
-              {(s.tathbit ?? 0) > 0 && <span>📌 {s.tathbit}</span>}
-              {(s.murajaah ?? 0) > 0 && <span>🔁 {s.murajaah}</span>}
-              {s.surah && (
-                <span className="text-xs font-normal text-silver-600">
-                  {s.surah}
-                  {s.fromAyah && (
-                    <span dir="ltr">
-                      {" "}
-                      {s.fromAyah}
-                      {s.toAyah ? `-${s.toAyah}` : ""}
-                    </span>
-                  )}
-                </span>
-              )}
-            </span>
-            <button
-              type="button"
-              onClick={() => setSessions(sessions.filter((x) => x.id !== s.id))}
-              className="shrink-0 text-xs font-bold text-red-600"
-              aria-label="حذف"
-            >
-              ✕
-            </button>
-          </div>
-        ))}
-      </div>
-
       <Field label="ملاحظات" icon="📝">
         <textarea
           className={`${inputCls} min-h-16`}
@@ -421,29 +203,11 @@ export function StudentSheet({
   );
 }
 
-/** شارات حالة الأهداف الصغيرة على صندوق الطالبة */
+/** سطر صغير تحت اسم الطالبة: بداية الحفظ إن وُجدت */
 export function GoalDots({ student }: { student: Student }) {
+  const start = student.plan?.start?.trim();
+  if (!start) return null;
   return (
-    <span className="flex items-center justify-center gap-1 text-[11px]">
-      {goalItems("hifz").map(({ key, icon }) => {
-        const has = Boolean(student.goals[key]?.trim());
-        const isDone = student.done[key];
-        return (
-          <span
-            key={key}
-            className={`rounded-full px-1 ${
-              isDone
-                ? "bg-white/90"
-                : has
-                  ? "bg-white/40"
-                  : "bg-white/10 opacity-40 grayscale"
-            }`}
-            title={key}
-          >
-            {icon}
-          </span>
-        );
-      })}
-    </span>
+    <span className="text-[11px] font-normal text-white/80">📖 {start}</span>
   );
 }
