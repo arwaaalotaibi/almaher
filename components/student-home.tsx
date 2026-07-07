@@ -225,10 +225,9 @@ export function StudentHome() {
                     style={{ width: `${(passed / schedule.length) * 100}%` }}
                   />
                 </div>
-                <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                <div className="mt-3 grid grid-cols-2 gap-2 text-center">
                   {[
                     { l: "حفظ", v: me.plan.hifz, i: "📖" },
-                    { l: "تثبيت", v: me.plan.tathbit, i: "📌" },
                     { l: "مراجعة", v: me.plan.murajaah, i: "🔁" },
                   ].map((x) => (
                     <div key={x.l} className="rounded-xl bg-plum-50 py-2">

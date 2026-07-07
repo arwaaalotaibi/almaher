@@ -172,10 +172,9 @@ export function sessionKindMeta(k: string) {
   return SESSION_KINDS.find((x) => x.key === k) ?? SESSION_KINDS[0];
 }
 
-/* حقول خطة الطالبة بالأوجه (عدد اللقاءات يأتي من الحلقة) */
+/* حقول خطة الطالبة بالأوجه — التثبيت يُحسب تلقائياً (= حفظ الحصة الفائتة) */
 export const PLAN_FIELDS = [
   { key: "hifz", label: "أوجه الحفظ", icon: "📖" },
-  { key: "tathbit", label: "أوجه التثبيت", icon: "📌" },
   { key: "murajaah", label: "أوجه المراجعة", icon: "🔁" },
 ] as const;
 
@@ -228,8 +227,9 @@ export function buildSchedule(
   while (first.getDay() !== dow) first.setDate(first.getDate() + 1);
 
   const h = spread(plan.hifz || 0, n);
-  const t = spread(plan.tathbit || 0, n);
   const m = spread(plan.murajaah || 0, n);
+  // التثبيت = حفظ الحصة الفائتة (اللقاء الأول بلا تثبيت)
+  const t = h.map((_, i) => (i === 0 ? 0 : h[i - 1]));
 
   const rows: ScheduleRow[] = [];
   let ch = 0,

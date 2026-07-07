@@ -183,9 +183,10 @@ export function StudentSheet({
           📋 خطة الفصل (بالأوجه)
         </p>
         <p className="mb-2 text-[11px] text-silver-600">
-          إجمالي أوجه الفصل — يوزّعها النظام على اللقاءات تلقائياً
+          إجمالي أوجه الفصل — يوزّعها النظام على اللقاءات، والتثبيت يُحسب تلقائياً
+          (= حفظ الحصة الفائتة)
         </p>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {PLAN_FIELDS.map(({ key, label, icon }) => (
             <label key={key} className="block">
               <span className="mb-1 block text-xs font-bold text-plum-700">
