@@ -92,8 +92,8 @@ export function StudentSheet({
             s.date
           )}</td><td class="seg">${
             s.hifzLabel || (s.hifz ? `${ar(s.hifz)} أوجه` : dash)
-          }</td><td class="seg">${s.tathbitLabel || dash}</td><td>${
-            s.murajaah ? `${ar(s.murajaah)} أوجه` : dash
+          }</td><td class="seg">${s.tathbitLabel || dash}</td><td class="seg">${
+            s.murajaahLabel || (s.murajaah ? `${ar(s.murajaah)} أوجه` : dash)
           }</td></tr>`
       )
       .join("");
@@ -216,6 +216,7 @@ export function StudentSheet({
         </Field>
       </div>
 
+      {/* بداية الحفظ */}
       <div className="mb-1 grid grid-cols-2 gap-3">
         <Field label="بداية الحفظ — السورة" icon="📖">
           <select
@@ -254,14 +255,53 @@ export function StudentSheet({
         </Field>
       </div>
 
+      {/* بداية المراجعة */}
+      <div className="mb-1 grid grid-cols-2 gap-3">
+        <Field label="بداية المراجعة — السورة" icon="🔁">
+          <select
+            className={inputCls}
+            value={plan.murStartSurah ?? ""}
+            onChange={(e) =>
+              setPlan({ ...plan, murStartSurah: e.target.value, murStartAyah: 1 })
+            }
+          >
+            <option value="">اختاري السورة…</option>
+            {SURAHS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="رقم الآية" icon="🔢">
+          <select
+            className={inputCls}
+            value={plan.murStartAyah ?? 1}
+            onChange={(e) =>
+              setPlan({ ...plan, murStartAyah: Number(e.target.value) })
+            }
+            disabled={!plan.murStartSurah}
+          >
+            {Array.from(
+              { length: Math.max(1, ayahCount(plan.murStartSurah ?? "")) },
+              (_, i) => i + 1
+            ).map((n) => (
+              <option key={n} value={n}>
+                {n.toLocaleString("ar-EG")}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
       {/* خطة الفصل بالأوجه */}
       <div className="mb-3 rounded-2xl border border-cream-dark p-3">
         <p className="mb-1 font-kufi text-sm font-bold text-plum-800">
-          📋 خطة الفصل (بالأوجه)
+          📋 أوجه كل لقاء
         </p>
         <p className="mb-2 text-[11px] text-silver-600">
-          إجمالي أوجه الفصل — يوزّعها النظام على اللقاءات، والتثبيت يُحسب تلقائياً
-          (= حفظ الحصة الفائتة)
+          كمية كل لقاء — يحسب النظام مقطعها عبر المصحف، والتثبيت تلقائياً (= حفظ
+          اللقاء السابق)
         </p>
         <div className="grid grid-cols-2 gap-2">
           {PLAN_FIELDS.map(({ key, label, icon }) => (
@@ -312,7 +352,9 @@ export function StudentSheet({
                 </p>
                 <p className="text-[11px] text-silver-600">
                   {s.tathbitLabel && `📌 تثبيت: ${s.tathbitLabel} · `}
-                  🔁 مراجعة: {s.murajaah ? `${ar(s.murajaah)} أوجه` : "—"}
+                  🔁 مراجعة:{" "}
+                  {s.murajaahLabel ||
+                    (s.murajaah ? `${ar(s.murajaah)} أوجه` : "—")}
                 </p>
               </div>
             ))}

@@ -273,7 +273,9 @@ export function StudentHome() {
                         </div>
                         <div className="rounded-xl bg-white py-2">
                           <p className="font-bold text-plum-700">
-                            🔁 {s.murajaah ? `${ar(s.murajaah)} أوجه` : "—"}
+                            🔁{" "}
+                            {s.murajaahLabel ||
+                              (s.murajaah ? `${ar(s.murajaah)} أوجه` : "—")}
                           </p>
                           <p className="text-[10px] text-silver-600">مراجعة</p>
                         </div>
@@ -323,7 +325,9 @@ export function StudentHome() {
                         }`}
                       >
                         {s.tathbitLabel && `📌 ${s.tathbitLabel} · `}
-                        🔁 مراجعة {s.murajaah ? `${ar(s.murajaah)} أوجه` : "—"}
+                        🔁 مراجعة{" "}
+                        {s.murajaahLabel ||
+                          (s.murajaah ? `${ar(s.murajaah)} أوجه` : "—")}
                       </p>
                     </div>
                   );

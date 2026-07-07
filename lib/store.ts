@@ -19,10 +19,12 @@ export interface CoursePlan {
   meetings: number; // (قديم — غير مستخدم)
   hifz: number; // أوجه الحفظ
   tathbit: number; // أوجه التثبيت
-  murajaah: number; // أوجه المراجعة
+  murajaah: number; // أوجه المراجعة لكل لقاء
   start?: string; // (قديم — نص حر)
   startSurah?: string; // بداية الحفظ: السورة
   startAyah?: number; // بداية الحفظ: رقم الآية
+  murStartSurah?: string; // بداية المراجعة: السورة
+  murStartAyah?: number; // بداية المراجعة: رقم الآية
 }
 
 export const EMPTY_PLAN: CoursePlan = {
@@ -33,6 +35,8 @@ export const EMPTY_PLAN: CoursePlan = {
   start: "",
   startSurah: "",
   startAyah: 1,
+  murStartSurah: "",
+  murStartAyah: 1,
 };
 
 /** نص بداية الحفظ للعرض */
@@ -178,7 +182,7 @@ export function sessionKindMeta(k: string) {
   return SESSION_KINDS.find((x) => x.key === k) ?? SESSION_KINDS[0];
 }
 
-/* حقول خطة الطالبة بالأوجه — التثبيت يُحسب تلقائياً (= حفظ الحصة الفائتة) */
+/* أوجه كل لقاء — التثبيت يُحسب تلقائياً (= حفظ اللقاء السابق) */
 export const PLAN_FIELDS = [
   { key: "hifz", label: "أوجه الحفظ", icon: "📖" },
   { key: "murajaah", label: "أوجه المراجعة", icon: "🔁" },
@@ -196,6 +200,7 @@ export interface ScheduleRow {
   murajaah: number;
   hifzLabel: string; // مقطع الحفظ الجديد (سورة/آية) — إن عُرفت بداية الحفظ
   tathbitLabel: string; // مقطع التثبيت (= حفظ اللقاء الفائت)
+  murajaahLabel: string; // مقطع المراجعة — إن عُرفت بداية المراجعة
   cumHifz: number; // التراكمي حتى هذا اللقاء
   cumTathbit: number;
   cumMurajaah: number;
@@ -234,54 +239,79 @@ export function buildSchedule(
   const first = new Date(start);
   while (first.getDay() !== dow) first.setDate(first.getDate() + 1);
 
-  const h = spread(plan.hifz || 0, n);
-  const m = spread(plan.murajaah || 0, n);
-  // التثبيت = حفظ الحصة الفائتة (اللقاء الأول بلا تثبيت)
-  const t = h.map((_, i) => (i === 0 ? 0 : h[i - 1]));
+  // «أوجه الحفظ» و«أوجه المراجعة» = كمية كل لقاء (تتراكم عبر المصحف)
+  const perH = Math.max(0, Math.round(plan.hifz || 0));
+  const perM = Math.max(0, Math.round(plan.murajaah || 0));
 
-  // موضع بداية الحفظ في المصحف (إن حُدّد) → مقطع كل لقاء
-  const startNum = plan.startSurah ? surahNumber(plan.startSurah) : 0;
-  const startPage = startNum ? pageOf(startNum, plan.startAyah || 1) : 0;
+  const hPage0 = plan.startSurah
+    ? pageOf(surahNumber(plan.startSurah), plan.startAyah || 1)
+    : 0;
+  const mPage0 = plan.murStartSurah
+    ? pageOf(surahNumber(plan.murStartSurah), plan.murStartAyah || 1)
+    : 0;
 
-  // نطاق صفحات كل لقاء (متتابعة من بداية الحفظ)
-  const ranges: { from: number; to: number }[] = [];
-  let cursor = startPage;
-  for (let i = 0; i < n; i++) {
-    if (startPage && h[i] > 0) {
-      const from = cursor;
-      const to = Math.min(MUSHAF_PAGES, from + h[i] - 1);
-      ranges.push({ from, to });
-      cursor = to + 1;
-    } else {
-      ranges.push({ from: 0, to: 0 });
-    }
-  }
+  type Rng = { from: number; to: number };
+  const empty: Rng = { from: 0, to: 0 };
 
   const rows: ScheduleRow[] = [];
+  let hCur = hPage0; // مؤشّر صفحة الحفظ التالية
+  let mCur = mPage0; // مؤشّر صفحة المراجعة التالية
+  let prevH: Rng = empty; // حفظ اللقاء السابق (= تثبيت اللقاء الحالي)
   let ch = 0,
     ct = 0,
     cm = 0;
+
   for (let i = 0; i < n; i++) {
     const date = new Date(first);
     date.setDate(first.getDate() + i * 7);
-    ch += h[i];
-    ct += t[i];
-    cm += m[i];
-    const r = ranges[i];
+
+    // مقطع الحفظ الجديد لهذا اللقاء
+    let hRange: Rng = empty;
+    let hCount = perH;
+    if (hPage0) {
+      if (perH > 0 && hCur <= MUSHAF_PAGES) {
+        hRange = { from: hCur, to: Math.min(MUSHAF_PAGES, hCur + perH - 1) };
+        hCount = hRange.to - hRange.from + 1;
+        hCur = hRange.to + 1;
+      } else {
+        hCount = 0; // انتهى المصحف
+      }
+    }
+
     // التثبيت = مقطع حفظ اللقاء السابق
-    const pr = i > 0 ? ranges[i - 1] : { from: 0, to: 0 };
+    const tRange = prevH;
+    const tCount = tRange.from ? tRange.to - tRange.from + 1 : 0;
+
+    // مقطع المراجعة (إن حُدّدت بدايتها)
+    let mRange: Rng = empty;
+    let mCount = perM;
+    if (mPage0) {
+      if (perM > 0 && mCur <= MUSHAF_PAGES) {
+        mRange = { from: mCur, to: Math.min(MUSHAF_PAGES, mCur + perM - 1) };
+        mCount = mRange.to - mRange.from + 1;
+        mCur = mRange.to + 1;
+      } else {
+        mCount = 0;
+      }
+    }
+
+    ch += hCount;
+    ct += tCount;
+    cm += mCount;
     rows.push({
       n: i + 1,
       date,
-      hifz: h[i],
-      tathbit: t[i],
-      murajaah: m[i],
-      hifzLabel: r.from ? hifzRangeLabel(r.from, r.to) : "",
-      tathbitLabel: pr.from ? hifzRangeLabel(pr.from, pr.to) : "",
+      hifz: hCount,
+      tathbit: tCount,
+      murajaah: mCount,
+      hifzLabel: hRange.from ? hifzRangeLabel(hRange.from, hRange.to) : "",
+      tathbitLabel: tRange.from ? hifzRangeLabel(tRange.from, tRange.to) : "",
+      murajaahLabel: mRange.from ? hifzRangeLabel(mRange.from, mRange.to) : "",
       cumHifz: ch,
       cumTathbit: ct,
       cumMurajaah: cm,
     });
+    prevH = hRange;
   }
   return rows;
 }
