@@ -8,7 +8,6 @@ import {
   PLAN_FIELDS,
   sessionKindMeta,
   STUDENT_PICK_KEY,
-  trackMeta,
   useApp,
 } from "@/lib/store";
 import Link from "next/link";
@@ -86,9 +85,6 @@ export function StudentHome() {
         <img src="/logo.png" alt="الماهر" className="mx-auto mb-3 h-16 w-auto" />
         <h1 className="font-kufi text-3xl font-bold text-plum-800">{me.name}</h1>
         <p className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
-          <span className="rounded-lg bg-plum-600 px-2.5 py-0.5 text-xs font-bold text-white">
-            {trackMeta(me.track).icon} مسار {trackMeta(me.track).label}
-          </span>
           {halaqa && (
             <span className="rounded-lg bg-plum-100 px-2.5 py-0.5 text-xs font-bold text-plum-700">
               🕌 {halaqaTitle(halaqa)}
@@ -161,7 +157,7 @@ export function StudentHome() {
           <Ribbon className="mb-6">أهدافي هذا الأسبوع</Ribbon>
 
           <div className="grid gap-3">
-            {goalItems(me.track).map(({ key, label, icon }) => {
+            {goalItems("hifz").map(({ key, label, icon }) => {
               const text = me.goals[key]?.trim();
               const isDone = me.done[key];
               return (

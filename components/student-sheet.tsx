@@ -10,15 +10,12 @@ import {
   PLAN_FIELDS,
   SESSION_KINDS,
   sessionKindMeta,
-  TRACKS,
-  TRACK_META,
   uid,
   useApp,
   type Goals,
   type GoalsDone,
   type SessionLog,
   type Student,
-  type TrackKey,
 } from "@/lib/store";
 import { SURAHS } from "@/lib/surahs";
 import { DangerBtn, Field, inputCls, PrimaryBtn, Sheet } from "./ui";
@@ -38,7 +35,6 @@ export function StudentSheet({
   const [goals, setGoals] = useState<Goals>({ hifz: "", tathbit: "", murajaah: "" });
   const [done, setDone] = useState<GoalsDone>({ hifz: false, tathbit: false, murajaah: false });
   const [note, setNote] = useState("");
-  const [track, setTrack] = useState<TrackKey>("hifz");
   const [plan, setPlan] = useState<CoursePlan>({ ...EMPTY_PLAN });
   const [sessions, setSessions] = useState<SessionLog[]>([]);
   const [copied, setCopied] = useState(false);
@@ -54,7 +50,6 @@ export function StudentSheet({
       setName(student.name);
       setTeacherId(student.teacherId);
       setHalaqaId(student.halaqaId);
-      setTrack(student.track ?? "hifz");
       setPlan({ ...EMPTY_PLAN, ...student.plan });
       setSessions(student.sessions ?? []);
       setGoals({ ...student.goals });
@@ -95,7 +90,6 @@ export function StudentSheet({
       name: name.trim(),
       teacherId,
       halaqaId,
-      track,
       plan,
       sessions,
       goals,
@@ -188,25 +182,11 @@ export function StudentSheet({
         </Field>
       </div>
 
-      <Field label="المسار" icon="🛤️">
-        <select
-          className={inputCls}
-          value={track}
-          onChange={(e) => setTrack(e.target.value as TrackKey)}
-        >
-          {TRACKS.map((tk) => (
-            <option key={tk} value={tk}>
-              {TRACK_META[tk].icon} مسار {TRACK_META[tk].label}
-            </option>
-          ))}
-        </select>
-      </Field>
-
       <div className="mb-3 rounded-2xl bg-plum-50 p-3">
         <p className="mb-2 font-kufi text-sm font-bold text-plum-800">
-          أهداف مسار {TRACK_META[track].label} هذا الأسبوع
+          أهداف هذا الأسبوع
         </p>
-        {goalItems(track).map(({ key, label, icon }) => (
+        {goalItems("hifz").map(({ key, label, icon }) => (
           <div key={key} className="mb-2 last:mb-0">
             <div className="mb-1 flex items-center justify-between">
               <span className="text-sm font-bold text-plum-700">
@@ -376,7 +356,7 @@ export function StudentSheet({
 export function GoalDots({ student }: { student: Student }) {
   return (
     <span className="flex items-center justify-center gap-1 text-[11px]">
-      {goalItems(student.track).map(({ key, icon }) => {
+      {goalItems("hifz").map(({ key, icon }) => {
         const has = Boolean(student.goals[key]?.trim());
         const isDone = student.done[key];
         return (
