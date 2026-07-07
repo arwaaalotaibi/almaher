@@ -84,48 +84,63 @@ export function StudentSheet({
     const w = window.open("", "_blank");
     if (!w) return;
     const startLabel = hifzStartLabel(plan);
+    const dash = "–";
     const rows = schedule
       .map(
         (s) =>
-          `<tr><td>${ar(s.n)}</td><td>${formatSchedDate(s.date)}</td><td>${
-            s.hifz || "—"
-          }</td><td>${s.tathbit || "—"}</td><td>${s.murajaah || "—"}</td></tr>`
+          `<tr><td class="num">${ar(s.n)}</td><td>${formatSchedDate(
+            s.date
+          )}</td><td>${s.hifz ? ar(s.hifz) : dash}</td><td>${
+            s.tathbit ? ar(s.tathbit) : dash
+          }</td><td>${s.murajaah ? ar(s.murajaah) : dash}</td></tr>`
       )
       .join("");
     w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8">
 <title>جدول حفظ — ${name}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 <style>
-  *{font-family:'Segoe UI','Tahoma',sans-serif;box-sizing:border-box}
-  body{margin:0;padding:28px;color:#453039}
-  .head{text-align:center;border-bottom:3px solid #7d5a6c;padding-bottom:14px;margin-bottom:18px}
-  .head img{height:60px}
-  h1{font-size:22px;color:#5d3f4e;margin:8px 0 2px}
-  .sub{color:#8f8880;font-size:13px}
-  .info{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:14px 0}
-  .chip{background:#f7f2f5;border:1px solid #d9c8d1;border-radius:10px;padding:5px 12px;font-size:13px;font-weight:bold;color:#5d3f4e}
-  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:14px}
-  th{background:#5d3f4e;color:#fff;padding:9px;font-size:14px}
-  td{border:1px solid #e8e4df;padding:8px;text-align:center}
-  tr:nth-child(even) td{background:#f7f2f5}
-  .foot{text-align:center;color:#a39c93;font-size:12px;margin-top:18px}
-  @media print{body{padding:10px}}
+  *{font-family:'Amiri','Traditional Arabic','Geeza Pro','Times New Roman',serif;box-sizing:border-box}
+  body{margin:0;padding:34px;color:#3a2a32;background:#fff}
+  .frame{border:3px double #7d5a6c;border-radius:8px;padding:26px 28px 20px}
+  .head{text-align:center}
+  .head img{height:74px}
+  h1{font-size:34px;font-weight:700;color:#5d3f4e;margin:10px 0 2px}
+  .name{font-size:22px;color:#3a2a32;font-weight:700}
+  .assoc{color:#a8894f;font-size:17px;margin-top:2px}
+  .rule{height:2px;background:linear-gradient(90deg,transparent,#a8894f,transparent);margin:16px 0}
+  .info{text-align:center;font-size:19px;color:#5d3f4e;margin-bottom:16px;line-height:2.1}
+  .info b{color:#3a2a32}
+  table{width:100%;border-collapse:collapse;font-size:20px}
+  th{background:#5d3f4e;color:#fff;padding:13px 10px;font-weight:700;border:1px solid #4d3340}
+  td{border:1px solid #d9c8d1;padding:11px 8px;text-align:center}
+  td.num{font-weight:700;color:#5d3f4e}
+  tr:nth-child(even) td{background:#faf6f8}
+  .foot{text-align:center;color:#9c8fa0;font-size:15px;margin-top:16px;font-style:italic}
+  @media print{body{padding:8px}}
 </style></head><body>
-  <div class="head">
-    <img src="${window.location.origin}/logo.png" alt="الماهر"/>
-    <h1>جدول الحفظ — الطالبة ${name || ""}</h1>
-    <div class="sub">جمعية الماهر بالقرآن وعلومه</div>
+  <div class="frame">
+    <div class="head">
+      <img src="${window.location.origin}/logo.png" alt="الماهر"/>
+      <h1>جدول الحفظ</h1>
+      <div class="name">الطالبة: ${name || ""}</div>
+      <div class="assoc">جمعية الماهر بالقرآن وعلومه</div>
+    </div>
+    <div class="rule"></div>
+    <div class="info">
+      <b>الحلقة:</b> ${halaqaTitle(halaqa)}${
+        startLabel ? `&nbsp;&nbsp;•&nbsp;&nbsp;<b>بداية الحفظ:</b> ${startLabel}` : ""
+      }<br/>
+      <b>عدد اللقاءات:</b> ${ar(schedule.length)}
+    </div>
+    <table>
+      <thead><tr><th>اللقاء</th><th>التاريخ</th><th>حفظ</th><th>تثبيت</th><th>مراجعة</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="foot">الأرقام بالأوجه · التثبيت = حفظ اللقاء السابق</div>
   </div>
-  <div class="info">
-    <span class="chip">🕌 ${halaqaTitle(halaqa)}</span>
-    ${startLabel ? `<span class="chip">📖 بداية الحفظ: ${startLabel}</span>` : ""}
-    <span class="chip">📅 ${ar(schedule.length)} لقاء</span>
-  </div>
-  <table>
-    <thead><tr><th>اللقاء</th><th>التاريخ</th><th>حفظ</th><th>تثبيت</th><th>مراجعة</th></tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-  <div class="foot">الأوجه لكل لقاء · التثبيت = حفظ اللقاء السابق</div>
-  <script>window.onload=function(){window.print()}</script>
+  <script>window.onload=function(){setTimeout(function(){window.print()},400)}</script>
 </body></html>`);
     w.document.close();
   };
