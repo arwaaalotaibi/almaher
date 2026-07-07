@@ -73,12 +73,23 @@ export interface Announcement {
   createdAt: string; // ISO
 }
 
+/** مقطع من خطة قراءة الكتاب: يوم قراءة أو اختبار */
+export interface ReadingSegment {
+  id: string;
+  date: string; // ISO yyyy-mm-dd
+  fromPage: number;
+  toPage: number;
+  isExam: boolean;
+  note?: string;
+}
+
 export interface Book {
   id: string;
   title: string;
   url: string; // رابط ملف الـPDF العام
   pages: number; // عدد صفحات الصور المجهّزة (0 = عرض PDF مباشر)
   imgBase: string; // رابط مجلد صور الصفحات
+  readingPlan: ReadingSegment[]; // خطة القراءة الموزّعة على الأيام
   createdAt: string;
 }
 
@@ -401,7 +412,7 @@ export async function pullRemote(): Promise<void> {
       .order("created_at", { ascending: false }),
     supabase
       .from("almaher_books")
-      .select("id,title,url,pages,img_base,created_at")
+      .select("id,title,url,pages,img_base,reading_plan,created_at")
       .order("created_at", { ascending: false }),
   ]);
   if (h.error || t.error || s.error || a.error || b.error) {
@@ -446,6 +457,9 @@ export async function pullRemote(): Promise<void> {
       url: row.url as string,
       pages: (row.pages as number) ?? 0,
       imgBase: (row.img_base as string) ?? "",
+      readingPlan: Array.isArray(row.reading_plan)
+        ? (row.reading_plan as ReadingSegment[])
+        : [],
       createdAt: row.created_at as string,
     })),
   });
@@ -726,6 +740,17 @@ export const actions = {
     run(() => supabase.from("almaher_announcements").delete().eq("id", id));
   },
 
+  setBookPlan(id: string, plan: ReadingSegment[]) {
+    setState((s) => ({
+      ...s,
+      books: s.books.map((bk) =>
+        bk.id === id ? { ...bk, readingPlan: plan } : bk
+      ),
+    }));
+    run(() =>
+      supabase.from("almaher_books").update({ reading_plan: plan }).eq("id", id)
+    );
+  },
   renameBook(id: string, title: string) {
     const t = title.trim();
     if (!t) return;
@@ -782,6 +807,85 @@ export const actions = {
 
 export function halaqaTitle(h: Halaqa): string {
   return h.day ? `${h.mosque} — ${h.day}` : h.mosque;
+}
+
+/* ================== خطة قراءة الكتاب ================== */
+
+function ymd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+}
+
+/** توليد خطة قراءة تلقائياً: توزيع الصفحات على الأيام ثم اختبار */
+export function buildReadingPlan(
+  totalPages: number,
+  startISO: string,
+  pagesPerDay: number,
+  dows: number[], // أيام الأسبوع المسموحة (0=الأحد)، فارغ = كل يوم
+  addExam: boolean
+): ReadingSegment[] {
+  if (!startISO || totalPages < 1 || pagesPerDay < 1) return [];
+  const active = dows.length ? dows : [0, 1, 2, 3, 4, 5, 6];
+  const d = new Date(`${startISO}T00:00:00`);
+  if (isNaN(d.getTime())) return [];
+  const segs: ReadingSegment[] = [];
+  let page = 1;
+  let guard = 0;
+  while (page <= totalPages && guard < 2000) {
+    if (active.includes(d.getDay())) {
+      const to = Math.min(totalPages, page + pagesPerDay - 1);
+      segs.push({
+        id: uid(),
+        date: ymd(d),
+        fromPage: page,
+        toPage: to,
+        isExam: false,
+      });
+      page = to + 1;
+    }
+    d.setDate(d.getDate() + 1);
+    guard++;
+  }
+  if (addExam) {
+    while (!active.includes(d.getDay()) && guard < 2100) {
+      d.setDate(d.getDate() + 1);
+      guard++;
+    }
+    segs.push({
+      id: uid(),
+      date: ymd(d),
+      fromPage: 1,
+      toPage: totalPages,
+      isExam: true,
+      note: "اختبار على الكتاب كاملاً",
+    });
+  }
+  return segs;
+}
+
+/** مقطع «اليوم» من خطة القراءة (أو الأقرب القادم) */
+export function todaySegment(plan: ReadingSegment[]): {
+  seg: ReadingSegment;
+  when: "today" | "upcoming" | "past";
+} | null {
+  if (!plan.length) return null;
+  const today = ymd(new Date());
+  const sorted = [...plan].sort((a, b) => a.date.localeCompare(b.date));
+  const exact = sorted.find((s) => s.date === today);
+  if (exact) return { seg: exact, when: "today" };
+  const next = sorted.find((s) => s.date > today);
+  if (next) return { seg: next, when: "upcoming" };
+  return { seg: sorted[sorted.length - 1], when: "past" };
+}
+
+export function segDateLabel(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  return d.toLocaleDateString("ar-u-ca-gregory-nu-arab", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 }
 
 /* ================== تحويل الكتاب إلى صور صفحات ==================
@@ -866,6 +970,7 @@ export async function convertAndUploadBook(
       url: pub(`${id}.pdf`),
       pages: total,
       imgBase: pub(`pages/${id}`),
+      readingPlan: [],
       createdAt: new Date().toISOString(),
     };
 

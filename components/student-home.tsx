@@ -9,7 +9,9 @@ import {
   goalItems,
   halaqaTitle,
   PLAN_FIELDS,
+  segDateLabel,
   STUDENT_PICK_KEY,
+  todaySegment,
   useApp,
 } from "@/lib/store";
 
@@ -142,19 +144,49 @@ export function StudentHome() {
               </p>
             </div>
           ) : (
-            <div className="grid gap-2.5">
-              {books.map((b) => (
-                <Link
-                  key={b.id}
-                  href={`/book/${b.id}`}
-                  className="name-box flex items-center gap-3 rounded-xl px-5 py-4 text-start transition active:scale-[0.99]"
-                >
-                  <span className="text-2xl">📖</span>
-                  <span className="font-kufi text-lg font-semibold text-white">
-                    {b.title}
-                  </span>
-                </Link>
-              ))}
+            <div className="grid gap-3">
+              {books.map((b) => {
+                const ts = todaySegment(b.readingPlan);
+                return (
+                  <div key={b.id} className="overflow-hidden rounded-xl">
+                    <Link
+                      href={`/book/${b.id}`}
+                      className="name-box flex items-center gap-3 rounded-xl px-5 py-4 text-start transition active:scale-[0.99]"
+                    >
+                      <span className="text-2xl">📖</span>
+                      <span className="font-kufi text-lg font-semibold text-white">
+                        {b.title}
+                      </span>
+                    </Link>
+                    {ts && (
+                      <div
+                        className={`mt-1.5 rounded-xl px-4 py-2.5 text-sm ${
+                          ts.when === "today"
+                            ? "bg-plum-600 text-white"
+                            : "bg-plum-50 text-plum-800"
+                        }`}
+                      >
+                        {ts.seg.isExam ? (
+                          <span className="font-bold">
+                            📝 {ts.when === "today" ? "اليوم اختبار!" : "اختبار"}{" "}
+                            <span className="font-normal opacity-90">
+                              — {segDateLabel(ts.seg.date)}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="font-bold">
+                            📅 {ts.when === "today" ? "مهمة اليوم" : "التالي"}:
+                            صفحات {ar(ts.seg.fromPage)}–{ar(ts.seg.toPage)}{" "}
+                            <span className="font-normal opacity-80">
+                              ({segDateLabel(ts.seg.date)})
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>

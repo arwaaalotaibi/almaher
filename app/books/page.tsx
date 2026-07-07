@@ -181,10 +181,10 @@ function BooksInner() {
                   </button>
                 </div>
               </div>
-              <div className="mt-2 flex items-center gap-2">
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 {b.pages > 0 ? (
                   <span className="rounded-full bg-plum-100 px-2.5 py-0.5 text-[11px] font-bold text-plum-700">
-                    ⚡ جودة عالية · {ar(b.pages)} صفحة
+                    ⚡ {ar(b.pages)} صفحة
                   </span>
                 ) : (
                   <button
@@ -196,6 +196,13 @@ function BooksInner() {
                     ⚡ تحسين العرض (مطلوب)
                   </button>
                 )}
+                <Link
+                  href={`/books/${b.id}`}
+                  className="rounded-full bg-plum-600 px-3 py-1 text-[11px] font-bold text-white"
+                >
+                  📅 خطة القراءة
+                  {b.readingPlan.length > 0 && ` (${ar(b.readingPlan.length)})`}
+                </Link>
               </div>
             </div>
           ))}
