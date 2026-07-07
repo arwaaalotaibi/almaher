@@ -77,3 +77,18 @@ input, textarea, select {
   to { transform: translateY(0); opacity: 1; }
 }
 .sheet-anim { animation: sheet-up 0.22s ease-out; }
+
+/* انتقال صفحات الكتاب */
+@keyframes page-in {
+  from { opacity: 0.35; transform: translateX(-14px) scale(0.995); }
+  to { opacity: 1; transform: none; }
+}
+.page-in { animation: page-in 0.28s ease-out; }
+
+/* شريط أدوات زجاجي */
+.glass-bar {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 2px 14px rgba(77, 51, 64, 0.12);
+}

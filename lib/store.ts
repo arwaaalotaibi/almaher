@@ -660,6 +660,7 @@ export interface Stroke {
   color: string;
   width: number;
   points: [number, number][]; // نقاط منسوبة 0..1
+  alpha?: number; // شفافية الخط (قلم ~0.9، تظليل ~0.35)
 }
 
 export type BookAnnotations = Record<string, Stroke[]>; // مفتاح = رقم الصفحة

@@ -19,10 +19,12 @@ export default function BookPage({
   if (!hydrated) return <main className="mx-auto max-w-3xl px-4 pt-10" />;
 
   const book = books.find((b) => b.id === id);
+  const backHref = role === "admin" ? "/books" : "/";
+
   if (!book) {
     return (
       <main className="mx-auto max-w-3xl px-4 pt-10">
-        <PageHeader title="الكتاب غير موجود" back="/" />
+        <PageHeader title="الكتاب غير موجود" back={backHref} />
       </main>
     );
   }
@@ -31,9 +33,14 @@ export default function BookPage({
     role === "student" ? window.localStorage.getItem(STUDENT_PICK_KEY) : null;
 
   return (
-    <main className="mx-auto max-w-3xl px-4 pb-24 pt-8">
-      <PageHeader title={book.title} back={role === "admin" ? "/books" : "/"} />
-      <PdfReader url={book.url} bookId={book.id} studentId={studentId} />
+    <main className="mx-auto max-w-3xl">
+      <PdfReader
+        url={book.url}
+        bookId={book.id}
+        studentId={studentId}
+        title={book.title}
+        backHref={backHref}
+      />
     </main>
   );
 }
