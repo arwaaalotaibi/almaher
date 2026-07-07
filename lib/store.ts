@@ -23,14 +23,17 @@ export const EMPTY_PLAN: CoursePlan = {
   murajaah: 0,
 };
 
-/** إنجاز لقاء واحد — السورة والآيات */
+/** حصّة واحدة — أوجه الحفظ/التثبيت/المراجعة (+ تفصيل السورة اختياري) */
 export interface SessionLog {
   id: string;
   date: string; // ISO
-  kind: string; // نوع الإنجاز: hifz | tathbit | murajaah
-  surah: string; // اسم السورة
-  fromAyah: string; // من آية
-  toAyah: string; // إلى آية
+  hifz?: number; // أوجه الحفظ الجديد
+  tathbit?: number; // أوجه التثبيت (= حفظ الحصة الفائتة)
+  murajaah?: number; // أوجه المراجعة
+  surah?: string; // اسم السورة (اختياري)
+  fromAyah?: string;
+  toAyah?: string;
+  kind?: string; // (قديم — للتوافق)
   note?: string;
 }
 

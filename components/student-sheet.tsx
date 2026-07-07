@@ -8,8 +8,6 @@ import {
   goalItems,
   normalizeDigits,
   PLAN_FIELDS,
-  SESSION_KINDS,
-  sessionKindMeta,
   uid,
   useApp,
   type Goals,
@@ -19,6 +17,51 @@ import {
 } from "@/lib/store";
 import { SURAHS } from "@/lib/surahs";
 import { DangerBtn, Field, inputCls, PrimaryBtn, Sheet } from "./ui";
+
+/** عدّاد سريع بأزرار +/− للأوجه */
+function Stepper({
+  icon,
+  label,
+  value,
+  onChange,
+  hint,
+}: {
+  icon: string;
+  label: string;
+  value: number;
+  onChange: (n: number) => void;
+  hint?: string;
+}) {
+  return (
+    <div className="rounded-xl bg-white p-2 text-center shadow-sm">
+      <p className="text-xs font-bold text-plum-700">
+        {icon} {label}
+      </p>
+      {hint && <p className="text-[9px] text-silver-500">{hint}</p>}
+      <div className="mt-1 flex items-center justify-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => onChange(Math.max(0, value - 1))}
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-cream text-lg font-bold text-plum-700 active:scale-95"
+          aria-label="نقص"
+        >
+          −
+        </button>
+        <span className="w-6 font-kufi text-xl font-bold text-plum-800">
+          {value.toLocaleString("ar-EG")}
+        </span>
+        <button
+          type="button"
+          onClick={() => onChange(value + 1)}
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-plum-600 text-lg font-bold text-white active:scale-95"
+          aria-label="زيادة"
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
 
 /** نافذة بيانات الطالبة: الاسم + المعلّمة + الأهداف الثلاثة */
 export function StudentSheet({
@@ -39,8 +82,10 @@ export function StudentSheet({
   const [sessions, setSessions] = useState<SessionLog[]>([]);
   const [copied, setCopied] = useState(false);
 
-  // مسودّة إنجاز اللقاء
-  const [sKind, setSKind] = useState<string>("hifz");
+  // مسودّة الحصّة (أوجه) — التثبيت يُعبّأ تلقائياً بحفظ الحصة السابقة
+  const [sHifz, setSHifz] = useState(0);
+  const [sTathbit, setSTathbit] = useState(0);
+  const [sMuraj, setSMuraj] = useState(0);
   const [sSurah, setSSurah] = useState("");
   const [sFrom, setSFrom] = useState("");
   const [sTo, setSTo] = useState("");
@@ -55,7 +100,10 @@ export function StudentSheet({
       setGoals({ ...student.goals });
       setDone({ ...student.done });
       setNote(student.note ?? "");
-      setSKind("hifz");
+      setSHifz(0);
+      // تثبيت هذه الحصة = حفظ الحصة الفائتة تلقائياً
+      setSTathbit(student.sessions?.[0]?.hifz ?? 0);
+      setSMuraj(0);
       setSSurah("");
       setSFrom("");
       setSTo("");
@@ -63,18 +111,24 @@ export function StudentSheet({
   }, [student]);
 
   const addSession = () => {
-    if (!sSurah.trim()) return;
+    if (!sHifz && !sTathbit && !sMuraj && !sSurah.trim()) return;
     setSessions([
       {
         id: uid(),
         date: new Date().toISOString(),
-        kind: sKind,
+        hifz: sHifz,
+        tathbit: sTathbit,
+        murajaah: sMuraj,
         surah: sSurah.trim(),
         fromAyah: normalizeDigits(sFrom),
         toAyah: normalizeDigits(sTo),
       },
       ...sessions,
     ]);
+    // الحصة القادمة: تثبيتها = حفظ هذه الحصة
+    setSTathbit(sHifz);
+    setSHifz(0);
+    setSMuraj(0);
     setSSurah("");
     setSFrom("");
     setSTo("");
@@ -240,97 +294,109 @@ export function StudentSheet({
         </div>
       </div>
 
-      {/* سجل إنجاز اللقاءات */}
+      {/* تسجيل سريع للحصص بالأوجه */}
       <div className="mb-3 rounded-2xl border border-cream-dark p-3">
-        <p className="mb-2 font-kufi text-sm font-bold text-plum-800">
-          ✅ إنجاز اللقاءات ({sessions.length.toLocaleString("ar-EG")}
-          {plan.meetings ? ` من ${plan.meetings.toLocaleString("ar-EG")}` : ""})
+        <p className="mb-0.5 font-kufi text-sm font-bold text-plum-800">
+          ⚡ تسجيل الحصة (بالأوجه)
+        </p>
+        <p className="mb-2 text-[11px] text-silver-600">
+          التثبيت يُعبّأ تلقائياً بحفظ الحصة السابقة ✨
         </p>
 
-        {/* إضافة إنجاز لقاء جديد */}
         <div className="mb-2 rounded-xl bg-plum-50 p-2.5">
-          <div className="mb-2 flex gap-1.5">
-            {SESSION_KINDS.map((k) => (
-              <button
-                key={k.key}
-                type="button"
-                onClick={() => setSKind(k.key)}
-                className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition ${
-                  sKind === k.key
-                    ? "bg-plum-600 text-white"
-                    : "bg-white text-silver-600"
-                }`}
-              >
-                {k.icon} {k.label}
-              </button>
-            ))}
-          </div>
-          <input
-            className={`${inputCls} mb-2`}
-            list="surah-list"
-            placeholder="السورة"
-            value={sSurah}
-            onChange={(e) => setSSurah(e.target.value)}
-          />
-          <datalist id="surah-list">
-            {SURAHS.map((s) => (
-              <option key={s} value={s} />
-            ))}
-          </datalist>
-          <div className="mb-2 grid grid-cols-2 gap-2">
-            <input
-              className={inputCls}
-              inputMode="numeric"
-              placeholder="من آية"
-              value={sFrom}
-              onChange={(e) => setSFrom(e.target.value)}
+          <div className="grid grid-cols-3 gap-2">
+            <Stepper icon="📖" label="حفظ" value={sHifz} onChange={setSHifz} />
+            <Stepper
+              icon="📌"
+              label="تثبيت"
+              value={sTathbit}
+              onChange={setSTathbit}
+              hint="الحصة الفائتة"
             />
-            <input
-              className={inputCls}
-              inputMode="numeric"
-              placeholder="إلى آية"
-              value={sTo}
-              onChange={(e) => setSTo(e.target.value)}
-            />
+            <Stepper icon="🔁" label="مراجعة" value={sMuraj} onChange={setSMuraj} />
           </div>
+
+          <details className="mt-2">
+            <summary className="cursor-pointer text-[11px] font-bold text-plum-700">
+              + تفاصيل السورة (اختياري)
+            </summary>
+            <input
+              className={`${inputCls} mb-2 mt-2`}
+              list="surah-list"
+              placeholder="السورة"
+              value={sSurah}
+              onChange={(e) => setSSurah(e.target.value)}
+            />
+            <datalist id="surah-list">
+              {SURAHS.map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                className={inputCls}
+                inputMode="numeric"
+                placeholder="من آية"
+                value={sFrom}
+                onChange={(e) => setSFrom(e.target.value)}
+              />
+              <input
+                className={inputCls}
+                inputMode="numeric"
+                placeholder="إلى آية"
+                value={sTo}
+                onChange={(e) => setSTo(e.target.value)}
+              />
+            </div>
+          </details>
+
           <button
             type="button"
             onClick={addSession}
-            className="w-full rounded-xl bg-plum-600 py-2 text-sm font-bold text-white"
+            className="mt-2 w-full rounded-xl bg-plum-600 py-2.5 text-sm font-bold text-white"
           >
-            ➕ تسجيل إنجاز اللقاء
+            ➕ تسجيل الحصة
           </button>
         </div>
 
-        {/* قائمة الإنجازات */}
-        {sessions.map((s, i) => {
-          const km = sessionKindMeta(s.kind);
-          return (
-            <div
-              key={s.id}
-              className="mb-1.5 flex items-center justify-between rounded-lg bg-cream px-3 py-2 text-sm"
+        {/* سجل الحصص */}
+        {sessions.length > 0 && (
+          <p className="mb-1 text-xs font-bold text-plum-700">
+            سجل الحصص ({sessions.length.toLocaleString("ar-EG")})
+          </p>
+        )}
+        {sessions.map((s) => (
+          <div
+            key={s.id}
+            className="mb-1.5 flex items-center justify-between rounded-lg bg-cream px-3 py-2 text-sm"
+          >
+            <span className="flex flex-wrap items-center gap-2 font-bold text-plum-800">
+              {(s.hifz ?? 0) > 0 && <span>📖 {s.hifz}</span>}
+              {(s.tathbit ?? 0) > 0 && <span>📌 {s.tathbit}</span>}
+              {(s.murajaah ?? 0) > 0 && <span>🔁 {s.murajaah}</span>}
+              {s.surah && (
+                <span className="text-xs font-normal text-silver-600">
+                  {s.surah}
+                  {s.fromAyah && (
+                    <span dir="ltr">
+                      {" "}
+                      {s.fromAyah}
+                      {s.toAyah ? `-${s.toAyah}` : ""}
+                    </span>
+                  )}
+                </span>
+              )}
+            </span>
+            <button
+              type="button"
+              onClick={() => setSessions(sessions.filter((x) => x.id !== s.id))}
+              className="shrink-0 text-xs font-bold text-red-600"
+              aria-label="حذف"
             >
-              <span className="font-bold text-plum-800">
-                {km.icon} {s.surah}
-                {s.fromAyah && (
-                  <span dir="ltr" className="text-silver-600">
-                    {" "}
-                    {s.fromAyah}
-                    {s.toAyah ? `-${s.toAyah}` : ""}
-                  </span>
-                )}
-              </span>
-              <button
-                type="button"
-                onClick={() => setSessions(sessions.filter((x) => x.id !== s.id))}
-                className="text-xs font-bold text-red-600"
-                aria-label="حذف"
-              >
-                ✕
-              </button>
-            </div>
-          );
-        })}
+              ✕
+            </button>
+          </div>
+        ))}
       </div>
 
       <Field label="ملاحظات" icon="📝">

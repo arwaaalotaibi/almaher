@@ -9,7 +9,6 @@ import {
   goalItems,
   halaqaTitle,
   PLAN_FIELDS,
-  sessionKindMeta,
   STUDENT_PICK_KEY,
   useApp,
 } from "@/lib/store";
@@ -347,34 +346,38 @@ export function StudentHome() {
             </>
           ) : null}
 
-          {/* سجل الإنجاز */}
+          {/* سجل الحصص */}
           {me.sessions && me.sessions.length > 0 && (
             <>
-              <Ribbon className="mb-4 mt-8">سجل إنجازي</Ribbon>
+              <Ribbon className="mb-4 mt-8">سجل حصصي</Ribbon>
               <div className="grid gap-2">
-                {me.sessions.map((s) => {
-                  const km = sessionKindMeta(s.kind);
-                  return (
-                    <div
-                      key={s.id}
-                      className="card flex items-center justify-between rounded-xl px-4 py-3"
-                    >
-                      <span className="font-kufi text-base font-bold text-plum-800">
-                        {km.icon} {s.surah}
-                        {s.fromAyah && (
-                          <span dir="ltr" className="font-normal text-silver-600">
-                            {" "}
-                            {s.fromAyah}
-                            {s.toAyah ? `-${s.toAyah}` : ""}
-                          </span>
-                        )}
+                {me.sessions.map((s, i) => (
+                  <div
+                    key={s.id}
+                    className="card flex items-center justify-between rounded-xl px-4 py-3"
+                  >
+                    <span className="flex items-center gap-3 font-kufi text-sm font-bold text-plum-800">
+                      <span className="rounded-full bg-plum-100 px-2 py-0.5 text-[11px] text-plum-700">
+                        حصة {ar(me.sessions!.length - i)}
                       </span>
-                      <span className="rounded-full bg-plum-100 px-2.5 py-0.5 text-[11px] font-bold text-plum-700">
-                        {km.label}
-                      </span>
-                    </div>
-                  );
-                })}
+                      {(s.hifz ?? 0) > 0 && <span>📖 {ar(s.hifz!)}</span>}
+                      {(s.tathbit ?? 0) > 0 && <span>📌 {ar(s.tathbit!)}</span>}
+                      {(s.murajaah ?? 0) > 0 && <span>🔁 {ar(s.murajaah!)}</span>}
+                      {s.surah && (
+                        <span className="text-xs font-normal text-silver-600">
+                          {s.surah}
+                          {s.fromAyah && (
+                            <span dir="ltr">
+                              {" "}
+                              {s.fromAyah}
+                              {s.toAyah ? `-${s.toAyah}` : ""}
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                ))}
               </div>
             </>
           )}
