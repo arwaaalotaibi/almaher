@@ -68,11 +68,19 @@ export interface Announcement {
   createdAt: string; // ISO
 }
 
+export interface Book {
+  id: string;
+  title: string;
+  url: string; // رابط ملف الـPDF العام
+  createdAt: string;
+}
+
 export interface AppState {
   halaqas: Halaqa[];
   teachers: Teacher[];
   students: Student[];
   announcements: Announcement[];
+  books: Book[];
 }
 
 export const EMPTY_GOALS: Goals = {};
@@ -160,6 +168,7 @@ const SEED: AppState = {
   teachers: [],
   students: [],
   announcements: [],
+  books: [],
 };
 
 /* ================== المخزن المحلي (نسخة سريعة للعرض) ================== */
@@ -182,6 +191,7 @@ function load(): AppState {
         announcements: Array.isArray(parsed.announcements)
           ? parsed.announcements
           : [],
+        books: Array.isArray(parsed.books) ? parsed.books : [],
       };
     } else {
       cache = SEED;
@@ -276,7 +286,7 @@ function run(op: () => PromiseLike<{ error: unknown }>) {
 
 /** جلب كل البيانات من قاعدة البيانات وتحديث العرض */
 export async function pullRemote(): Promise<void> {
-  const [h, t, s, a] = await Promise.all([
+  const [h, t, s, a, b] = await Promise.all([
     supabase.from("almaher_halaqas").select("id,mosque,day").order("created_at"),
     supabase.from("almaher_teachers").select("id,name,halaqa_ids").order("created_at"),
     supabase
@@ -287,9 +297,13 @@ export async function pullRemote(): Promise<void> {
       .from("almaher_announcements")
       .select("id,body,halaqa_id,created_at")
       .order("created_at", { ascending: false }),
+    supabase
+      .from("almaher_books")
+      .select("id,title,url,created_at")
+      .order("created_at", { ascending: false }),
   ]);
-  if (h.error || t.error || s.error || a.error) {
-    throw h.error ?? t.error ?? s.error ?? a.error;
+  if (h.error || t.error || s.error || a.error || b.error) {
+    throw h.error ?? t.error ?? s.error ?? a.error ?? b.error;
   }
   persist({
     halaqas: (h.data ?? []) as Halaqa[],
@@ -316,6 +330,12 @@ export async function pullRemote(): Promise<void> {
       id: row.id as string,
       body: row.body as string,
       halaqaId: (row.halaqa_id as string) ?? "",
+      createdAt: row.created_at as string,
+    })),
+    books: (b.data ?? []).map((row) => ({
+      id: row.id as string,
+      title: row.title as string,
+      url: row.url as string,
       createdAt: row.created_at as string,
     })),
   });
@@ -413,6 +433,7 @@ export function subscribeRealtime() {
     "almaher_teachers",
     "almaher_students",
     "almaher_announcements",
+    "almaher_books",
   ]) {
     channel.on("postgres_changes", { event: "*", schema: "public", table }, refresh);
   }
@@ -568,6 +589,33 @@ export const actions = {
     run(() => supabase.from("almaher_announcements").delete().eq("id", id));
   },
 
+  /** رفع كتاب PDF إلى التخزين ثم تسجيله */
+  async uploadBook(file: File, title: string): Promise<string | null> {
+    const id = uid();
+    const path = `${id}.pdf`;
+    const up = await supabase.storage
+      .from("almaher-books")
+      .upload(path, file, { contentType: "application/pdf", upsert: false });
+    if (up.error) return up.error.message;
+    const { data } = supabase.storage.from("almaher-books").getPublicUrl(path);
+    const book: Book = {
+      id,
+      title: title.trim() || "كتاب",
+      url: data.publicUrl,
+      createdAt: new Date().toISOString(),
+    };
+    setState((s) => ({ ...s, books: [book, ...s.books] }));
+    const ins = await supabase
+      .from("almaher_books")
+      .insert({ id: book.id, title: book.title, url: book.url });
+    return ins.error ? ins.error.message : null;
+  },
+  removeBook(id: string) {
+    setState((s) => ({ ...s, books: s.books.filter((bk) => bk.id !== id) }));
+    run(() => supabase.from("almaher_books").delete().eq("id", id));
+    void supabase.storage.from("almaher-books").remove([`${id}.pdf`]);
+  },
+
   exportJSON(): string {
     return JSON.stringify(load(), null, 2);
   },
@@ -584,6 +632,7 @@ export const actions = {
         announcements: Array.isArray(parsed.announcements)
           ? parsed.announcements
           : [],
+        books: Array.isArray(parsed.books) ? parsed.books : getState().books,
       };
       persist(state);
       pushAll(state).catch(() => syncAlert());
@@ -603,6 +652,43 @@ export const actions = {
 
 export function halaqaTitle(h: Halaqa): string {
   return h.day ? `${h.mosque} — ${h.day}` : h.mosque;
+}
+
+/* ================== تحديدات/رسومات الكتاب ================== */
+
+export interface Stroke {
+  color: string;
+  width: number;
+  points: [number, number][]; // نقاط منسوبة 0..1
+}
+
+export type BookAnnotations = Record<string, Stroke[]>; // مفتاح = رقم الصفحة
+
+export async function loadAnnotations(
+  studentId: string,
+  bookId: string
+): Promise<BookAnnotations> {
+  const { data, error } = await supabase
+    .from("almaher_annotations")
+    .select("data")
+    .eq("id", `${studentId}:${bookId}`)
+    .maybeSingle();
+  if (error || !data) return {};
+  return (data.data as BookAnnotations) ?? {};
+}
+
+export async function saveAnnotations(
+  studentId: string,
+  bookId: string,
+  data: BookAnnotations
+): Promise<void> {
+  await supabase.from("almaher_annotations").upsert({
+    id: `${studentId}:${bookId}`,
+    student_id: studentId,
+    book_id: bookId,
+    data,
+    updated_at: new Date().toISOString(),
+  });
 }
 
 export function arabicCount(n: number, single: string, dual: string, plural: string): string {

@@ -11,12 +11,13 @@ import {
   trackMeta,
   useApp,
 } from "@/lib/store";
+import Link from "next/link";
 import { Ribbon } from "./ui";
 import { NotificationsCard } from "./notifications-card";
 
 /** شاشة الطالبة: تدخل برمزها فتُعرض أهدافها مباشرة (قراءة فقط) */
 export function StudentHome() {
-  const { halaqas, teachers, students } = useApp();
+  const { halaqas, teachers, students, books } = useApp();
   const [myId, setMyId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -94,6 +95,26 @@ export function StudentHome() {
       </div>
 
       <NotificationsCard halaqaIds={me.halaqaId ? [me.halaqaId] : []} />
+
+      {books.length > 0 && (
+        <>
+          <Ribbon className="mb-4">📚 القراءة</Ribbon>
+          <div className="mb-8 grid gap-2.5">
+            {books.map((b) => (
+              <Link
+                key={b.id}
+                href={`/book/${b.id}`}
+                className="name-box flex items-center gap-3 rounded-xl px-5 py-4 text-start transition active:scale-[0.99]"
+              >
+                <span className="text-2xl">📖</span>
+                <span className="font-kufi text-lg font-semibold text-white">
+                  {b.title}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
 
       <Ribbon className="mb-6">أهدافي هذا الأسبوع</Ribbon>
 

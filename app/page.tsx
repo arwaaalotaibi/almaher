@@ -79,6 +79,14 @@ export default function Home() {
           <span className="font-kufi text-sm font-bold text-plum-800">لوحة الشرف</span>
           <span className="text-[11px] text-silver-600">صمّمي إعلاناً</span>
         </Link>
+        <Link
+          href="/books"
+          className="card flex flex-col items-center gap-1.5 rounded-2xl py-4 transition active:scale-[0.97]"
+        >
+          <span className="text-2xl">📚</span>
+          <span className="font-kufi text-sm font-bold text-plum-800">كتب القراءة</span>
+          <span className="text-[11px] text-silver-600">رفع PDF</span>
+        </Link>
       </div>
 
       <button

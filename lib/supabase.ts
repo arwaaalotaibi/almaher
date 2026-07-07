@@ -26,8 +26,10 @@ export function roleFromEmail(email: string | null | undefined): Role | null {
   return entry ? entry[0] : null;
 }
 
-export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co",
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder",
-  { auth: { persistSession: true, autoRefreshToken: true } }
-);
+// مفاتيح عامة قابلة للنشر (publishable) — آمنة في كود العميل، والحماية عبر RLS
+const SUPABASE_URL = "https://vtrpryydwwvbumcxiakk.supabase.co";
+const SUPABASE_KEY = "sb_publishable_AKL6Ce_gVR6k4gFSnBzDYQ_A2J33_PE";
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true },
+});
