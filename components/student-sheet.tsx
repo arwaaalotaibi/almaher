@@ -3,14 +3,19 @@
 import { useEffect, useState } from "react";
 import {
   actions,
+  buildSchedule,
   CoursePlan,
   EMPTY_PLAN,
+  formatSchedDate,
+  halaqaTitle,
   hifzStartLabel,
   normalizeDigits,
   PLAN_FIELDS,
   useApp,
   type Student,
 } from "@/lib/store";
+
+const ar = (n: number) => n.toLocaleString("ar-EG");
 import { ayahCount, SURAHS } from "@/lib/surahs";
 import { DangerBtn, Field, inputCls, PrimaryBtn, Sheet } from "./ui";
 
@@ -70,6 +75,60 @@ export function StudentSheet({
         year: "numeric",
       })
     : null;
+
+  const halaqa = halaqas.find((h) => h.id === halaqaId);
+  const schedule = halaqa ? buildSchedule(halaqa, plan) : null;
+
+  const printSchedule = () => {
+    if (!schedule || !halaqa) return;
+    const w = window.open("", "_blank");
+    if (!w) return;
+    const startLabel = hifzStartLabel(plan);
+    const rows = schedule
+      .map(
+        (s) =>
+          `<tr><td>${ar(s.n)}</td><td>${formatSchedDate(s.date)}</td><td>${
+            s.hifz || "—"
+          }</td><td>${s.tathbit || "—"}</td><td>${s.murajaah || "—"}</td></tr>`
+      )
+      .join("");
+    w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8">
+<title>جدول حفظ — ${name}</title>
+<style>
+  *{font-family:'Segoe UI','Tahoma',sans-serif;box-sizing:border-box}
+  body{margin:0;padding:28px;color:#453039}
+  .head{text-align:center;border-bottom:3px solid #7d5a6c;padding-bottom:14px;margin-bottom:18px}
+  .head img{height:60px}
+  h1{font-size:22px;color:#5d3f4e;margin:8px 0 2px}
+  .sub{color:#8f8880;font-size:13px}
+  .info{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:14px 0}
+  .chip{background:#f7f2f5;border:1px solid #d9c8d1;border-radius:10px;padding:5px 12px;font-size:13px;font-weight:bold;color:#5d3f4e}
+  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:14px}
+  th{background:#5d3f4e;color:#fff;padding:9px;font-size:14px}
+  td{border:1px solid #e8e4df;padding:8px;text-align:center}
+  tr:nth-child(even) td{background:#f7f2f5}
+  .foot{text-align:center;color:#a39c93;font-size:12px;margin-top:18px}
+  @media print{body{padding:10px}}
+</style></head><body>
+  <div class="head">
+    <img src="${window.location.origin}/logo.png" alt="الماهر"/>
+    <h1>جدول الحفظ — الطالبة ${name || ""}</h1>
+    <div class="sub">جمعية الماهر بالقرآن وعلومه</div>
+  </div>
+  <div class="info">
+    <span class="chip">🕌 ${halaqaTitle(halaqa)}</span>
+    ${startLabel ? `<span class="chip">📖 بداية الحفظ: ${startLabel}</span>` : ""}
+    <span class="chip">📅 ${ar(schedule.length)} لقاء</span>
+  </div>
+  <table>
+    <thead><tr><th>اللقاء</th><th>التاريخ</th><th>حفظ</th><th>تثبيت</th><th>مراجعة</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="foot">الأوجه لكل لقاء · التثبيت = حفظ اللقاء السابق</div>
+  <script>window.onload=function(){window.print()}</script>
+</body></html>`);
+    w.document.close();
+  };
 
   return (
     <Sheet open onClose={onClose} title="بيانات الطالبة">
@@ -205,6 +264,57 @@ export function StudentSheet({
           ))}
         </div>
       </div>
+
+      {/* جدول الحفظ المولّد */}
+      {schedule ? (
+        <div className="mb-3 rounded-2xl border border-cream-dark p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="font-kufi text-sm font-bold text-plum-800">
+              📅 جدول الحفظ ({ar(schedule.length)} لقاء)
+            </p>
+            <button
+              type="button"
+              onClick={printSchedule}
+              className="rounded-full bg-plum-600 px-3 py-1 text-xs font-bold text-white"
+            >
+              🖨️ طباعة
+            </button>
+          </div>
+          <div className="overflow-hidden rounded-xl border border-cream-dark">
+            <div className="grid grid-cols-[auto_1fr_auto_auto_auto] text-center text-xs">
+              {["لقاء", "التاريخ", "📖", "📌", "🔁"].map((h) => (
+                <div
+                  key={h}
+                  className="bg-plum-800 py-1.5 font-kufi font-bold text-white"
+                >
+                  {h}
+                </div>
+              ))}
+              {schedule.map((s) => (
+                <div key={s.n} className="contents">
+                  <div className="border-t border-cream-dark py-1.5">{ar(s.n)}</div>
+                  <div className="border-t border-cream-dark py-1.5">
+                    {formatSchedDate(s.date)}
+                  </div>
+                  <div className="border-t border-cream-dark py-1.5">
+                    {s.hifz ? ar(s.hifz) : "—"}
+                  </div>
+                  <div className="border-t border-cream-dark py-1.5">
+                    {s.tathbit ? ar(s.tathbit) : "—"}
+                  </div>
+                  <div className="border-t border-cream-dark py-1.5">
+                    {s.murajaah ? ar(s.murajaah) : "—"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : (plan.hifz || plan.murajaah) && halaqa ? (
+        <p className="mb-3 rounded-xl bg-cream px-3 py-2.5 text-center text-xs font-bold text-silver-600">
+          حدّدي «تاريخ البداية وعدد اللقاءات» من صفحة الحلقة ليظهر الجدول
+        </p>
+      ) : null}
 
       <Field label="ملاحظات" icon="📝">
         <textarea
