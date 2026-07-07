@@ -3,22 +3,28 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import {
+  actions,
   buildSchedule,
+  CoursePlan,
   currentSessionIndex,
+  EMPTY_PLAN,
   formatSchedDate,
   halaqaTitle,
   hifzStartLabel,
+  normalizeDigits,
   PLAN_FIELDS,
   segDateLabel,
   STUDENT_PICK_KEY,
   todaySegment,
   useApp,
+  type Student,
 } from "@/lib/store";
+import { ayahCount, SURAHS } from "@/lib/surahs";
 import { printHifzSchedule } from "@/lib/print-schedule";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 import Link from "next/link";
-import { Ribbon } from "./ui";
+import { Field, inputCls, PrimaryBtn, Ribbon } from "./ui";
 import { NotificationsCard } from "./notifications-card";
 
 /** شاشة الطالبة: تدخل برمزها فتُعرض أهدافها مباشرة (قراءة فقط) */
@@ -196,16 +202,8 @@ export function StudentHome() {
       {/* شاشة القرآن */}
       {tab === "quran" && (
         <section>
-          {hifzStartLabel(me.plan) && (
-            <div className="mb-3 flex items-center justify-between rounded-2xl bg-plum-600 px-4 py-3">
-              <span className="font-kufi text-sm font-bold text-white">
-                📖 بداية الحفظ
-              </span>
-              <span className="font-kufi text-base font-bold text-white">
-                {hifzStartLabel(me.plan)}
-              </span>
-            </div>
-          )}
+          {/* الطالبة تُدخل بداية الحفظ/المراجعة وأوجه اللقاء بنفسها */}
+          <MyPlanEditor student={me} />
 
           {/* خطة الفصل — جدول مولّد تلقائياً */}
           {schedule ? (
@@ -381,5 +379,139 @@ export function StudentHome() {
         🚪 تسجيل الخروج
       </button>
     </main>
+  );
+}
+
+/** نموذج تُدخل فيه الطالبة بداية الحفظ/المراجعة وأوجه كل لقاء بنفسها */
+function MyPlanEditor({ student }: { student: Student }) {
+  const [plan, setPlan] = useState<CoursePlan>({ ...EMPTY_PLAN, ...student.plan });
+  const [saved, setSaved] = useState(false);
+
+  // مزامنة إن عدّلت الإدارة البيانات من جهاز آخر
+  useEffect(() => {
+    setPlan({ ...EMPTY_PLAN, ...student.plan });
+  }, [student.plan]);
+
+  const planNum = (v: string) => Math.max(0, Number(normalizeDigits(v)) || 0);
+
+  const save = () => {
+    actions.updateStudent(student.id, { plan });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <div className="card mb-4 rounded-2xl p-4">
+      <p className="mb-3 font-kufi text-base font-bold text-plum-800">
+        📝 بيانات حفظي
+      </p>
+
+      {/* بداية الحفظ */}
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="بداية الحفظ — السورة" icon="📖">
+          <select
+            className={inputCls}
+            value={plan.startSurah ?? ""}
+            onChange={(e) =>
+              setPlan({ ...plan, startSurah: e.target.value, startAyah: 1 })
+            }
+          >
+            <option value="">اختاري السورة…</option>
+            {SURAHS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="رقم الآية" icon="🔢">
+          <select
+            className={inputCls}
+            value={plan.startAyah ?? 1}
+            onChange={(e) => setPlan({ ...plan, startAyah: Number(e.target.value) })}
+            disabled={!plan.startSurah}
+          >
+            {Array.from(
+              { length: Math.max(1, ayahCount(plan.startSurah ?? "")) },
+              (_, i) => i + 1
+            ).map((n) => (
+              <option key={n} value={n}>
+                {ar(n)}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
+      {/* بداية المراجعة */}
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="بداية المراجعة — السورة" icon="🔁">
+          <select
+            className={inputCls}
+            value={plan.murStartSurah ?? ""}
+            onChange={(e) =>
+              setPlan({ ...plan, murStartSurah: e.target.value, murStartAyah: 1 })
+            }
+          >
+            <option value="">اختاري السورة…</option>
+            {SURAHS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="رقم الآية" icon="🔢">
+          <select
+            className={inputCls}
+            value={plan.murStartAyah ?? 1}
+            onChange={(e) =>
+              setPlan({ ...plan, murStartAyah: Number(e.target.value) })
+            }
+            disabled={!plan.murStartSurah}
+          >
+            {Array.from(
+              { length: Math.max(1, ayahCount(plan.murStartSurah ?? "")) },
+              (_, i) => i + 1
+            ).map((n) => (
+              <option key={n} value={n}>
+                {ar(n)}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
+      {/* أوجه كل لقاء */}
+      <div className="mt-1 rounded-2xl border border-cream-dark p-3">
+        <p className="mb-2 font-kufi text-sm font-bold text-plum-800">
+          📋 أوجه كل لقاء
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          {PLAN_FIELDS.map(({ key, label, icon }) => (
+            <label key={key} className="block">
+              <span className="mb-1 block text-xs font-bold text-plum-700">
+                {icon} {label.replace("أوجه ", "")}
+              </span>
+              <input
+                className={`${inputCls} text-center`}
+                inputMode="numeric"
+                placeholder="٠"
+                value={plan[key] || ""}
+                onChange={(e) =>
+                  setPlan({ ...plan, [key]: planNum(e.target.value) })
+                }
+              />
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-3">
+        <PrimaryBtn onClick={save}>
+          {saved ? "تم الحفظ ✓" : "حفظ بياناتي"}
+        </PrimaryBtn>
+      </div>
+    </div>
   );
 }
