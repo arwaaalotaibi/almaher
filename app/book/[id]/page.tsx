@@ -40,6 +40,8 @@ export default function BookPage({
         studentId={studentId}
         title={book.title}
         backHref={backHref}
+        pages={book.pages}
+        imgBase={book.imgBase}
       />
     </main>
   );

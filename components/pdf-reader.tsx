@@ -35,13 +35,19 @@ export function PdfReader({
   studentId,
   title,
   backHref,
+  pages = 0,
+  imgBase = "",
 }: {
   url: string;
   bookId: string;
   studentId: string | null;
   title: string;
   backHref: string;
+  pages?: number;
+  imgBase?: string;
 }) {
+  // الوضع المفضّل: صور صفحات مجهّزة مسبقاً (مطابقة للأصل وأسرع)
+  const imageMode = pages > 0 && Boolean(imgBase);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [pdf, setPdf] = useState<any>(null);
   const [numPages, setNumPages] = useState(0);
@@ -76,6 +82,8 @@ export function PdfReader({
   const containerRef = useRef<HTMLDivElement>(null);
   const pageCanvas = useRef<HTMLCanvasElement>(null);
   const overlay = useRef<HTMLCanvasElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [imgW, setImgW] = useState(360);
 
   const posKey = `almaher-bookpos:${bookId}`;
   const bmLocalKey = `almaher-bm:${bookId}`;
@@ -87,24 +95,32 @@ export function PdfReader({
     setFailed(false);
     (async () => {
       try {
-        const pdfjs = await import("pdfjs-dist");
-        pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-        const task = pdfjs.getDocument({
-          url,
-          // خرائط الحروف والخطوط القياسية — تحافظ على خط الكتاب الأصلي ووضوحه
-          cMapUrl: "/pdf-cmaps/",
-          cMapPacked: true,
-          standardFontDataUrl: "/pdf-fonts/",
-        });
-        task.onProgress = ({ loaded, total }: { loaded: number; total: number }) => {
-          if (total > 0) setProgress(Math.min(99, Math.round((loaded / total) * 100)));
-        };
-        const doc = await task.promise;
-        if (cancelled) return;
-        setPdf(doc);
-        setNumPages(doc.numPages);
+        let total: number;
+        if (imageMode) {
+          // صور مجهّزة — لا حاجة لتحميل الـPDF إطلاقاً
+          total = pages;
+          setNumPages(total);
+        } else {
+          const pdfjs = await import("pdfjs-dist");
+          pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+          const task = pdfjs.getDocument({
+            url,
+            // خرائط الحروف والخطوط القياسية — تحافظ على خط الكتاب الأصلي ووضوحه
+            cMapUrl: "/pdf-cmaps/",
+            cMapPacked: true,
+            standardFontDataUrl: "/pdf-fonts/",
+          });
+          task.onProgress = ({ loaded, total: t }: { loaded: number; total: number }) => {
+            if (t > 0) setProgress(Math.min(99, Math.round((loaded / t) * 100)));
+          };
+          const doc = await task.promise;
+          if (cancelled) return;
+          setPdf(doc);
+          total = doc.numPages;
+          setNumPages(total);
+        }
         const savedPos = Number(window.localStorage.getItem(posKey) ?? 1);
-        setPageNum(Math.min(Math.max(1, savedPos || 1), doc.numPages));
+        setPageNum(Math.min(Math.max(1, savedPos || 1), total));
         if (studentId) {
           // كتابات الطالبة وإشاراتها تتزامن عبر أجهزتها
           const { ann, bookmarks: bm } = await loadAnnotations(studentId, bookId);
@@ -136,9 +152,46 @@ export function PdfReader({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url, bookId, studentId]);
 
-  /* ============ رسم الصفحة الحالية ============ */
+  /* ============ وضع الصور: مقاس العرض + طبقة الرسم + تحميل مسبق ============ */
   useEffect(() => {
-    if (!pdf) return;
+    if (!imageMode || loading) return;
+    const cw = containerRef.current?.clientWidth ?? 360;
+    setImgW(Math.round(Math.min(cw, 820) * ZOOMS[zoomIdx]));
+  }, [imageMode, loading, zoomIdx, fitTick]);
+
+  const sizeOverlayToImg = useCallback(() => {
+    const img = imgRef.current;
+    const ov = overlay.current;
+    if (!img || !ov) return;
+    const rect = img.getBoundingClientRect();
+    if (rect.width < 10 || rect.height < 10) return;
+    const dpr = window.devicePixelRatio || 1;
+    ov.width = rect.width * dpr;
+    ov.height = rect.height * dpr;
+    ov.style.width = `${rect.width}px`;
+    ov.style.height = `${rect.height}px`;
+    redraw();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageNum]);
+
+  useEffect(() => {
+    if (!imageMode) return;
+    requestAnimationFrame(() => sizeOverlayToImg());
+  }, [imageMode, imgW, sizeOverlayToImg]);
+
+  useEffect(() => {
+    if (!imageMode || !numPages) return;
+    for (const n of [pageNum + 1, pageNum - 1]) {
+      if (n >= 1 && n <= numPages) {
+        const im = new Image();
+        im.src = `${imgBase}/p${n}`;
+      }
+    }
+  }, [imageMode, pageNum, numPages, imgBase]);
+
+  /* ============ رسم الصفحة الحالية (وضع PDF المباشر) ============ */
+  useEffect(() => {
+    if (!pdf || imageMode) return;
     let cancelled = false;
     (async () => {
       const page = await pdf.getPage(pageNum);
@@ -536,10 +589,27 @@ export function PdfReader({
               className={`relative ${flash ? "page-in" : ""}`}
               onClick={onPageTap}
             >
-              <canvas
-                ref={pageCanvas}
-                className="rounded-xl bg-white shadow-lg ring-1 ring-cream-dark"
-              />
+              {imageMode ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  ref={imgRef}
+                  src={`${imgBase}/p${pageNum}`}
+                  alt={`صفحة ${ar(pageNum)}`}
+                  draggable={false}
+                  onLoad={() => {
+                    sizeOverlayToImg();
+                    setFlash(true);
+                    setTimeout(() => setFlash(false), 320);
+                  }}
+                  style={{ width: imgW }}
+                  className="rounded-xl bg-white shadow-lg ring-1 ring-cream-dark"
+                />
+              ) : (
+                <canvas
+                  ref={pageCanvas}
+                  className="rounded-xl bg-white shadow-lg ring-1 ring-cream-dark"
+                />
+              )}
               <canvas
                 ref={overlay}
                 onPointerDown={onDown}

@@ -72,6 +72,8 @@ export interface Book {
   id: string;
   title: string;
   url: string; // رابط ملف الـPDF العام
+  pages: number; // عدد صفحات الصور المجهّزة (0 = عرض PDF مباشر)
+  imgBase: string; // رابط مجلد صور الصفحات
   createdAt: string;
 }
 
@@ -299,7 +301,7 @@ export async function pullRemote(): Promise<void> {
       .order("created_at", { ascending: false }),
     supabase
       .from("almaher_books")
-      .select("id,title,url,created_at")
+      .select("id,title,url,pages,img_base,created_at")
       .order("created_at", { ascending: false }),
   ]);
   if (h.error || t.error || s.error || a.error || b.error) {
@@ -336,6 +338,8 @@ export async function pullRemote(): Promise<void> {
       id: row.id as string,
       title: row.title as string,
       url: row.url as string,
+      pages: (row.pages as number) ?? 0,
+      imgBase: (row.img_base as string) ?? "",
       createdAt: row.created_at as string,
     })),
   });
@@ -589,31 +593,15 @@ export const actions = {
     run(() => supabase.from("almaher_announcements").delete().eq("id", id));
   },
 
-  /** رفع كتاب PDF إلى التخزين ثم تسجيله */
-  async uploadBook(file: File, title: string): Promise<string | null> {
-    const id = uid();
-    const path = `${id}.pdf`;
-    const up = await supabase.storage
-      .from("almaher-books")
-      .upload(path, file, { contentType: "application/pdf", upsert: false });
-    if (up.error) return up.error.message;
-    const { data } = supabase.storage.from("almaher-books").getPublicUrl(path);
-    const book: Book = {
-      id,
-      title: title.trim() || "كتاب",
-      url: data.publicUrl,
-      createdAt: new Date().toISOString(),
-    };
-    setState((s) => ({ ...s, books: [book, ...s.books] }));
-    const ins = await supabase
-      .from("almaher_books")
-      .insert({ id: book.id, title: book.title, url: book.url });
-    return ins.error ? ins.error.message : null;
-  },
   removeBook(id: string) {
+    const book = getState().books.find((bk) => bk.id === id);
     setState((s) => ({ ...s, books: s.books.filter((bk) => bk.id !== id) }));
     run(() => supabase.from("almaher_books").delete().eq("id", id));
-    void supabase.storage.from("almaher-books").remove([`${id}.pdf`]);
+    const paths = [`${id}.pdf`];
+    for (let p = 1; p <= (book?.pages ?? 0); p++) paths.push(`pages/${id}/p${p}`);
+    for (let i = 0; i < paths.length; i += 100) {
+      void supabase.storage.from("almaher-books").remove(paths.slice(i, i + 100));
+    }
   },
 
   exportJSON(): string {
@@ -652,6 +640,121 @@ export const actions = {
 
 export function halaqaTitle(h: Halaqa): string {
   return h.day ? `${h.mosque} — ${h.day}` : h.mosque;
+}
+
+/* ================== تحويل الكتاب إلى صور صفحات ==================
+   يُحوَّل الـPDF مرة واحدة عند الرفع إلى صور عالية الدقة، فتشاهد كل
+   الطالبات نفس الصفحة المطابقة للأصل على أي جهاز وبفتح أسرع. */
+
+const PAGE_W = 1600; // عرض صورة الصفحة بالبكسل
+
+function canvasToBlob(
+  c: HTMLCanvasElement,
+  type: string,
+  quality: number
+): Promise<Blob | null> {
+  return new Promise((res) => c.toBlob(res, type, quality));
+}
+
+export async function convertAndUploadBook(
+  source: ArrayBuffer,
+  title: string,
+  opts: {
+    existingId?: string; // إعادة معالجة كتاب موجود
+    pdfAlreadyUploaded?: boolean;
+    onProgress: (done: number, total: number) => void;
+  }
+): Promise<string | null> {
+  const id = opts.existingId ?? uid();
+  try {
+    const pdfjs = await import("pdfjs-dist");
+    pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+    const doc = await pdfjs.getDocument({
+      data: source,
+      cMapUrl: "/pdf-cmaps/",
+      cMapPacked: true,
+      standardFontDataUrl: "/pdf-fonts/",
+    }).promise;
+    const total = doc.numPages;
+
+    // أفضل صيغة يدعمها المتصفح
+    const probe = document.createElement("canvas");
+    probe.width = probe.height = 2;
+    const useWebp = probe.toDataURL("image/webp").startsWith("data:image/webp");
+    const mime = useWebp ? "image/webp" : "image/jpeg";
+
+    for (let p = 1; p <= total; p++) {
+      const page = await doc.getPage(p);
+      const scale = PAGE_W / page.getViewport({ scale: 1 }).width;
+      const viewport = page.getViewport({ scale });
+      const c = document.createElement("canvas");
+      c.width = viewport.width;
+      c.height = viewport.height;
+      const ctx = c.getContext("2d")!;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, c.width, c.height);
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      const blob = await canvasToBlob(c, mime, 0.82);
+      if (!blob) return "تعذّر تجهيز صورة الصفحة";
+      // الاستبدال (upsert) معطّل في تخزين هذا المشروع — نحذف ثم ندرج
+      await supabase.storage.from("almaher-books").remove([`pages/${id}/p${p}`]);
+      const up = await supabase.storage
+        .from("almaher-books")
+        .upload(`pages/${id}/p${p}`, blob, { contentType: mime });
+      if (up.error) return up.error.message;
+      page.cleanup();
+      opts.onProgress(p, total);
+    }
+
+    if (!opts.pdfAlreadyUploaded) {
+      await supabase.storage.from("almaher-books").remove([`${id}.pdf`]);
+      const up = await supabase.storage
+        .from("almaher-books")
+        .upload(`${id}.pdf`, new Blob([source], { type: "application/pdf" }), {
+          contentType: "application/pdf",
+        });
+      if (up.error) return up.error.message;
+    }
+
+    const pub = (p: string) =>
+      supabase.storage.from("almaher-books").getPublicUrl(p).data.publicUrl;
+    const book: Book = {
+      id,
+      title: title.trim() || "كتاب",
+      url: pub(`${id}.pdf`),
+      pages: total,
+      imgBase: pub(`pages/${id}`),
+      createdAt: new Date().toISOString(),
+    };
+
+    if (opts.existingId) {
+      const upd = await supabase
+        .from("almaher_books")
+        .update({ pages: book.pages, img_base: book.imgBase })
+        .eq("id", id);
+      if (upd.error) return upd.error.message;
+      setState((s) => ({
+        ...s,
+        books: s.books.map((bk) =>
+          bk.id === id ? { ...bk, pages: book.pages, imgBase: book.imgBase } : bk
+        ),
+      }));
+    } else {
+      const ins = await supabase.from("almaher_books").insert({
+        id: book.id,
+        title: book.title,
+        url: book.url,
+        pages: book.pages,
+        img_base: book.imgBase,
+      });
+      if (ins.error) return ins.error.message;
+      setState((s) => ({ ...s, books: [book, ...s.books] }));
+    }
+    return null;
+  } catch (e) {
+    console.error(e);
+    return "تعذّر فتح ملف الـPDF";
+  }
 }
 
 /* ================== تحديدات/رسومات الكتاب ================== */
