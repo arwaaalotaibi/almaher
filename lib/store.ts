@@ -14,7 +14,9 @@ export interface CoursePlan {
   hifz: number; // أوجه الحفظ
   tathbit: number; // أوجه التثبيت
   murajaah: number; // أوجه المراجعة
-  start?: string; // بداية الحفظ (سورة/جزء/موضع)
+  start?: string; // (قديم — نص حر)
+  startSurah?: string; // بداية الحفظ: السورة
+  startAyah?: number; // بداية الحفظ: رقم الآية
 }
 
 export const EMPTY_PLAN: CoursePlan = {
@@ -23,7 +25,17 @@ export const EMPTY_PLAN: CoursePlan = {
   tathbit: 0,
   murajaah: 0,
   start: "",
+  startSurah: "",
+  startAyah: 1,
 };
+
+/** نص بداية الحفظ للعرض */
+export function hifzStartLabel(plan?: CoursePlan): string {
+  if (!plan) return "";
+  if (plan.startSurah)
+    return `سورة ${plan.startSurah} — آية ${(plan.startAyah ?? 1).toLocaleString("ar-EG")}`;
+  return plan.start?.trim() ?? "";
+}
 
 /** حصّة واحدة — أوجه الحفظ/التثبيت/المراجعة (+ تفصيل السورة اختياري) */
 export interface SessionLog {

@@ -7,6 +7,7 @@ import {
   currentSessionIndex,
   formatSchedDate,
   halaqaTitle,
+  hifzStartLabel,
   PLAN_FIELDS,
   segDateLabel,
   STUDENT_PICK_KEY,
@@ -194,13 +195,13 @@ export function StudentHome() {
       {/* شاشة القرآن */}
       {tab === "quran" && (
         <section>
-          {me.plan?.start?.trim() && (
+          {hifzStartLabel(me.plan) && (
             <div className="mb-3 flex items-center justify-between rounded-2xl bg-plum-600 px-4 py-3">
               <span className="font-kufi text-sm font-bold text-white">
                 📖 بداية الحفظ
               </span>
-              <span className="font-kufi text-lg font-bold text-white">
-                {me.plan.start}
+              <span className="font-kufi text-base font-bold text-white">
+                {hifzStartLabel(me.plan)}
               </span>
             </div>
           )}

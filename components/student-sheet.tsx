@@ -5,12 +5,13 @@ import {
   actions,
   CoursePlan,
   EMPTY_PLAN,
+  hifzStartLabel,
   normalizeDigits,
   PLAN_FIELDS,
   useApp,
   type Student,
 } from "@/lib/store";
-import { SURAHS } from "@/lib/surahs";
+import { ayahCount, SURAHS } from "@/lib/surahs";
 import { DangerBtn, Field, inputCls, PrimaryBtn, Sheet } from "./ui";
 
 /** نافذة بيانات الطالبة: الاسم + المعلّمة + بداية الحفظ + خطة الفصل */
@@ -138,20 +139,43 @@ export function StudentSheet({
         </Field>
       </div>
 
-      <Field label="بداية الحفظ" icon="📖">
-        <input
-          className={inputCls}
-          list="surah-list"
-          placeholder="مثال: سورة الملك · جزء عمّ · صفحة ٥٨٢"
-          value={plan.start ?? ""}
-          onChange={(e) => setPlan({ ...plan, start: e.target.value })}
-        />
-        <datalist id="surah-list">
-          {SURAHS.map((s) => (
-            <option key={s} value={s} />
-          ))}
-        </datalist>
-      </Field>
+      <div className="mb-1 grid grid-cols-2 gap-3">
+        <Field label="بداية الحفظ — السورة" icon="📖">
+          <select
+            className={inputCls}
+            value={plan.startSurah ?? ""}
+            onChange={(e) =>
+              setPlan({ ...plan, startSurah: e.target.value, startAyah: 1 })
+            }
+          >
+            <option value="">اختاري السورة…</option>
+            {SURAHS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="رقم الآية" icon="🔢">
+          <select
+            className={inputCls}
+            value={plan.startAyah ?? 1}
+            onChange={(e) =>
+              setPlan({ ...plan, startAyah: Number(e.target.value) })
+            }
+            disabled={!plan.startSurah}
+          >
+            {Array.from(
+              { length: Math.max(1, ayahCount(plan.startSurah ?? "")) },
+              (_, i) => i + 1
+            ).map((n) => (
+              <option key={n} value={n}>
+                {n.toLocaleString("ar-EG")}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
 
       {/* خطة الفصل بالأوجه */}
       <div className="mb-3 rounded-2xl border border-cream-dark p-3">
@@ -205,7 +229,7 @@ export function StudentSheet({
 
 /** سطر صغير تحت اسم الطالبة: بداية الحفظ إن وُجدت */
 export function GoalDots({ student }: { student: Student }) {
-  const start = student.plan?.start?.trim();
+  const start = hifzStartLabel(student.plan);
   if (!start) return null;
   return (
     <span className="text-[11px] font-normal text-white/80">📖 {start}</span>
