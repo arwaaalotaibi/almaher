@@ -53,9 +53,11 @@ export function PdfReader({
   const [chrome, setChrome] = useState(true);
   const [gridOpen, setGridOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [progress, setProgress] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
   const [saved, setSaved] = useState(false);
   const [flash, setFlash] = useState(false);
+  const [fitTick, setFitTick] = useState(0);
 
   const annot = useRef<BookAnnotations>({});
   const dirty = useRef(false);
@@ -82,7 +84,11 @@ export function PdfReader({
       try {
         const pdfjs = await import("pdfjs-dist");
         pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-        const doc = await pdfjs.getDocument({ url }).promise;
+        const task = pdfjs.getDocument({ url });
+        task.onProgress = ({ loaded, total }: { loaded: number; total: number }) => {
+          if (total > 0) setProgress(Math.min(99, Math.round((loaded / total) * 100)));
+        };
+        const doc = await task.promise;
         if (cancelled) return;
         setPdf(doc);
         setNumPages(doc.numPages);
@@ -110,7 +116,14 @@ export function PdfReader({
     (async () => {
       const page = await pdf.getPage(pageNum);
       if (cancelled) return;
-      const baseW = Math.min(containerRef.current?.clientWidth ?? 800, 820);
+      let cw = containerRef.current?.clientWidth ?? 0;
+      if (cw < 120) {
+        // التخطيط لم يستقر بعد — ننتظر إطاراً ونعيد القياس
+        await new Promise((r) => requestAnimationFrame(r));
+        cw = containerRef.current?.clientWidth ?? 360;
+        if (cw < 120) cw = 360;
+      }
+      const baseW = Math.min(cw, 820);
       const scale =
         (baseW * ZOOMS[zoomIdx]) / page.getViewport({ scale: 1 }).width;
       const viewport = page.getViewport({ scale });
@@ -148,7 +161,28 @@ export function PdfReader({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pdf, pageNum, zoomIdx]);
+  }, [pdf, pageNum, zoomIdx, fitTick]);
+
+  /* إعادة ضبط مقاس الصفحة عند تغيّر عرض الشاشة (تدوير الجوال أو استقرار التخطيط) */
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    let lastW = el.clientWidth;
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const ro = new ResizeObserver(() => {
+      const w = el.clientWidth;
+      if (Math.abs(w - lastW) > 8) {
+        lastW = w;
+        clearTimeout(t);
+        t = setTimeout(() => setFitTick((x) => x + 1), 150);
+      }
+    });
+    ro.observe(el);
+    return () => {
+      clearTimeout(t);
+      ro.disconnect();
+    };
+  }, [loading]);
 
   /* حفظ آخر صفحة وصلتها + حفظ الكتابات عند الخروج */
   useEffect(() => {
@@ -396,9 +430,39 @@ export function PdfReader({
         onTouchEnd={onTouchEnd}
       >
         {loading ? (
-          <div className="flex flex-col items-center gap-3 py-24">
-            <span className="text-4xl">📖</span>
-            <p className="text-sm font-bold text-silver-600">جارٍ فتح الكتاب…</p>
+          <div className="flex justify-center py-14">
+            {/* غلاف الفتح — واضح لكل الناس */}
+            <div className="w-full max-w-xs">
+              <div className="rounded-2xl bg-gradient-to-b from-plum-600 to-plum-800 px-6 pb-8 pt-10 text-center shadow-xl">
+                <div className="mx-auto mb-5 flex h-20 w-20 animate-pulse items-center justify-center rounded-full bg-white/15 text-5xl">
+                  📖
+                </div>
+                <h2 className="font-kufi text-2xl font-bold leading-snug text-white">
+                  {title}
+                </h2>
+                <p className="mt-6 text-sm font-bold text-white/85">
+                  جارٍ فتح الكتاب…
+                </p>
+                <div className="mx-auto mt-3 h-2 w-full overflow-hidden rounded-full bg-white/20">
+                  <div
+                    className={`h-full rounded-full bg-white transition-all duration-300 ${
+                      progress === null ? "w-1/3 animate-pulse" : ""
+                    }`}
+                    style={
+                      progress !== null ? { width: `${progress}%` } : undefined
+                    }
+                  />
+                </div>
+                {progress !== null && (
+                  <p className="mt-2 text-xs font-bold text-white/70">
+                    {progress.toLocaleString("ar-EG")}٪
+                  </p>
+                )}
+              </div>
+              <p className="mt-4 text-center text-xs font-bold text-silver-600">
+                لحظات ويظهر الكتاب كاملاً بإذن الله
+              </p>
+            </div>
           </div>
         ) : (
           <div className="flex min-w-fit justify-center">
