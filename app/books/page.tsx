@@ -8,6 +8,7 @@ import {
   inputCls,
   PageHeader,
   PrimaryBtn,
+  Sheet,
   useHydrated,
 } from "@/components/ui";
 import { RoleOnly } from "@/components/admin-only";
@@ -28,6 +29,8 @@ function BooksInner() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
   const [prog, setProg] = useState<{ done: number; total: number; label: string } | null>(null);
+  const [editBook, setEditBook] = useState<Book | null>(null);
+  const [editTitle, setEditTitle] = useState("");
 
   if (!hydrated) return <main className="mx-auto max-w-2xl px-4 pt-10" />;
 
@@ -152,18 +155,31 @@ function BooksInner() {
                   <span className="text-2xl">📕</span>
                   <span className="truncate">{b.title}</span>
                 </Link>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (window.confirm(`حذف كتاب «${b.title}»؟`)) {
-                      actions.removeBook(b.id);
-                    }
-                  }}
-                  className="shrink-0 text-sm font-bold text-red-600"
-                  disabled={busy}
-                >
-                  حذف
-                </button>
+                <div className="flex shrink-0 items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditBook(b);
+                      setEditTitle(b.title);
+                    }}
+                    className="text-sm font-bold text-plum-700"
+                    disabled={busy}
+                  >
+                    ✏️ تعديل
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`حذف كتاب «${b.title}»؟`)) {
+                        actions.removeBook(b.id);
+                      }
+                    }}
+                    className="text-sm font-bold text-red-600"
+                    disabled={busy}
+                  >
+                    حذف
+                  </button>
+                </div>
               </div>
               <div className="mt-2 flex items-center gap-2">
                 {b.pages > 0 ? (
@@ -185,6 +201,35 @@ function BooksInner() {
           ))}
         </div>
       )}
+
+      {/* تعديل اسم الكتاب */}
+      <Sheet
+        open={editBook !== null}
+        onClose={() => setEditBook(null)}
+        title="تعديل اسم الكتاب"
+      >
+        <Field label="اسم الكتاب" icon="📖">
+          <input
+            className={inputCls}
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            autoFocus
+          />
+        </Field>
+        <PrimaryBtn
+          onClick={() => {
+            if (editBook && editTitle.trim()) {
+              actions.renameBook(editBook.id, editTitle);
+            }
+            setEditBook(null);
+          }}
+        >
+          حفظ
+        </PrimaryBtn>
+        <p className="mt-2 text-center text-xs text-silver-600">
+          يظهر الاسم الجديد لجميع الطالبات فوراً
+        </p>
+      </Sheet>
     </main>
   );
 }

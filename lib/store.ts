@@ -593,6 +593,15 @@ export const actions = {
     run(() => supabase.from("almaher_announcements").delete().eq("id", id));
   },
 
+  renameBook(id: string, title: string) {
+    const t = title.trim();
+    if (!t) return;
+    setState((s) => ({
+      ...s,
+      books: s.books.map((bk) => (bk.id === id ? { ...bk, title: t } : bk)),
+    }));
+    run(() => supabase.from("almaher_books").update({ title: t }).eq("id", id));
+  },
   removeBook(id: string) {
     const book = getState().books.find((bk) => bk.id === id);
     setState((s) => ({ ...s, books: s.books.filter((bk) => bk.id !== id) }));
