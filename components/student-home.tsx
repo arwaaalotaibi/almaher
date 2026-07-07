@@ -14,6 +14,7 @@ import {
   todaySegment,
   useApp,
 } from "@/lib/store";
+import { printHifzSchedule } from "@/lib/print-schedule";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 import Link from "next/link";
@@ -210,6 +211,21 @@ export function StudentHome() {
           {schedule ? (
             <>
               <Ribbon className="mb-4 mt-8">خطة الفصل</Ribbon>
+
+              <button
+                type="button"
+                onClick={() =>
+                  printHifzSchedule({
+                    studentName: me.name,
+                    halaqaLabel: halaqa ? halaqaTitle(halaqa) : "",
+                    startLabel: hifzStartLabel(me.plan),
+                    schedule,
+                  })
+                }
+                className="mb-3 w-full rounded-xl bg-plum-600 py-2.5 font-kufi text-sm font-bold text-white transition active:scale-[0.98]"
+              >
+                🖨️ طباعة جدولي
+              </button>
 
               {/* التقدّم في الفصل */}
               <div className="card mb-3 rounded-2xl p-4">
