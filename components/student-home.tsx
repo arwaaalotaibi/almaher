@@ -386,6 +386,7 @@ export function StudentHome() {
 function MyPlanEditor({ student }: { student: Student }) {
   const [plan, setPlan] = useState<CoursePlan>({ ...EMPTY_PLAN, ...student.plan });
   const [saved, setSaved] = useState(false);
+  const [open, setOpen] = useState(false);
 
   // مزامنة إن عدّلت الإدارة البيانات من جهاز آخر
   useEffect(() => {
@@ -402,10 +403,26 @@ function MyPlanEditor({ student }: { student: Student }) {
 
   return (
     <div className="card mb-4 rounded-2xl p-4">
-      <p className="mb-3 font-kufi text-base font-bold text-plum-800">
-        📝 بيانات حفظي
-      </p>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between text-start"
+        aria-expanded={open}
+      >
+        <span className="font-kufi text-base font-bold text-plum-800">
+          📝 بيانات حفظي
+        </span>
+        <span
+          className={`text-plum-600 transition-transform duration-200 ${
+            open ? "rotate-180" : ""
+          }`}
+        >
+          ▾
+        </span>
+      </button>
 
+      {!open ? null : (
+      <div className="mt-3">
       {/* بداية الحفظ */}
       <div className="grid grid-cols-2 gap-3">
         <Field label="بداية الحفظ — السورة" icon="📖">
@@ -512,6 +529,8 @@ function MyPlanEditor({ student }: { student: Student }) {
           {saved ? "تم الحفظ ✓" : "حفظ بياناتي"}
         </PrimaryBtn>
       </div>
+      </div>
+      )}
     </div>
   );
 }
