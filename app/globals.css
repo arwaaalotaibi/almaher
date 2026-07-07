@@ -33,10 +33,9 @@ body {
   min-height: 100dvh;
 }
 
-/* زخرفة هندسية إسلامية خفيفة مثل خلفية البوستر */
+/* خلفية سادة بلون الكريمي (بدون نقش) */
 .pattern-bg {
   background-color: var(--color-cream);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%235d3f4e' stroke-opacity='0.055' stroke-width='1.4'%3E%3Cpath d='M60 6 L74 32 L102 32 L88 58 L102 84 L74 84 L60 110 L46 84 L18 84 L32 58 L18 32 L46 32 Z'/%3E%3Ccircle cx='60' cy='58' r='16'/%3E%3Cpath d='M0 0 L14 14 M120 0 L106 14 M0 120 L14 106 M120 120 L106 106'/%3E%3C/g%3E%3C/svg%3E");
 }
 
 /* شريط فضّي متدرّج مثل شارة «حلقات مسجد …» */
