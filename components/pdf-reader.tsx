@@ -4,11 +4,12 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   loadAnnotations,
+  normalizeDigits,
   saveAnnotations,
   type BookAnnotations,
   type Stroke,
 } from "@/lib/store";
-import { Sheet } from "./ui";
+import { inputCls, Sheet } from "./ui";
 
 const COLORS = ["#c0392b", "#d68910", "#1e8449", "#2471a3", "#7d3c98", "#2c3e50"];
 const ZOOMS = [1, 1.5, 2];
@@ -58,6 +59,8 @@ export function PdfReader({
   const [saved, setSaved] = useState(false);
   const [flash, setFlash] = useState(false);
   const [fitTick, setFitTick] = useState(0);
+  const [bookmarks, setBookmarks] = useState<number[]>([]);
+  const [jumpVal, setJumpVal] = useState("");
 
   const annot = useRef<BookAnnotations>({});
   const dirty = useRef(false);
@@ -69,11 +72,13 @@ export function PdfReader({
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const suppressClick = useRef(false);
 
+  const bmRef = useRef<number[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const pageCanvas = useRef<HTMLCanvasElement>(null);
   const overlay = useRef<HTMLCanvasElement>(null);
 
   const posKey = `almaher-bookpos:${bookId}`;
+  const bmLocalKey = `almaher-bm:${bookId}`;
 
   /* ============ تحميل المستند + كتابات الطالبة ============ */
   useEffect(() => {
@@ -94,7 +99,23 @@ export function PdfReader({
         setNumPages(doc.numPages);
         const savedPos = Number(window.localStorage.getItem(posKey) ?? 1);
         setPageNum(Math.min(Math.max(1, savedPos || 1), doc.numPages));
-        if (studentId) annot.current = await loadAnnotations(studentId, bookId);
+        if (studentId) {
+          // كتابات الطالبة وإشاراتها تتزامن عبر أجهزتها
+          const { ann, bookmarks: bm } = await loadAnnotations(studentId, bookId);
+          annot.current = ann;
+          bmRef.current = bm;
+          setBookmarks(bm);
+        } else {
+          try {
+            const bm = JSON.parse(
+              window.localStorage.getItem(bmLocalKey) ?? "[]"
+            ) as number[];
+            bmRef.current = Array.isArray(bm) ? bm : [];
+            setBookmarks(bmRef.current);
+          } catch {
+            /* نتجاهل */
+          }
+        }
         setLoading(false);
       } catch {
         if (!cancelled) {
@@ -193,7 +214,7 @@ export function PdfReader({
     return () => {
       renderTask.current?.cancel();
       if (studentId && dirty.current) {
-        void saveAnnotations(studentId, bookId, annot.current);
+        void saveAnnotations(studentId, bookId, annot.current, bmRef.current);
       }
     };
   }, [studentId, bookId]);
@@ -249,11 +270,34 @@ export function PdfReader({
     setSaved(false);
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
-      await saveAnnotations(studentId, bookId, annot.current);
+      await saveAnnotations(studentId, bookId, annot.current, bmRef.current);
       dirty.current = false;
       setSaved(true);
     }, 700);
   }, [studentId, bookId]);
+
+  /* الإشارات المرجعية */
+  const toggleBookmark = () => {
+    const next = bmRef.current.includes(pageNum)
+      ? bmRef.current.filter((n) => n !== pageNum)
+      : [...bmRef.current, pageNum].sort((a, b) => a - b);
+    bmRef.current = next;
+    setBookmarks(next);
+    if (studentId) {
+      scheduleSave();
+    } else {
+      window.localStorage.setItem(bmLocalKey, JSON.stringify(next));
+    }
+  };
+
+  const jumpTo = () => {
+    const n = Number(normalizeDigits(jumpVal));
+    if (n >= 1 && n <= numPages) {
+      goto(n);
+      setJumpVal("");
+      setGridOpen(false);
+    }
+  };
 
   function eraseAt(p: [number, number]) {
     const k = String(pageNum);
@@ -400,10 +444,26 @@ export function PdfReader({
             📖 {title}
           </h1>
           {numPages > 0 && (
-            <span className="shrink-0 rounded-full bg-plum-100 px-2.5 py-1 text-xs font-bold text-plum-700">
+            <button
+              type="button"
+              onClick={() => setGridOpen(true)}
+              className="shrink-0 rounded-full bg-plum-100 px-2.5 py-1 text-xs font-bold text-plum-700"
+            >
               {ar(pageNum)} / {ar(numPages)}
-            </span>
+            </button>
           )}
+          <button
+            type="button"
+            onClick={toggleBookmark}
+            className={`shrink-0 rounded-full px-2.5 py-1 text-sm font-bold transition ${
+              bookmarks.includes(pageNum)
+                ? "bg-plum-600 text-white"
+                : "bg-cream text-plum-700"
+            }`}
+            aria-label="إشارة مرجعية"
+          >
+            🔖
+          </button>
           <button
             type="button"
             onClick={() => setZoomIdx((zoomIdx + 1) % ZOOMS.length)}
@@ -656,6 +716,69 @@ export function PdfReader({
 
       {/* خريطة الصفحات */}
       <Sheet open={gridOpen} onClose={() => setGridOpen(false)} title="⊞ الصفحات">
+        {/* بحث برقم الصفحة */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            jumpTo();
+          }}
+          className="mb-3 flex gap-2"
+        >
+          <input
+            className={`${inputCls} text-center`}
+            inputMode="numeric"
+            placeholder="اكتبي رقم الصفحة…"
+            value={jumpVal}
+            onChange={(e) => setJumpVal(e.target.value)}
+          />
+          <button
+            type="submit"
+            className="shrink-0 rounded-xl bg-plum-600 px-5 font-kufi text-sm font-bold text-white"
+          >
+            اذهبي
+          </button>
+        </form>
+
+        {/* الإشارات المرجعية */}
+        {bookmarks.length > 0 && (
+          <div className="mb-3 rounded-2xl bg-plum-50 p-3">
+            <p className="mb-2 text-xs font-bold text-plum-700">🔖 إشاراتي المرجعية</p>
+            <div className="flex flex-wrap gap-1.5">
+              {bookmarks.map((n) => (
+                <span
+                  key={n}
+                  className="flex items-center gap-1 rounded-full bg-white pr-2.5 shadow-sm"
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      goto(n);
+                      setGridOpen(false);
+                    }}
+                    className="py-1 font-kufi text-sm font-bold text-plum-800"
+                  >
+                    صفحة {ar(n)}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = bmRef.current.filter((x) => x !== n);
+                      bmRef.current = next;
+                      setBookmarks(next);
+                      if (studentId) scheduleSave();
+                      else window.localStorage.setItem(bmLocalKey, JSON.stringify(next));
+                    }}
+                    className="px-1.5 text-xs font-bold text-red-500"
+                    aria-label="حذف الإشارة"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-5 gap-2">
           {Array.from({ length: numPages }, (_, i) => i + 1).map((n) => (
             <button
@@ -678,6 +801,9 @@ export function PdfReader({
                     n === pageNum ? "bg-white" : "bg-plum-600"
                   }`}
                 />
+              )}
+              {bookmarks.includes(n) && (
+                <span className="absolute -top-0.5 right-1 text-[10px]">🔖</span>
               )}
             </button>
           ))}

@@ -665,29 +665,39 @@ export interface Stroke {
 
 export type BookAnnotations = Record<string, Stroke[]>; // مفتاح = رقم الصفحة
 
+/* الإشارات المرجعية تُخزَّن مع الكتابات في نفس السجل تحت مفتاح محجوز */
+const BM_KEY = "__bm";
+
 export async function loadAnnotations(
   studentId: string,
   bookId: string
-): Promise<BookAnnotations> {
+): Promise<{ ann: BookAnnotations; bookmarks: number[] }> {
   const { data, error } = await supabase
     .from("almaher_annotations")
     .select("data")
     .eq("id", `${studentId}:${bookId}`)
     .maybeSingle();
-  if (error || !data) return {};
-  return (data.data as BookAnnotations) ?? {};
+  if (error || !data) return { ann: {}, bookmarks: [] };
+  const raw = (data.data ?? {}) as Record<string, unknown>;
+  const bookmarks = Array.isArray(raw[BM_KEY]) ? (raw[BM_KEY] as number[]) : [];
+  const ann: BookAnnotations = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (k !== BM_KEY && Array.isArray(v)) ann[k] = v as Stroke[];
+  }
+  return { ann, bookmarks };
 }
 
 export async function saveAnnotations(
   studentId: string,
   bookId: string,
-  data: BookAnnotations
+  ann: BookAnnotations,
+  bookmarks: number[]
 ): Promise<void> {
   await supabase.from("almaher_annotations").upsert({
     id: `${studentId}:${bookId}`,
     student_id: studentId,
     book_id: bookId,
-    data,
+    data: { ...ann, [BM_KEY]: bookmarks },
     updated_at: new Date().toISOString(),
   });
 }
