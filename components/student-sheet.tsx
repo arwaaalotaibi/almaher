@@ -92,7 +92,7 @@ export function StudentSheet({
             s.date
           )}</td><td class="seg">${
             s.hifzLabel || (s.hifz ? `${ar(s.hifz)} أوجه` : dash)
-          }</td><td class="seg">${s.tathbitLabel || dash}</td><td class="seg">${
+          }</td><td class="seg">${
             s.murajaahLabel || (s.murajaah ? `${ar(s.murajaah)} أوجه` : dash)
           }</td></tr>`
       )
@@ -138,10 +138,10 @@ export function StudentSheet({
       <b>عدد اللقاءات:</b> ${ar(schedule.length)}
     </div>
     <table>
-      <thead><tr><th>اللقاء</th><th>التاريخ</th><th>الحفظ الجديد</th><th>التثبيت</th><th>المراجعة</th></tr></thead>
+      <thead><tr><th>اللقاء</th><th>التاريخ</th><th>الحفظ الجديد</th><th>المراجعة</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <div class="foot">التثبيت = حفظ اللقاء السابق · المراجعة بالأوجه</div>
+    <div class="foot">جمعية الماهر بالقرآن وعلومه</div>
   </div>
   <script>window.onload=function(){setTimeout(function(){window.print()},400)}</script>
 </body></html>`);
@@ -351,7 +351,6 @@ export function StudentSheet({
                   📖 {s.hifzLabel || (s.hifz ? `${ar(s.hifz)} أوجه` : "—")}
                 </p>
                 <p className="text-[11px] text-silver-600">
-                  {s.tathbitLabel && `📌 تثبيت: ${s.tathbitLabel} · `}
                   🔁 مراجعة:{" "}
                   {s.murajaahLabel ||
                     (s.murajaah ? `${ar(s.murajaah)} أوجه` : "—")}

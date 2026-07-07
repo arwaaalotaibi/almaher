@@ -264,21 +264,14 @@ export function StudentHome() {
                           {s.hifzLabel || (s.hifz ? `${ar(s.hifz)} أوجه` : "—")}
                         </p>
                       </div>
-                      <div className="mt-2 grid grid-cols-2 gap-2 text-center text-xs">
-                        <div className="rounded-xl bg-white py-2">
-                          <p className="font-bold text-plum-700">
-                            📌 {s.tathbitLabel || (s.tathbit ? `${ar(s.tathbit)} أوجه` : "—")}
-                          </p>
-                          <p className="text-[10px] text-silver-600">تثبيت</p>
-                        </div>
-                        <div className="rounded-xl bg-white py-2">
-                          <p className="font-bold text-plum-700">
-                            🔁{" "}
-                            {s.murajaahLabel ||
-                              (s.murajaah ? `${ar(s.murajaah)} أوجه` : "—")}
-                          </p>
-                          <p className="text-[10px] text-silver-600">مراجعة</p>
-                        </div>
+                      <div className="mt-2 rounded-xl bg-white p-3 text-center">
+                        <p className="text-[11px] font-bold text-silver-600">
+                          🔁 المراجعة
+                        </p>
+                        <p className="mt-0.5 font-kufi text-lg font-bold text-plum-700">
+                          {s.murajaahLabel ||
+                            (s.murajaah ? `${ar(s.murajaah)} أوجه` : "—")}
+                        </p>
                       </div>
                     </div>
                   );
@@ -324,7 +317,6 @@ export function StudentHome() {
                           isCur ? "text-white/85" : "text-silver-600"
                         }`}
                       >
-                        {s.tathbitLabel && `📌 ${s.tathbitLabel} · `}
                         🔁 مراجعة{" "}
                         {s.murajaahLabel ||
                           (s.murajaah ? `${ar(s.murajaah)} أوجه` : "—")}
