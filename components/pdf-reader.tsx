@@ -89,7 +89,13 @@ export function PdfReader({
       try {
         const pdfjs = await import("pdfjs-dist");
         pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-        const task = pdfjs.getDocument({ url });
+        const task = pdfjs.getDocument({
+          url,
+          // خرائط الحروف والخطوط القياسية — تحافظ على خط الكتاب الأصلي ووضوحه
+          cMapUrl: "/pdf-cmaps/",
+          cMapPacked: true,
+          standardFontDataUrl: "/pdf-fonts/",
+        });
         task.onProgress = ({ loaded, total }: { loaded: number; total: number }) => {
           if (total > 0) setProgress(Math.min(99, Math.round((loaded / total) * 100)));
         };
