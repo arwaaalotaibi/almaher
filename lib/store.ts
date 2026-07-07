@@ -2,6 +2,12 @@
 
 import { useSyncExternalStore } from "react";
 import { supabase } from "./supabase";
+import {
+  hifzRangeLabel,
+  MUSHAF_PAGES,
+  pageOf,
+  surahNumber,
+} from "./mushaf";
 
 /* ================== الأنواع ================== */
 
@@ -188,6 +194,8 @@ export interface ScheduleRow {
   hifz: number; // أوجه الحفظ في هذا اللقاء
   tathbit: number;
   murajaah: number;
+  hifzLabel: string; // مقطع الحفظ الجديد (سورة/آية) — إن عُرفت بداية الحفظ
+  tathbitLabel: string; // مقطع التثبيت (= حفظ اللقاء الفائت)
   cumHifz: number; // التراكمي حتى هذا اللقاء
   cumTathbit: number;
   cumMurajaah: number;
@@ -231,6 +239,24 @@ export function buildSchedule(
   // التثبيت = حفظ الحصة الفائتة (اللقاء الأول بلا تثبيت)
   const t = h.map((_, i) => (i === 0 ? 0 : h[i - 1]));
 
+  // موضع بداية الحفظ في المصحف (إن حُدّد) → مقطع كل لقاء
+  const startNum = plan.startSurah ? surahNumber(plan.startSurah) : 0;
+  const startPage = startNum ? pageOf(startNum, plan.startAyah || 1) : 0;
+
+  // نطاق صفحات كل لقاء (متتابعة من بداية الحفظ)
+  const ranges: { from: number; to: number }[] = [];
+  let cursor = startPage;
+  for (let i = 0; i < n; i++) {
+    if (startPage && h[i] > 0) {
+      const from = cursor;
+      const to = Math.min(MUSHAF_PAGES, from + h[i] - 1);
+      ranges.push({ from, to });
+      cursor = to + 1;
+    } else {
+      ranges.push({ from: 0, to: 0 });
+    }
+  }
+
   const rows: ScheduleRow[] = [];
   let ch = 0,
     ct = 0,
@@ -241,12 +267,17 @@ export function buildSchedule(
     ch += h[i];
     ct += t[i];
     cm += m[i];
+    const r = ranges[i];
+    // التثبيت = مقطع حفظ اللقاء السابق
+    const pr = i > 0 ? ranges[i - 1] : { from: 0, to: 0 };
     rows.push({
       n: i + 1,
       date,
       hifz: h[i],
       tathbit: t[i],
       murajaah: m[i],
+      hifzLabel: r.from ? hifzRangeLabel(r.from, r.to) : "",
+      tathbitLabel: pr.from ? hifzRangeLabel(pr.from, pr.to) : "",
       cumHifz: ch,
       cumTathbit: ct,
       cumMurajaah: cm,

@@ -90,9 +90,11 @@ export function StudentSheet({
         (s) =>
           `<tr><td class="num">${ar(s.n)}</td><td>${formatSchedDate(
             s.date
-          )}</td><td>${s.hifz ? ar(s.hifz) : dash}</td><td>${
-            s.tathbit ? ar(s.tathbit) : dash
-          }</td><td>${s.murajaah ? ar(s.murajaah) : dash}</td></tr>`
+          )}</td><td class="seg">${
+            s.hifzLabel || (s.hifz ? `${ar(s.hifz)} أوجه` : dash)
+          }</td><td class="seg">${s.tathbitLabel || dash}</td><td>${
+            s.murajaah ? `${ar(s.murajaah)} أوجه` : dash
+          }</td></tr>`
       )
       .join("");
     w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8">
@@ -116,6 +118,7 @@ export function StudentSheet({
   th{background:#5d3f4e;color:#fff;padding:13px 10px;font-weight:700;border:1px solid #4d3340}
   td{border:1px solid #d9c8d1;padding:11px 8px;text-align:center}
   td.num{font-weight:700;color:#5d3f4e}
+  td.seg{font-weight:700;color:#3a2a32}
   tr:nth-child(even) td{background:#faf6f8}
   .foot{text-align:center;color:#9c8fa0;font-size:15px;margin-top:16px;font-style:italic}
   @media print{body{padding:8px}}
@@ -135,10 +138,10 @@ export function StudentSheet({
       <b>عدد اللقاءات:</b> ${ar(schedule.length)}
     </div>
     <table>
-      <thead><tr><th>اللقاء</th><th>التاريخ</th><th>حفظ</th><th>تثبيت</th><th>مراجعة</th></tr></thead>
+      <thead><tr><th>اللقاء</th><th>التاريخ</th><th>الحفظ الجديد</th><th>التثبيت</th><th>المراجعة</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <div class="foot">الأرقام بالأوجه · التثبيت = حفظ اللقاء السابق</div>
+    <div class="foot">التثبيت = حفظ اللقاء السابق · المراجعة بالأوجه</div>
   </div>
   <script>window.onload=function(){setTimeout(function(){window.print()},400)}</script>
 </body></html>`);
@@ -295,34 +298,24 @@ export function StudentSheet({
               🖨️ طباعة
             </button>
           </div>
-          <div className="overflow-hidden rounded-xl border border-cream-dark">
-            <div className="grid grid-cols-[auto_1fr_auto_auto_auto] text-center text-xs">
-              {["لقاء", "التاريخ", "📖", "📌", "🔁"].map((h) => (
-                <div
-                  key={h}
-                  className="bg-plum-800 py-1.5 font-kufi font-bold text-white"
-                >
-                  {h}
-                </div>
-              ))}
-              {schedule.map((s) => (
-                <div key={s.n} className="contents">
-                  <div className="border-t border-cream-dark py-1.5">{ar(s.n)}</div>
-                  <div className="border-t border-cream-dark py-1.5">
+          <div className="grid gap-1.5">
+            {schedule.map((s) => (
+              <div key={s.n} className="rounded-xl bg-cream px-3 py-2">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-bold text-plum-700">لقاء {ar(s.n)}</span>
+                  <span className="text-silver-600">
                     {formatSchedDate(s.date)}
-                  </div>
-                  <div className="border-t border-cream-dark py-1.5">
-                    {s.hifz ? ar(s.hifz) : "—"}
-                  </div>
-                  <div className="border-t border-cream-dark py-1.5">
-                    {s.tathbit ? ar(s.tathbit) : "—"}
-                  </div>
-                  <div className="border-t border-cream-dark py-1.5">
-                    {s.murajaah ? ar(s.murajaah) : "—"}
-                  </div>
+                  </span>
                 </div>
-              ))}
-            </div>
+                <p className="mt-0.5 font-kufi text-sm font-bold text-plum-800">
+                  📖 {s.hifzLabel || (s.hifz ? `${ar(s.hifz)} أوجه` : "—")}
+                </p>
+                <p className="text-[11px] text-silver-600">
+                  {s.tathbitLabel && `📌 تثبيت: ${s.tathbitLabel} · `}
+                  🔁 مراجعة: {s.murajaah ? `${ar(s.murajaah)} أوجه` : "—"}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
       ) : (plan.hifz || plan.murajaah) && halaqa ? (

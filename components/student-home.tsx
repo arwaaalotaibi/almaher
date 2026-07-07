@@ -256,28 +256,28 @@ export function StudentHome() {
                           لقاء {ar(s.n)} · {formatSchedDate(s.date)}
                         </span>
                       </div>
-                      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                        {[
-                          { l: "حفظ", v: s.hifz, i: "📖" },
-                          { l: "تثبيت", v: s.tathbit, i: "📌" },
-                          { l: "مراجعة", v: s.murajaah, i: "🔁" },
-                        ].map((x) => (
-                          <div
-                            key={x.l}
-                            className="rounded-xl bg-white py-2 shadow-sm"
-                          >
-                            <p className="text-xl font-bold text-plum-700">
-                              {ar(x.v)}
-                            </p>
-                            <p className="text-[11px] font-bold text-silver-600">
-                              {x.i} {x.l}
-                            </p>
-                          </div>
-                        ))}
+                      <div className="mt-3 rounded-xl bg-white p-3 text-center shadow-sm">
+                        <p className="text-[11px] font-bold text-silver-600">
+                          📖 الحفظ الجديد
+                        </p>
+                        <p className="mt-0.5 font-kufi text-lg font-bold text-plum-800">
+                          {s.hifzLabel || (s.hifz ? `${ar(s.hifz)} أوجه` : "—")}
+                        </p>
                       </div>
-                      <p className="mt-2 text-center text-[11px] text-silver-600">
-                        عدد الأوجه المطلوبة في هذا اللقاء
-                      </p>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-center text-xs">
+                        <div className="rounded-xl bg-white py-2">
+                          <p className="font-bold text-plum-700">
+                            📌 {s.tathbitLabel || (s.tathbit ? `${ar(s.tathbit)} أوجه` : "—")}
+                          </p>
+                          <p className="text-[10px] text-silver-600">تثبيت</p>
+                        </div>
+                        <div className="rounded-xl bg-white py-2">
+                          <p className="font-bold text-plum-700">
+                            🔁 {s.murajaah ? `${ar(s.murajaah)} أوجه` : "—"}
+                          </p>
+                          <p className="text-[10px] text-silver-600">مراجعة</p>
+                        </div>
+                      </div>
                     </div>
                   );
                 })()
@@ -287,52 +287,47 @@ export function StudentHome() {
                 </div>
               )}
 
-              {/* الجدول الكامل */}
-              <div className="card overflow-hidden rounded-2xl">
-                <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-0 text-center text-xs">
-                  <div className="bg-plum-800 py-2 font-kufi font-bold text-white">
-                    لقاء
-                  </div>
-                  <div className="bg-plum-800 py-2 font-kufi font-bold text-white">
-                    التاريخ
-                  </div>
-                  <div className="bg-plum-800 py-2 font-kufi font-bold text-white">
-                    📖
-                  </div>
-                  <div className="bg-plum-800 py-2 font-kufi font-bold text-white">
-                    📌
-                  </div>
-                  <div className="bg-plum-800 py-2 font-kufi font-bold text-white">
-                    🔁
-                  </div>
-                  {schedule.map((s) => {
-                    const isCur = s.n === curIdx;
-                    const cell = isCur
-                      ? "bg-plum-100 font-bold text-plum-800"
-                      : "text-ink";
-                    return (
-                      <div key={s.n} className="contents">
-                        <div className={`border-t border-cream-dark py-2 ${cell}`}>
-                          {ar(s.n)}
-                        </div>
-                        <div
-                          className={`border-t border-cream-dark py-2 ${cell}`}
+              {/* جدول اللقاءات كاملاً */}
+              <div className="grid gap-1.5">
+                {schedule.map((s) => {
+                  const isCur = s.n === curIdx;
+                  return (
+                    <div
+                      key={s.n}
+                      className={`rounded-xl px-3 py-2.5 ${
+                        isCur
+                          ? "bg-plum-600 text-white"
+                          : "card"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span
+                          className={`font-bold ${isCur ? "text-white" : "text-plum-700"}`}
                         >
+                          لقاء {ar(s.n)}
+                        </span>
+                        <span className={isCur ? "text-white/85" : "text-silver-600"}>
                           {formatSchedDate(s.date)}
-                        </div>
-                        <div className={`border-t border-cream-dark py-2 ${cell}`}>
-                          {s.hifz ? ar(s.hifz) : "—"}
-                        </div>
-                        <div className={`border-t border-cream-dark py-2 ${cell}`}>
-                          {s.tathbit ? ar(s.tathbit) : "—"}
-                        </div>
-                        <div className={`border-t border-cream-dark py-2 ${cell}`}>
-                          {s.murajaah ? ar(s.murajaah) : "—"}
-                        </div>
+                        </span>
                       </div>
-                    );
-                  })}
-                </div>
+                      <p
+                        className={`mt-0.5 font-kufi text-sm font-bold ${
+                          isCur ? "text-white" : "text-plum-800"
+                        }`}
+                      >
+                        📖 {s.hifzLabel || (s.hifz ? `${ar(s.hifz)} أوجه` : "—")}
+                      </p>
+                      <p
+                        className={`text-[11px] ${
+                          isCur ? "text-white/85" : "text-silver-600"
+                        }`}
+                      >
+                        {s.tathbitLabel && `📌 ${s.tathbitLabel} · `}
+                        🔁 مراجعة {s.murajaah ? `${ar(s.murajaah)} أوجه` : "—"}
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
             </>
           ) : totalFaces > 0 ? (
