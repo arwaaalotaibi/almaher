@@ -20,13 +20,7 @@ import {
   type Student,
 } from "@/lib/store";
 import { ayahCount, SURAHS } from "@/lib/surahs";
-import {
-  TERMS,
-  TERMS_ITEM_COUNT,
-  TERMS_SUBTITLE,
-  TERMS_TITLE,
-  TERMS_VERSION,
-} from "@/lib/terms";
+import { TERMS, TERMS_SUBTITLE, TERMS_TITLE, TERMS_VERSION } from "@/lib/terms";
 import { printHifzSchedule } from "@/lib/print-schedule";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
@@ -404,7 +398,7 @@ function TermsGate({
 }) {
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const doneCount = Object.values(checked).filter(Boolean).length;
-  const allDone = doneCount >= TERMS_ITEM_COUNT;
+  const allDone = doneCount >= TERMS.length;
 
   const agree = () => {
     if (!allDone) return;
@@ -429,46 +423,55 @@ function TermsGate({
       </div>
 
       <div className="grid gap-3">
-        {TERMS.map((sec) => (
-          <div key={sec.title} className="card rounded-2xl p-4">
-            <p className="mb-2 font-kufi text-base font-bold text-plum-800">
-              {sec.icon} {sec.title}
-            </p>
-            <div className="grid gap-1.5">
-              {sec.items.map((item, i) => {
-                const key = `${sec.title}#${i}`;
-                const on = !!checked[key];
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() =>
-                      setChecked((c) => ({ ...c, [key]: !c[key] }))
-                    }
-                    className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 text-start transition ${
-                      on
-                        ? "border-plum-500 bg-plum-50"
-                        : "border-cream-dark bg-white"
-                    }`}
+        {TERMS.map((sec) => {
+          const on = !!checked[sec.title];
+          return (
+            <div
+              key={sec.title}
+              className={`card rounded-2xl p-4 transition ${
+                on ? "border-plum-500 bg-plum-50" : ""
+              }`}
+            >
+              <p className="mb-2 font-kufi text-base font-bold text-plum-800">
+                {sec.icon} {sec.title}
+              </p>
+              <ul className="mb-3 grid list-disc gap-1.5 pe-5 ps-1">
+                {sec.items.map((item, i) => (
+                  <li
+                    key={i}
+                    className="text-sm font-medium leading-relaxed text-ink marker:text-plum-500"
                   >
-                    <span
-                      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 text-xs font-bold ${
-                        on
-                          ? "border-plum-600 bg-plum-600 text-white"
-                          : "border-silver-400 text-transparent"
-                      }`}
-                    >
-                      ✓
-                    </span>
-                    <span className="text-sm font-medium leading-relaxed text-ink">
-                      {item}
-                    </span>
-                  </button>
-                );
-              })}
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                onClick={() =>
+                  setChecked((c) => ({ ...c, [sec.title]: !c[sec.title] }))
+                }
+                className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-start transition ${
+                  on
+                    ? "border-plum-600 bg-white"
+                    : "border-cream-dark bg-white"
+                }`}
+              >
+                <span
+                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 text-xs font-bold ${
+                    on
+                      ? "border-plum-600 bg-plum-600 text-white"
+                      : "border-silver-400 text-transparent"
+                  }`}
+                >
+                  ✓
+                </span>
+                <span className="text-sm font-bold text-plum-700">
+                  أقرّ والتزم ببنود «{sec.title}»
+                </span>
+              </button>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <button
@@ -483,13 +486,13 @@ function TermsGate({
       <div className="glass-bar fixed inset-x-0 bottom-0 z-40 px-4 py-3">
         <div className="mx-auto max-w-2xl">
           <p className="mb-2 text-center text-xs font-bold text-plum-700">
-            أقررتِ بـ {ar(doneCount)} من {ar(TERMS_ITEM_COUNT)} بنداً
+            أقررتِ بـ {ar(doneCount)} من {ar(TERMS.length)} أقسام
           </p>
           <PrimaryBtn
             onClick={agree}
             className={allDone ? "" : "opacity-40"}
           >
-            {allDone ? "أوافق وألتزم بجميع البنود" : "أقرّي بكل البنود للمتابعة"}
+            {allDone ? "أوافق وألتزم بجميع البنود" : "أقرّي بكل الأقسام للمتابعة"}
           </PrimaryBtn>
         </div>
       </div>
