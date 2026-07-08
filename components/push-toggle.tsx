@@ -36,8 +36,12 @@ export function PushToggle({
       } else {
         setState(await enablePush(studentId, halaqaId));
       }
-    } catch {
-      window.alert("تعذّر ضبط إشعارات الجهاز — حاولي مرة أخرى");
+    } catch (e) {
+      window.alert(
+        e instanceof Error && e.message
+          ? e.message
+          : "تعذّر ضبط إشعارات الجهاز — حاولي مرة أخرى"
+      );
     } finally {
       setBusy(false);
     }

@@ -30,6 +30,23 @@ export function pushSupported(): boolean {
   );
 }
 
+export function isIOS(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return (
+    /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
+
+/** هل التطبيق مثبّت ويعمل من الشاشة الرئيسية (standalone)؟ */
+export function isStandalone(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    window.matchMedia?.("(display-mode: standalone)").matches === true ||
+    (navigator as unknown as { standalone?: boolean }).standalone === true
+  );
+}
+
 /** تسجيل الـService Worker (مرة واحدة) */
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (!pushSupported()) return null;
@@ -56,6 +73,12 @@ export async function enablePush(
   halaqaId: string
 ): Promise<PushState> {
   if (!pushSupported()) return "unsupported";
+  // على آيفون لا تعمل الإشعارات إلا من التطبيق المثبّت على الشاشة الرئيسية
+  if (isIOS() && !isStandalone()) {
+    throw new Error(
+      "على آيفون: أضيفي التطبيق إلى الشاشة الرئيسية (زر المشاركة ← إضافة إلى الشاشة الرئيسية)، ثم افتحيه من الأيقونة وفعّلي الإشعارات من هناك."
+    );
+  }
   const perm = await Notification.requestPermission();
   if (perm !== "granted") return perm === "denied" ? "denied" : "default";
 
