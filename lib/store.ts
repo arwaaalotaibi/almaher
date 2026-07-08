@@ -156,6 +156,31 @@ export interface NotifRead {
   readAt?: string; // ISO — وقت القراءة
 }
 
+/** سجلّ تسميع لقاء: ما سمّعته الطالبة (تسميع/مراجعة/تثبيت) — سورة ومن آية إلى آية */
+export interface RecitationLog {
+  id: string;
+  studentId: string;
+  date: string; // yyyy-mm-dd
+  tasmiSurah?: string;
+  tasmiFrom?: number;
+  tasmiTo?: number;
+  murajaSurah?: string;
+  murajaFrom?: number;
+  murajaTo?: number;
+  tathbitSurah?: string;
+  tathbitFrom?: number;
+  tathbitTo?: number;
+  note?: string;
+  createdAt?: string;
+}
+
+/** أقسام سجلّ التسميع الثلاثة */
+export const RECITE_PARTS = [
+  { key: "tasmi", label: "التسميع (الحفظ الجديد)", icon: "📖" },
+  { key: "muraja", label: "المراجعة", icon: "🔁" },
+  { key: "tathbit", label: "التثبيت", icon: "📌" },
+] as const;
+
 export interface AppState {
   halaqas: Halaqa[];
   teachers: Teacher[];
@@ -163,6 +188,7 @@ export interface AppState {
   announcements: Announcement[];
   books: Book[];
   notifReads: NotifRead[];
+  recitations: RecitationLog[];
 }
 
 export const EMPTY_GOALS: Goals = {};
@@ -395,6 +421,7 @@ const SEED: AppState = {
   announcements: [],
   books: [],
   notifReads: [],
+  recitations: [],
 };
 
 /* ================== المخزن المحلي (نسخة سريعة للعرض) ================== */
@@ -419,6 +446,7 @@ function load(): AppState {
           : [],
         books: Array.isArray(parsed.books) ? parsed.books : [],
         notifReads: Array.isArray(parsed.notifReads) ? parsed.notifReads : [],
+        recitations: Array.isArray(parsed.recitations) ? parsed.recitations : [],
       };
     } else {
       cache = SEED;
@@ -516,7 +544,7 @@ function run(op: () => PromiseLike<{ error: unknown }>) {
 
 /** جلب كل البيانات من قاعدة البيانات وتحديث العرض */
 export async function pullRemote(): Promise<void> {
-  const [h, t, s, a, b, r] = await Promise.all([
+  const [h, t, s, a, b, r, sess] = await Promise.all([
     supabase
       .from("almaher_halaqas")
       .select("id,mosque,day,term_start,term_sessions")
@@ -537,6 +565,12 @@ export async function pullRemote(): Promise<void> {
     supabase
       .from("almaher_notif_reads")
       .select("announcement_id,student_id,read_at"),
+    supabase
+      .from("almaher_sessions")
+      .select(
+        "id,student_id,log_date,tasmi_surah,tasmi_from,tasmi_to,muraja_surah,muraja_from,muraja_to,tathbit_surah,tathbit_from,tathbit_to,note,created_at"
+      )
+      .order("log_date", { ascending: false }),
   ]);
   if (h.error || t.error || s.error || a.error || b.error) {
     throw h.error ?? t.error ?? s.error ?? a.error ?? b.error;
@@ -596,6 +630,22 @@ export async function pullRemote(): Promise<void> {
       announcementId: row.announcement_id as string,
       studentId: row.student_id as string,
       readAt: (row.read_at as string) ?? undefined,
+    })),
+    recitations: (sess.data ?? []).map((row) => ({
+      id: row.id as string,
+      studentId: row.student_id as string,
+      date: row.log_date as string,
+      tasmiSurah: (row.tasmi_surah as string) || undefined,
+      tasmiFrom: (row.tasmi_from as number) ?? undefined,
+      tasmiTo: (row.tasmi_to as number) ?? undefined,
+      murajaSurah: (row.muraja_surah as string) || undefined,
+      murajaFrom: (row.muraja_from as number) ?? undefined,
+      murajaTo: (row.muraja_to as number) ?? undefined,
+      tathbitSurah: (row.tathbit_surah as string) || undefined,
+      tathbitFrom: (row.tathbit_from as number) ?? undefined,
+      tathbitTo: (row.tathbit_to as number) ?? undefined,
+      note: (row.note as string) || undefined,
+      createdAt: (row.created_at as string) ?? undefined,
     })),
   });
 }
@@ -708,6 +758,7 @@ export function subscribeRealtime() {
     "almaher_announcements",
     "almaher_books",
     "almaher_notif_reads",
+    "almaher_sessions",
   ]) {
     channel.on("postgres_changes", { event: "*", schema: "public", table }, refresh);
   }
@@ -958,6 +1009,39 @@ export const actions = {
         .catch((e) => console.error("notif read", e));
     }
   },
+  /** الطالبة تسجّل ما سمّعته في اللقاء (تسميع/مراجعة/تثبيت) */
+  addRecitation(log: Omit<RecitationLog, "id" | "createdAt">) {
+    const rec: RecitationLog = {
+      ...log,
+      id: uid(),
+      createdAt: new Date().toISOString(),
+    };
+    setState((s) => ({ ...s, recitations: [rec, ...s.recitations] }));
+    run(() =>
+      supabase.from("almaher_sessions").insert({
+        id: rec.id,
+        student_id: rec.studentId,
+        log_date: rec.date,
+        tasmi_surah: rec.tasmiSurah ?? "",
+        tasmi_from: rec.tasmiFrom ?? null,
+        tasmi_to: rec.tasmiTo ?? null,
+        muraja_surah: rec.murajaSurah ?? "",
+        muraja_from: rec.murajaFrom ?? null,
+        muraja_to: rec.murajaTo ?? null,
+        tathbit_surah: rec.tathbitSurah ?? "",
+        tathbit_from: rec.tathbitFrom ?? null,
+        tathbit_to: rec.tathbitTo ?? null,
+        note: rec.note ?? "",
+      })
+    );
+  },
+  removeRecitation(id: string) {
+    setState((s) => ({
+      ...s,
+      recitations: s.recitations.filter((x) => x.id !== id),
+    }));
+    run(() => supabase.from("almaher_sessions").delete().eq("id", id));
+  },
   /** تحديث «آخر ظهور» للطالبة عند فتح التطبيق (صامت) */
   touchSeen(studentId: string) {
     if (!studentId) return;
@@ -1017,6 +1101,9 @@ export const actions = {
         notifReads: Array.isArray(parsed.notifReads)
           ? parsed.notifReads
           : getState().notifReads,
+        recitations: Array.isArray(parsed.recitations)
+          ? parsed.recitations
+          : getState().recitations,
       };
       persist(state);
       pushAll(state).catch(() => syncAlert());
@@ -1328,6 +1415,19 @@ export function notifReadMap(
   for (const x of reads)
     if (x.announcementId === announcementId) m[x.studentId] = x.readAt ?? "";
   return m;
+}
+
+/** نص مقطع التسميع: «الملك ١–٥» */
+export function reciteRangeLabel(
+  surah?: string,
+  from?: number,
+  to?: number
+): string {
+  if (!surah) return "";
+  const f = from ? from.toLocaleString("ar-EG") : "";
+  const t = to ? to.toLocaleString("ar-EG") : "";
+  const range = f && t ? `${f}–${t}` : f || t;
+  return range ? `${surah} ${range}` : surah;
 }
 
 /** وقت نسبي بالعربية: الآن / قبل ٥ دقائق / أمس / التاريخ */

@@ -32,6 +32,7 @@ import Link from "next/link";
 import { Field, inputCls, PrimaryBtn, Ribbon } from "./ui";
 import { NotificationsCenter, PinnedNotice } from "./notifications-card";
 import { PushToggle } from "./push-toggle";
+import { ReciteLogger } from "./recite-log";
 
 /** شاشة الطالبة: تدخل برمزها فتُعرض أهدافها مباشرة (قراءة فقط) */
 // تبويبات صفحة الطالبة (التجويد لاحقاً)
@@ -239,6 +240,9 @@ export function StudentHome() {
         <section>
           {/* الطالبة تُدخل بداية الحفظ/المراجعة وأوجه اللقاء بنفسها */}
           <MyPlanEditor student={me} />
+
+          {/* سجلّ التسميع بعد كل لقاء */}
+          <ReciteLogger student={me} />
 
           {/* خطة الفصل — جدول مولّد تلقائياً */}
           {schedule ? (

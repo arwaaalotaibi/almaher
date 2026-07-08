@@ -19,6 +19,7 @@ const ar = (n: number) => n.toLocaleString("ar-EG");
 import { ayahCount, SURAHS } from "@/lib/surahs";
 import { printHifzSchedule } from "@/lib/print-schedule";
 import { DangerBtn, Field, inputCls, PrimaryBtn, Sheet } from "./ui";
+import { ReciteHistory } from "./recite-log";
 
 /** نافذة بيانات الطالبة: الاسم + المعلّمة + بداية الحفظ + خطة الفصل */
 export function StudentSheet({
@@ -306,6 +307,14 @@ export function StudentSheet({
           حدّدي «تاريخ البداية وعدد اللقاءات» من صفحة الحلقة ليظهر الجدول
         </p>
       ) : null}
+
+      {/* سجلّ تسميع الطالبة */}
+      <div className="mb-3 rounded-2xl border border-cream-dark p-3">
+        <p className="mb-2 font-kufi text-sm font-bold text-plum-800">
+          🎙️ سجلّ التسميع
+        </p>
+        <ReciteHistory studentId={student.id} canDelete />
+      </div>
 
       <Field label="ملاحظات" icon="📝">
         <textarea
