@@ -26,7 +26,7 @@ function NotifItem({
 }: {
   n: Announcement;
   isNew: boolean;
-  halaqaLabel: string;
+  halaqaLabel?: string;
 }) {
   const meta = notifTypeMeta(n.type);
   return (
@@ -46,7 +46,8 @@ function NotifItem({
       </div>
       <p className="whitespace-pre-wrap text-sm text-ink">{n.body}</p>
       <p className="mt-1 text-[11px] font-bold text-silver-600">
-        {formatNotifDate(n.createdAt)} · {halaqaLabel}
+        {formatNotifDate(n.createdAt)}
+        {halaqaLabel ? ` · ${halaqaLabel}` : ""}
       </p>
     </div>
   );
@@ -121,7 +122,7 @@ export function NotificationsCenter({
   studentId?: string;
   onRead?: () => void;
 }) {
-  const { announcements, halaqas } = useApp();
+  const { announcements } = useApp();
   const list = useMemo(
     () => visibleAnnouncements(announcements, halaqaIds),
     [announcements, halaqaIds]
@@ -155,11 +156,6 @@ export function NotificationsCenter({
     );
   }
 
-  const label = (n: Announcement) => {
-    const h = halaqas.find((x) => x.id === n.halaqaId);
-    return h ? halaqaTitle(h) : "للجميع";
-  };
-
   return (
     <div className="grid gap-4">
       {smart.length > 0 && (
@@ -181,12 +177,7 @@ export function NotificationsCenter({
           </h3>
           <div className="grid gap-2">
             {g.items.map((n) => (
-              <NotifItem
-                key={n.id}
-                n={n}
-                isNew={!readSnap.has(n.id)}
-                halaqaLabel={label(n)}
-              />
+              <NotifItem key={n.id} n={n} isNew={!readSnap.has(n.id)} />
             ))}
           </div>
         </section>

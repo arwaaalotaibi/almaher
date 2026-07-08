@@ -55,6 +55,11 @@ export function StudentHome() {
     setReady(true);
   }, []);
 
+  // تحديث «آخر ظهور» عند فتح التطبيق
+  useEffect(() => {
+    if (myId) actions.touchSeen(myId);
+  }, [myId]);
+
   if (!ready) return <main className="mx-auto max-w-2xl px-4 pt-10" />;
 
   const me = students.find((s) => s.id === myId);

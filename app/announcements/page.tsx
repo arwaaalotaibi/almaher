@@ -6,8 +6,10 @@ import {
   formatNotifDate,
   halaqaTitle,
   NOTIF_TYPES,
+  notifReadMap,
   notifTypeMeta,
   readCountFor,
+  timeAgo,
   type NotifType,
   useApp,
 } from "@/lib/store";
@@ -35,6 +37,7 @@ function AnnouncementsInner() {
   const [target, setTarget] = useState(""); // "" = كل الطالبات
   const [type, setType] = useState<NotifType>("general");
   const [pinned, setPinned] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null); // تفاصيل قراءة إشعار
 
   if (!hydrated) return <main className="mx-auto max-w-2xl px-4 pt-10" />;
 
@@ -143,6 +146,11 @@ function AnnouncementsInner() {
                 ? students.length
                 : students.filter((s) => s.halaqaId === n.halaqaId).length;
             const readN = readCountFor(notifReads, n.id);
+            const targetStudents = students.filter(
+              (s) => n.halaqaId === "" || s.halaqaId === n.halaqaId
+            );
+            const readMap = notifReadMap(notifReads, n.id);
+            const isOpen = openId === n.id;
             return (
               <div
                 key={n.id}
@@ -161,10 +169,55 @@ function AnnouncementsInner() {
                   )}
                 </div>
                 <p className="whitespace-pre-wrap text-sm text-ink">{n.body}</p>
-                <p className="mt-1.5 text-[11px] font-bold text-plum-700">
+                <button
+                  type="button"
+                  onClick={() => setOpenId(isOpen ? null : n.id)}
+                  className="mt-1.5 flex items-center gap-1.5 text-[11px] font-bold text-plum-700"
+                >
                   👁️ قرأه {readN.toLocaleString("ar-EG")} من{" "}
                   {reach.toLocaleString("ar-EG")}
-                </p>
+                  <span className="text-silver-500">
+                    {isOpen ? "▲ إخفاء" : "▼ التفاصيل"}
+                  </span>
+                </button>
+
+                {isOpen && (
+                  <div className="mt-2 grid gap-1 rounded-xl bg-cream/60 p-2">
+                    {targetStudents.length === 0 ? (
+                      <p className="p-1 text-center text-[11px] text-silver-600">
+                        لا طالبات في هذا النطاق
+                      </p>
+                    ) : (
+                      targetStudents.map((s) => {
+                        const read = readMap[s.id] !== undefined;
+                        return (
+                          <div
+                            key={s.id}
+                            className="rounded-lg bg-white px-2.5 py-1.5"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-plum-800">
+                                {s.name}
+                              </span>
+                              <span
+                                className={`text-[11px] font-bold ${
+                                  read ? "text-emerald-600" : "text-silver-500"
+                                }`}
+                              >
+                                {read
+                                  ? `✅ قرأته ${timeAgo(readMap[s.id])}`
+                                  : "⚪ لم تقرأه"}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-silver-600">
+                              👣 آخر ظهور: {timeAgo(s.lastSeen)}
+                            </p>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
                 <div className="mt-2 flex items-center justify-between">
                   <span className="text-[11px] font-bold text-silver-600">
                     {formatNotifDate(n.createdAt)}

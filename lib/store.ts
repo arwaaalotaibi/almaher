@@ -76,6 +76,7 @@ export interface Student {
   updatedAt?: string; // ISO
   agreedAt?: string; // ISO — وقت إقرار الطالبة باللائحة
   agreedVersion?: string; // نسخة اللائحة التي أقرّت بها
+  lastSeen?: string; // ISO — آخر مرة فتحت فيها الطالبة التطبيق
 }
 
 export interface Halaqa {
@@ -152,6 +153,7 @@ export interface Book {
 export interface NotifRead {
   announcementId: string;
   studentId: string;
+  readAt?: string; // ISO — وقت القراءة
 }
 
 export interface AppState {
@@ -488,6 +490,7 @@ interface StudentRow {
   updated_at: string;
   agreed_at: string | null;
   agreed_version: string;
+  last_seen?: string | null;
 }
 
 function syncAlert() {
@@ -521,7 +524,7 @@ export async function pullRemote(): Promise<void> {
     supabase.from("almaher_teachers").select("id,name,halaqa_ids").order("created_at"),
     supabase
       .from("almaher_students")
-      .select("id,name,halaqa_id,teacher_id,code,track,plan,sessions,goals,done,note,updated_at,agreed_at,agreed_version")
+      .select("id,name,halaqa_id,teacher_id,code,track,plan,sessions,goals,done,note,updated_at,agreed_at,agreed_version,last_seen")
       .order("created_at"),
     supabase
       .from("almaher_announcements")
@@ -533,7 +536,7 @@ export async function pullRemote(): Promise<void> {
       .order("created_at", { ascending: false }),
     supabase
       .from("almaher_notif_reads")
-      .select("announcement_id,student_id"),
+      .select("announcement_id,student_id,read_at"),
   ]);
   if (h.error || t.error || s.error || a.error || b.error) {
     throw h.error ?? t.error ?? s.error ?? a.error ?? b.error;
@@ -566,6 +569,7 @@ export async function pullRemote(): Promise<void> {
       updatedAt: row.updated_at,
       agreedAt: row.agreed_at ?? undefined,
       agreedVersion: row.agreed_version ?? "",
+      lastSeen: row.last_seen ?? undefined,
     })),
     announcements: (a.data ?? []).map((row) => ({
       id: row.id as string,
@@ -591,6 +595,7 @@ export async function pullRemote(): Promise<void> {
     notifReads: (r.data ?? []).map((row) => ({
       announcementId: row.announcement_id as string,
       studentId: row.student_id as string,
+      readAt: (row.read_at as string) ?? undefined,
     })),
   });
 }
@@ -953,6 +958,13 @@ export const actions = {
         .catch((e) => console.error("notif read", e));
     }
   },
+  /** تحديث «آخر ظهور» للطالبة عند فتح التطبيق (صامت) */
+  touchSeen(studentId: string) {
+    if (!studentId) return;
+    Promise.resolve(
+      supabase.rpc("almaher_touch_seen", { p_sid: studentId })
+    ).catch((e) => console.error("seen", e));
+  },
 
   setBookPlan(id: string, plan: ReadingSegment[]) {
     setState((s) => ({
@@ -1305,6 +1317,35 @@ export function visibleAnnouncements(
 /** عدد الطالبات اللواتي قرأن إشعاراً معيّناً */
 export function readCountFor(reads: NotifRead[], announcementId: string): number {
   return reads.filter((x) => x.announcementId === announcementId).length;
+}
+
+/** خريطة: معرّف الطالبة → وقت قراءتها لإشعار معيّن */
+export function notifReadMap(
+  reads: NotifRead[],
+  announcementId: string
+): Record<string, string | undefined> {
+  const m: Record<string, string | undefined> = {};
+  for (const x of reads)
+    if (x.announcementId === announcementId) m[x.studentId] = x.readAt ?? "";
+  return m;
+}
+
+/** وقت نسبي بالعربية: الآن / قبل ٥ دقائق / أمس / التاريخ */
+export function timeAgo(iso?: string): string {
+  if (!iso) return "لم تظهر بعد";
+  const diff = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "الآن";
+  if (min < 60) return `قبل ${min.toLocaleString("ar-EG")} دقيقة`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `قبل ${hr.toLocaleString("ar-EG")} ساعة`;
+  const d = Math.floor(hr / 24);
+  if (d === 1) return "أمس";
+  if (d < 7) return `قبل ${d.toLocaleString("ar-EG")} أيام`;
+  return new Date(iso).toLocaleDateString("ar-u-ca-gregory-nu-arab", {
+    day: "numeric",
+    month: "long",
+  });
 }
 
 /** الإشعار المثبّت على الواجهة (إن وُجد ضمن الظاهرة) */
