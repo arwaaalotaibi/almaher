@@ -20,6 +20,13 @@ import {
   type Student,
 } from "@/lib/store";
 import { ayahCount, SURAHS } from "@/lib/surahs";
+import {
+  TERMS,
+  TERMS_ITEM_COUNT,
+  TERMS_SUBTITLE,
+  TERMS_TITLE,
+  TERMS_VERSION,
+} from "@/lib/terms";
 import { printHifzSchedule } from "@/lib/print-schedule";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
@@ -80,6 +87,11 @@ export function StudentHome() {
         </div>
       </main>
     );
+  }
+
+  // إقرار اللائحة: لا تدخل الطالبة قبل أن تقرّ بجميع البنود
+  if (me.agreedVersion !== TERMS_VERSION) {
+    return <TermsGate student={me} onLogout={logout} />;
   }
 
   const halaqa = halaqas.find((h) => h.id === me.halaqaId);
@@ -378,6 +390,109 @@ export function StudentHome() {
       >
         🚪 تسجيل الخروج
       </button>
+    </main>
+  );
+}
+
+/** شاشة إقرار اللائحة: تقرّ الطالبة بكل بند قبل الدخول */
+function TermsGate({
+  student,
+  onLogout,
+}: {
+  student: Student;
+  onLogout: () => void;
+}) {
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const doneCount = Object.values(checked).filter(Boolean).length;
+  const allDone = doneCount >= TERMS_ITEM_COUNT;
+
+  const agree = () => {
+    if (!allDone) return;
+    actions.updateStudent(student.id, {
+      agreedAt: new Date().toISOString(),
+      agreedVersion: TERMS_VERSION,
+    });
+  };
+
+  return (
+    <main className="mx-auto max-w-2xl px-4 pb-32 pt-10">
+      <div className="mb-5 text-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.png" alt="الماهر" className="mx-auto mb-3 h-16 w-auto" />
+        <h1 className="font-kufi text-xl font-bold leading-snug text-plum-800">
+          {TERMS_TITLE}
+        </h1>
+        <p className="mt-1 text-sm font-bold text-plum-600">{TERMS_SUBTITLE}</p>
+        <p className="mt-3 rounded-xl bg-plum-50 px-4 py-2.5 text-sm font-bold text-plum-700">
+          مرحباً {student.name} 🌸 — قبل الدخول، اطّلعي على اللائحة وأقرّي بكل بند
+        </p>
+      </div>
+
+      <div className="grid gap-3">
+        {TERMS.map((sec) => (
+          <div key={sec.title} className="card rounded-2xl p-4">
+            <p className="mb-2 font-kufi text-base font-bold text-plum-800">
+              {sec.icon} {sec.title}
+            </p>
+            <div className="grid gap-1.5">
+              {sec.items.map((item, i) => {
+                const key = `${sec.title}#${i}`;
+                const on = !!checked[key];
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() =>
+                      setChecked((c) => ({ ...c, [key]: !c[key] }))
+                    }
+                    className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 text-start transition ${
+                      on
+                        ? "border-plum-500 bg-plum-50"
+                        : "border-cream-dark bg-white"
+                    }`}
+                  >
+                    <span
+                      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 text-xs font-bold ${
+                        on
+                          ? "border-plum-600 bg-plum-600 text-white"
+                          : "border-silver-400 text-transparent"
+                      }`}
+                    >
+                      ✓
+                    </span>
+                    <span className="text-sm font-medium leading-relaxed text-ink">
+                      {item}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={onLogout}
+        className="mx-auto mt-6 block text-sm font-bold text-silver-600 underline"
+      >
+        الدخول برمز آخر
+      </button>
+
+      {/* شريط الإقرار الثابت أسفل الشاشة */}
+      <div className="glass-bar fixed inset-x-0 bottom-0 z-40 px-4 py-3">
+        <div className="mx-auto max-w-2xl">
+          <p className="mb-2 text-center text-xs font-bold text-plum-700">
+            أقررتِ بـ {ar(doneCount)} من {ar(TERMS_ITEM_COUNT)} بنداً
+          </p>
+          <PrimaryBtn
+            onClick={agree}
+            className={allDone ? "" : "opacity-40"}
+          >
+            {allDone ? "أوافق وألتزم بجميع البنود" : "أقرّي بكل البنود للمتابعة"}
+          </PrimaryBtn>
+        </div>
+      </div>
     </main>
   );
 }

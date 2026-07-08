@@ -74,6 +74,8 @@ export interface Student {
   done: GoalsDone;
   note?: string;
   updatedAt?: string; // ISO
+  agreedAt?: string; // ISO — وقت إقرار الطالبة باللائحة
+  agreedVersion?: string; // نسخة اللائحة التي أقرّت بها
 }
 
 export interface Halaqa {
@@ -446,6 +448,8 @@ interface StudentRow {
   done: GoalsDone;
   note: string;
   updated_at: string;
+  agreed_at: string | null;
+  agreed_version: string;
 }
 
 function syncAlert() {
@@ -479,7 +483,7 @@ export async function pullRemote(): Promise<void> {
     supabase.from("almaher_teachers").select("id,name,halaqa_ids").order("created_at"),
     supabase
       .from("almaher_students")
-      .select("id,name,halaqa_id,teacher_id,code,track,plan,sessions,goals,done,note,updated_at")
+      .select("id,name,halaqa_id,teacher_id,code,track,plan,sessions,goals,done,note,updated_at,agreed_at,agreed_version")
       .order("created_at"),
     supabase
       .from("almaher_announcements")
@@ -519,6 +523,8 @@ export async function pullRemote(): Promise<void> {
       done: { ...EMPTY_DONE, ...row.done },
       note: row.note,
       updatedAt: row.updated_at,
+      agreedAt: row.agreed_at ?? undefined,
+      agreedVersion: row.agreed_version ?? "",
     })),
     announcements: (a.data ?? []).map((row) => ({
       id: row.id as string,
@@ -554,6 +560,8 @@ function studentToRow(st: Student): StudentRow {
     done: st.done,
     note: st.note ?? "",
     updated_at: st.updatedAt ?? new Date().toISOString(),
+    agreed_at: st.agreedAt ?? null,
+    agreed_version: st.agreedVersion ?? "",
   };
 }
 

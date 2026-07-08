@@ -315,6 +315,22 @@ export function StudentSheet({
         />
       </Field>
 
+      {/* حالة إقرار اللائحة */}
+      <div
+        className={`mb-3 rounded-xl px-4 py-2.5 text-center text-xs font-bold ${
+          student.agreedAt
+            ? "bg-plum-50 text-plum-700"
+            : "bg-cream text-silver-600"
+        }`}
+      >
+        {student.agreedAt
+          ? `✅ أقرّت باللائحة — ${new Date(student.agreedAt).toLocaleDateString(
+              "ar-u-ca-gregory-nu-arab",
+              { day: "numeric", month: "long", year: "numeric" }
+            )}`
+          : "⏳ لم تُقرّ باللائحة بعد"}
+      </div>
+
       {updatedLabel && (
         <p className="mb-3 text-center text-xs text-silver-600">
           آخر تحديث: {updatedLabel}
