@@ -49,8 +49,18 @@ export function printHifzSchedule(opts: {
   td.seg{font-weight:700;color:#3a2a32}
   tr:nth-child(even) td{background:#faf6f8}
   .foot{text-align:center;color:#9c8fa0;font-size:15px;margin-top:16px;font-style:italic}
-  @media print{body{padding:8px}}
+  .bar{position:sticky;top:0;display:flex;gap:10px;justify-content:space-between;
+    background:#f2efec;padding:12px 14px;margin:-34px -34px 20px;border-bottom:1px solid #e0d6dc}
+  .bar button{font-family:inherit;font-size:17px;font-weight:700;border:none;border-radius:12px;
+    padding:11px 20px;cursor:pointer}
+  .back{background:#e8dfe4;color:#5d3f4e}
+  .print{background:#5d3f4e;color:#fff}
+  @media print{body{padding:8px}.bar{display:none}}
 </style></head><body>
+  <div class="bar">
+    <button class="back" onclick="window.close()">→ رجوع</button>
+    <button class="print" onclick="window.print()">🖨️ طباعة</button>
+  </div>
   <div class="frame">
     <div class="head">
       <img src="${window.location.origin}/logo.png" alt="الماهر"/>
@@ -71,7 +81,6 @@ export function printHifzSchedule(opts: {
     </table>
     <div class="foot">جمعية الماهر بالقرآن وعلومه</div>
   </div>
-  <script>window.onload=function(){setTimeout(function(){window.print()},400)}</script>
 </body></html>`);
   w.document.close();
 }
