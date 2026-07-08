@@ -97,6 +97,35 @@ export interface Announcement {
   body: string;
   halaqaId: string; // "" = لكل الحلقات
   createdAt: string; // ISO
+  pinned?: boolean; // مثبّت على واجهة الطالبة (واحد فقط)
+  type?: string; // نوع الإشعار (NotifType)
+  showAt?: string; // يظهر ابتداءً من (ISO) — للجدولة
+  expiresAt?: string; // يختفي بعد (ISO) — لانتهاء الصلاحية
+}
+
+/** أنواع الإشعارات — لكل نوع أيقونة ولون */
+export type NotifType =
+  | "general"
+  | "important"
+  | "congrats"
+  | "reminder"
+  | "holiday";
+
+export const NOTIF_TYPES: {
+  key: NotifType;
+  label: string;
+  icon: string;
+  cls: string; // لون الحدّ/الخلفية
+}[] = [
+  { key: "general", label: "عام", icon: "📢", cls: "border-plum-500 bg-plum-50" },
+  { key: "important", label: "تنبيه مهم", icon: "⚠️", cls: "border-amber-500 bg-amber-50" },
+  { key: "congrats", label: "تهنئة", icon: "🎉", cls: "border-emerald-500 bg-emerald-50" },
+  { key: "reminder", label: "تذكير موعد", icon: "⏰", cls: "border-sky-500 bg-sky-50" },
+  { key: "holiday", label: "إجازة", icon: "🌙", cls: "border-indigo-500 bg-indigo-50" },
+];
+
+export function notifTypeMeta(t?: string) {
+  return NOTIF_TYPES.find((x) => x.key === t) ?? NOTIF_TYPES[0];
 }
 
 /** مقطع من خطة قراءة الكتاب: يوم قراءة أو اختبار */
@@ -487,7 +516,7 @@ export async function pullRemote(): Promise<void> {
       .order("created_at"),
     supabase
       .from("almaher_announcements")
-      .select("id,body,halaqa_id,created_at")
+      .select("id,body,halaqa_id,created_at,pinned,type,show_at,expires_at")
       .order("created_at", { ascending: false }),
     supabase
       .from("almaher_books")
@@ -531,6 +560,10 @@ export async function pullRemote(): Promise<void> {
       body: row.body as string,
       halaqaId: (row.halaqa_id as string) ?? "",
       createdAt: row.created_at as string,
+      pinned: (row.pinned as boolean) ?? false,
+      type: (row.type as string) ?? "general",
+      showAt: (row.show_at as string) ?? undefined,
+      expiresAt: (row.expires_at as string) ?? undefined,
     })),
     books: (b.data ?? []).map((row) => ({
       id: row.id as string,
@@ -622,6 +655,10 @@ export async function pushAll(state: AppState): Promise<void> {
         body: n.body,
         halaqa_id: n.halaqaId,
         created_at: n.createdAt,
+        type: n.type ?? "general",
+        pinned: n.pinned ?? false,
+        show_at: n.showAt ?? null,
+        expires_at: n.expiresAt ?? null,
       }))
     );
     if (error) throw error;
@@ -798,21 +835,66 @@ export const actions = {
     run(() => supabase.from("almaher_students").delete().eq("id", id));
   },
 
-  addAnnouncement(body: string, halaqaId: string) {
+  addAnnouncement(
+    body: string,
+    halaqaId: string,
+    opts?: { type?: NotifType; pinned?: boolean }
+  ) {
     const note: Announcement = {
       id: uid(),
       body: body.trim(),
       halaqaId,
       createdAt: new Date().toISOString(),
+      type: opts?.type ?? "general",
+      pinned: opts?.pinned ?? false,
     };
-    setState((s) => ({ ...s, announcements: [note, ...s.announcements] }));
+    setState((s) => ({
+      ...s,
+      // تثبيت واحد فقط: أي إشعار جديد مثبّت يُلغي تثبيت الباقي
+      announcements: [
+        note,
+        ...(note.pinned
+          ? s.announcements.map((n) => ({ ...n, pinned: false }))
+          : s.announcements),
+      ],
+    }));
+    if (note.pinned) {
+      run(() =>
+        supabase
+          .from("almaher_announcements")
+          .update({ pinned: false })
+          .eq("pinned", true)
+      );
+    }
     run(() =>
       supabase.from("almaher_announcements").insert({
         id: note.id,
         body: note.body,
         halaqa_id: note.halaqaId,
         created_at: note.createdAt,
+        type: note.type,
+        pinned: note.pinned,
       })
+    );
+  },
+  /** تثبيت إشعار واحد على الواجهة (يُلغي تثبيت الباقي)، أو فكّ التثبيت */
+  setAnnouncementPinned(id: string, pinned: boolean) {
+    setState((s) => ({
+      ...s,
+      announcements: s.announcements.map((n) =>
+        n.id === id ? { ...n, pinned } : pinned ? { ...n, pinned: false } : n
+      ),
+    }));
+    if (pinned) {
+      run(() =>
+        supabase
+          .from("almaher_announcements")
+          .update({ pinned: false })
+          .eq("pinned", true)
+      );
+    }
+    run(() =>
+      supabase.from("almaher_announcements").update({ pinned }).eq("id", id)
     );
   },
   removeAnnouncement(id: string) {
@@ -1155,6 +1237,27 @@ export function announcementsFor(
   return all.filter((n) => n.halaqaId === "" || halaqaIds.includes(n.halaqaId));
 }
 
+/** الإشعارات الظاهرة الآن: تخصّ الحلقة + بدأ ظهورها + لم تنتهِ صلاحيتها */
+export function visibleAnnouncements(
+  all: Announcement[],
+  halaqaIds: string[]
+): Announcement[] {
+  const now = Date.now();
+  return announcementsFor(all, halaqaIds).filter((n) => {
+    if (n.showAt && new Date(n.showAt).getTime() > now) return false;
+    if (n.expiresAt && new Date(n.expiresAt).getTime() <= now) return false;
+    return true;
+  });
+}
+
+/** الإشعار المثبّت على الواجهة (إن وُجد ضمن الظاهرة) */
+export function pinnedAnnouncement(
+  all: Announcement[],
+  halaqaIds: string[]
+): Announcement | null {
+  return visibleAnnouncements(all, halaqaIds).find((n) => n.pinned) ?? null;
+}
+
 const SEEN_KEY = "almaher-notif-seen";
 
 /** آخر وقت شاهدت فيه الإشعارات على هذا الجهاز */
@@ -1178,4 +1281,80 @@ export function formatNotifDate(iso: string): string {
     day: "numeric",
     month: "long",
   });
+}
+
+/* ===== تتبّع القراءة لكل إشعار على حِدة (على الجهاز) ===== */
+const READ_KEY = "almaher-notif-read";
+
+export function getReadIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(READ_KEY);
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveReadIds(ids: Set<string>) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(READ_KEY, JSON.stringify([...ids]));
+  } catch {
+    /* تجاهل */
+  }
+}
+
+/** تعليم مجموعة إشعارات كمقروءة، وإرجاع المجموعة المحدّثة */
+export function markNotifsRead(idsToAdd: string[]): Set<string> {
+  const cur = getReadIds();
+  let changed = false;
+  for (const id of idsToAdd)
+    if (!cur.has(id)) {
+      cur.add(id);
+      changed = true;
+    }
+  if (changed) saveReadIds(cur);
+  return cur;
+}
+
+/** عدد غير المقروء ضمن قائمة إشعارات */
+export function countUnread(list: Announcement[], read: Set<string>): number {
+  return list.filter((n) => !read.has(n.id)).length;
+}
+
+/** تجميع الإشعارات بحسب التاريخ: اليوم / أمس / هذا الأسبوع / أقدم */
+export function groupByDate(list: Announcement[]): {
+  label: string;
+  items: Announcement[];
+}[] {
+  const now = new Date();
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  ).getTime();
+  const dayMs = 86400000;
+  const buckets: Record<string, Announcement[]> = {
+    today: [],
+    yesterday: [],
+    week: [],
+    older: [],
+  };
+  for (const n of list) {
+    const t = new Date(n.createdAt).getTime();
+    if (t >= startOfToday) buckets.today.push(n);
+    else if (t >= startOfToday - dayMs) buckets.yesterday.push(n);
+    else if (t >= startOfToday - 7 * dayMs) buckets.week.push(n);
+    else buckets.older.push(n);
+  }
+  const labels: [string, string][] = [
+    ["today", "اليوم"],
+    ["yesterday", "أمس"],
+    ["week", "هذا الأسبوع"],
+    ["older", "أقدم"],
+  ];
+  return labels
+    .map(([k, label]) => ({ label, items: buckets[k] }))
+    .filter((g) => g.items.length > 0);
 }

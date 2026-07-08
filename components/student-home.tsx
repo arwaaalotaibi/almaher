@@ -6,9 +6,11 @@ import {
   actions,
   buildSchedule,
   CoursePlan,
+  countUnread,
   currentSessionIndex,
   EMPTY_PLAN,
   formatSchedDate,
+  getReadIds,
   halaqaTitle,
   hifzStartLabel,
   normalizeDigits,
@@ -17,6 +19,7 @@ import {
   STUDENT_PICK_KEY,
   todaySegment,
   useApp,
+  visibleAnnouncements,
   type Student,
 } from "@/lib/store";
 import { ayahCount, SURAHS } from "@/lib/surahs";
@@ -26,24 +29,27 @@ import { printHifzSchedule } from "@/lib/print-schedule";
 const ar = (n: number) => n.toLocaleString("ar-EG");
 import Link from "next/link";
 import { Field, inputCls, PrimaryBtn, Ribbon } from "./ui";
-import { NotificationsCard } from "./notifications-card";
+import { NotificationsCenter, PinnedNotice } from "./notifications-card";
 
 /** شاشة الطالبة: تدخل برمزها فتُعرض أهدافها مباشرة (قراءة فقط) */
 // تبويبات صفحة الطالبة (التجويد لاحقاً)
 const STUDENT_TABS = [
   { key: "reading", icon: "📖", label: "القراءة" },
   { key: "quran", icon: "🕋", label: "القرآن" },
+  { key: "notifications", icon: "🔔", label: "الإشعارات" },
 ] as const;
 type StudentTab = (typeof STUDENT_TABS)[number]["key"];
 
 export function StudentHome() {
-  const { halaqas, teachers, students, books } = useApp();
+  const { halaqas, teachers, students, books, announcements } = useApp();
   const [myId, setMyId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState<StudentTab>("reading");
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setMyId(window.localStorage.getItem(STUDENT_PICK_KEY));
+    setReadIds(getReadIds());
     setReady(true);
   }, []);
 
@@ -88,6 +94,10 @@ export function StudentHome() {
     return <TermsGate student={me} onLogout={logout} />;
   }
 
+  const myHalaqaIds = me.halaqaId ? [me.halaqaId] : [];
+  const notifList = visibleAnnouncements(announcements, myHalaqaIds);
+  const unreadNotifs = countUnread(notifList, readIds);
+
   const halaqa = halaqas.find((h) => h.id === me.halaqaId);
   const teacher = teachers.find((t) => t.id === me.teacherId);
   const schedule = halaqa ? buildSchedule(halaqa, me.plan) : null;
@@ -123,7 +133,10 @@ export function StudentHome() {
         </p>
       </div>
 
-      <NotificationsCard halaqaIds={me.halaqaId ? [me.halaqaId] : []} />
+      <PinnedNotice
+        halaqaIds={myHalaqaIds}
+        onOpen={() => setTab("notifications")}
+      />
 
       {/* شريط التبويبات */}
       <div className="mb-6 flex gap-1.5 rounded-2xl bg-cream p-1.5">
@@ -132,7 +145,7 @@ export function StudentHome() {
             key={t.key}
             type="button"
             onClick={() => setTab(t.key)}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 font-kufi text-base font-bold transition ${
+            className={`relative flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 font-kufi text-base font-bold transition ${
               tab === t.key
                 ? "bg-plum-600 text-white shadow"
                 : "text-silver-600"
@@ -140,6 +153,11 @@ export function StudentHome() {
           >
             <span>{t.icon}</span>
             {t.label}
+            {t.key === "notifications" && unreadNotifs > 0 && (
+              <span className="absolute end-1.5 top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                {ar(unreadNotifs)}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -375,6 +393,16 @@ export function StudentHome() {
               آخر تحديث: {updatedLabel}
             </p>
           )}
+        </section>
+      )}
+
+      {/* شاشة الإشعارات — الأرشيف كاملاً */}
+      {tab === "notifications" && (
+        <section>
+          <NotificationsCenter
+            halaqaIds={myHalaqaIds}
+            onRead={() => setReadIds(getReadIds())}
+          />
         </section>
       )}
 

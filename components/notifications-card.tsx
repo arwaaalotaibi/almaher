@@ -2,34 +2,177 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  announcementsFor,
-  countUnseen,
+  Announcement,
   formatNotifDate,
-  getNotifSeen,
+  getReadIds,
+  groupByDate,
   halaqaTitle,
-  markNotifSeen,
+  markNotifsRead,
+  notifTypeMeta,
+  pinnedAnnouncement,
   useApp,
+  visibleAnnouncements,
 } from "@/lib/store";
 
-/** بطاقة إشعارات الإدارة — تظهر للطالبة/المعلّمة حسب حلقاتها */
-export function NotificationsCard({ halaqaIds }: { halaqaIds: string[] }) {
+const ar = (n: number) => n.toLocaleString("ar-EG");
+
+/** بطاقة إشعار واحدة — بلون نوعها، وعلامة «جديد» إن كانت غير مقروءة */
+function NotifItem({
+  n,
+  isNew,
+  halaqaLabel,
+}: {
+  n: Announcement;
+  isNew: boolean;
+  halaqaLabel: string;
+}) {
+  const meta = notifTypeMeta(n.type);
+  return (
+    <div
+      className={`rounded-xl border-s-4 px-3 py-2.5 ${
+        isNew ? meta.cls : "border-cream-dark bg-cream/40"
+      }`}
+    >
+      <div className="mb-0.5 flex items-center gap-1.5">
+        <span className="text-sm">{meta.icon}</span>
+        <span className="text-[11px] font-bold text-plum-700">{meta.label}</span>
+        {isNew && (
+          <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+            جديد
+          </span>
+        )}
+      </div>
+      <p className="whitespace-pre-wrap text-sm text-ink">{n.body}</p>
+      <p className="mt-1 text-[11px] font-bold text-silver-600">
+        {formatNotifDate(n.createdAt)} · {halaqaLabel}
+      </p>
+    </div>
+  );
+}
+
+/** بانر الإشعار المثبّت على الواجهة (يحدّده الإداري) — يظهر واحد فقط */
+export function PinnedNotice({
+  halaqaIds,
+  onOpen,
+}: {
+  halaqaIds: string[];
+  onOpen?: () => void;
+}) {
+  const { announcements } = useApp();
+  const pinned = useMemo(
+    () => pinnedAnnouncement(announcements, halaqaIds),
+    [announcements, halaqaIds]
+  );
+  if (!pinned) return null;
+  const meta = notifTypeMeta(pinned.type);
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={`mb-5 block w-full rounded-2xl border-s-4 p-4 text-start transition active:scale-[0.99] ${meta.cls}`}
+    >
+      <div className="mb-1 flex items-center gap-1.5">
+        <span>📌</span>
+        <span className="font-kufi text-sm font-bold text-plum-800">
+          {meta.icon} {meta.label}
+        </span>
+      </div>
+      <p className="whitespace-pre-wrap text-sm font-medium text-ink">
+        {pinned.body}
+      </p>
+      <p className="mt-1.5 text-[11px] font-bold text-silver-600">
+        {formatNotifDate(pinned.createdAt)}
+      </p>
+    </button>
+  );
+}
+
+/** مركز الإشعارات — الأرشيف كاملاً مجمّعاً بالتاريخ مع مقروء/غير مقروء */
+export function NotificationsCenter({
+  halaqaIds,
+  onRead,
+}: {
+  halaqaIds: string[];
+  onRead?: () => void;
+}) {
   const { announcements, halaqas } = useApp();
   const list = useMemo(
-    () => announcementsFor(announcements, halaqaIds),
+    () => visibleAnnouncements(announcements, halaqaIds),
     [announcements, halaqaIds]
   );
 
-  // نلتقط «آخر مشاهدة» عند الدخول، ثم نعلّمها كمقروءة بعد لحظات
-  const [seen, setSeen] = useState<number | null>(null);
+  // لقطة «المقروء» عند الفتح لتثبيت وسم «جديد»، ثم نعلّم الكل كمقروء
+  const [readSnap, setReadSnap] = useState<Set<string>>(new Set());
   useEffect(() => {
-    setSeen(getNotifSeen());
-    const t = setTimeout(() => markNotifSeen(), 2000);
+    setReadSnap(getReadIds());
+    const t = setTimeout(() => {
+      markNotifsRead(list.map((n) => n.id));
+      onRead?.();
+    }, 1200);
     return () => clearTimeout(t);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [list.length]);
+
+  const groups = useMemo(() => groupByDate(list), [list]);
+
+  if (list.length === 0) {
+    return (
+      <div className="card rounded-2xl p-8 text-center">
+        <p className="text-3xl">🔔</p>
+        <p className="mt-2 font-kufi font-bold text-plum-800">لا إشعارات بعد</p>
+        <p className="mt-1 text-sm text-silver-600">
+          ستظهر هنا إشعارات الإدارة أولاً بأول
+        </p>
+      </div>
+    );
+  }
+
+  const label = (n: Announcement) => {
+    const h = halaqas.find((x) => x.id === n.halaqaId);
+    return h ? halaqaTitle(h) : "للجميع";
+  };
+
+  return (
+    <div className="grid gap-4">
+      {groups.map((g) => (
+        <section key={g.label}>
+          <h3 className="mb-2 font-kufi text-sm font-bold text-plum-600">
+            {g.label}
+          </h3>
+          <div className="grid gap-2">
+            {g.items.map((n) => (
+              <NotifItem
+                key={n.id}
+                n={n}
+                isNew={!readSnap.has(n.id)}
+                halaqaLabel={label(n)}
+              />
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+/** بطاقة مدمجة (للمعلّمة): المثبّت + أحدث الإشعارات */
+export function NotificationsCard({ halaqaIds }: { halaqaIds: string[] }) {
+  const { announcements, halaqas } = useApp();
+  const list = useMemo(
+    () => visibleAnnouncements(announcements, halaqaIds),
+    [announcements, halaqaIds]
+  );
+
+  const [readSnap, setReadSnap] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    setReadSnap(getReadIds());
+    const t = setTimeout(() => markNotifsRead(list.map((n) => n.id)), 2000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [list.length]);
 
   if (list.length === 0) return null;
-  const seenAt = seen ?? 0;
-  const unseen = countUnseen(list, seenAt);
+  const unread = list.filter((n) => !readSnap.has(n.id)).length;
 
   return (
     <section className="card mb-5 rounded-2xl p-4">
@@ -37,32 +180,22 @@ export function NotificationsCard({ halaqaIds }: { halaqaIds: string[] }) {
         <span className="font-kufi text-base font-bold text-plum-800">
           📢 إشعارات الإدارة
         </span>
-        {unseen > 0 && (
+        {unread > 0 && (
           <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
-            {unseen.toLocaleString("ar-EG")} جديد
+            {ar(unread)} جديد
           </span>
         )}
       </div>
       <div className="grid gap-2">
-        {list.map((n) => {
+        {list.slice(0, 6).map((n) => {
           const h = halaqas.find((x) => x.id === n.halaqaId);
-          const isNew = new Date(n.createdAt).getTime() > seenAt;
           return (
-            <div
+            <NotifItem
               key={n.id}
-              className={`rounded-xl border-r-4 px-3 py-2.5 ${
-                isNew
-                  ? "border-plum-600 bg-plum-50"
-                  : "border-cream-dark bg-cream/40"
-              }`}
-            >
-              <p className="whitespace-pre-wrap text-sm text-ink">{n.body}</p>
-              <p className="mt-1 text-[11px] font-bold text-silver-600">
-                {formatNotifDate(n.createdAt)}
-                {" · "}
-                {h ? halaqaTitle(h) : "للجميع"}
-              </p>
-            </div>
+              n={n}
+              isNew={!readSnap.has(n.id)}
+              halaqaLabel={h ? halaqaTitle(h) : "للجميع"}
+            />
           );
         })}
       </div>
