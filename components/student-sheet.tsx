@@ -20,6 +20,7 @@ import { ayahCount, SURAHS } from "@/lib/surahs";
 import { printHifzSchedule } from "@/lib/print-schedule";
 import { DangerBtn, Field, inputCls, PrimaryBtn, Sheet } from "./ui";
 import { ReciteLogger } from "./recite-log";
+import { ProgressSummary } from "./motivation-panel";
 
 /** نافذة بيانات الطالبة: الاسم + المعلّمة + بداية الحفظ + خطة الفصل */
 export function StudentSheet({
@@ -307,6 +308,14 @@ export function StudentSheet({
           حدّدي «تاريخ البداية وعدد اللقاءات» من صفحة الحلقة ليظهر الجدول
         </p>
       ) : null}
+
+      {/* ملخّص تقدّم الطالبة */}
+      <div className="mb-3 rounded-2xl border border-cream-dark p-3">
+        <p className="mb-2 font-kufi text-sm font-bold text-plum-800">
+          🧭 تقدّم الطالبة
+        </p>
+        <ProgressSummary student={student} halaqa={halaqa} />
+      </div>
 
       {/* سجلّ تسميع الطالبة — الإدارة/المعلّمة تقدر تُدخل أيضاً */}
       <ReciteLogger student={student} />

@@ -5,6 +5,88 @@ import { useApp, type Halaqa, type Student } from "@/lib/store";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 
+/** ملخّص تقدّم مصغّر للإدارة/المعلّمة داخل بيانات الطالبة */
+export function ProgressSummary({
+  student,
+  halaqa,
+}: {
+  student: Student;
+  halaqa?: Halaqa;
+}) {
+  const { recitations } = useApp();
+  const p = computeProgress(student, recitations, halaqa);
+
+  if (!p.hasData) {
+    return (
+      <p className="rounded-xl bg-cream/60 px-3 py-3 text-center text-xs text-silver-600">
+        لم تبدأ الطالبة تسجيل التسميع بعد
+      </p>
+    );
+  }
+
+  return (
+    <div className="grid gap-2">
+      <div className="rounded-xl bg-plum-50 px-3 py-2.5">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-bold text-plum-800">
+            📖 {juzLabel(p.juz)}
+          </span>
+          <span className="text-sm font-bold text-plum-700">
+            {ar(p.juzPct)}٪
+          </span>
+        </div>
+        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white">
+          <div
+            className="h-full rounded-full bg-plum-600"
+            style={{ width: `${p.juzPct}%` }}
+          />
+        </div>
+        <p className="mt-1.5 text-[11px] font-bold text-silver-600">
+          صفحة {ar(p.currentPage)} من {ar(604)} · المصحف {ar(p.mushafPct)}٪
+        </p>
+      </div>
+
+      {p.expectedPage > 0 && (
+        <div
+          className={`rounded-xl px-3 py-2 text-xs font-bold ${
+            p.aheadPages >= 0
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-amber-50 text-amber-700"
+          }`}
+        >
+          {p.aheadPages > 0
+            ? `🌟 متقدّمة بـ${ar(p.aheadPages)} صفحة عن الخطة`
+            : p.aheadPages === 0
+              ? "✅ على الخطة تماماً"
+              : `⏳ متأخّرة بـ${ar(-p.aheadPages)} صفحة`}
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-2 text-center">
+        {[
+          { l: "🔥 سلسلة", v: `${ar(p.streak)} لقاء` },
+          { l: "🏅 أفضل", v: `${ar(p.personalBest)} أوجه` },
+          { l: "🎖️ أجزاء", v: ar(p.completedJuz) },
+        ].map((x) => (
+          <div key={x.l} className="rounded-xl bg-cream px-1 py-2">
+            <p className="text-[11px] font-bold text-plum-800">{x.v}</p>
+            <p className="text-[10px] text-silver-600">{x.l}</p>
+          </div>
+        ))}
+      </div>
+
+      <p className="rounded-xl bg-cream/60 px-3 py-2 text-[11px] font-bold text-plum-700">
+        {p.pagesToJuzEnd > 0
+          ? `📖 باقي ${ar(p.pagesToJuzEnd)} أوجه لإتمام ${juzLabel(p.juz)}`
+          : `🎉 أتمّت ${juzLabel(p.juz)}`}
+        {p.termSessionsLeft > 0
+          ? ` · 🏁 ${ar(p.termSessionsLeft)} حصص للفصل`
+          : ""}
+      </p>
+    </div>
+  );
+}
+
 /** لوحة «رحلتي مع القرآن» — تقدّم الطالبة وتحفيزها بتنافس مع نفسها */
 export function MotivationPanel({
   student,
