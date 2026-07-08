@@ -9,7 +9,6 @@ import {
 } from "react";
 import {
   ROLE_EMAILS,
-  ROLE_META,
   roleFromEmail,
   STUDENT_PASSWORD,
   supabase,
@@ -38,7 +37,8 @@ type Status = "loading" | "login" | "ready";
 /** بوابة الدخول: ثلاث شاشات — إدارة، معلّمات، طالبات */
 export function AuthGate({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
-  const [role, setRole] = useState<Role>("teacher");
+  // دور الدخول يُحدَّد من الرابط: الافتراضي طالبات، و?admin للإدارة
+  const [role, setRole] = useState<Role>("student");
   const [activeRole, setActiveRole] = useState<Role>("student");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -84,6 +84,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    // دور الدخول من الرابط: ?admin → إدارة، غير ذلك → طالبات
+    if (
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).has("admin")
+    ) {
+      setRole("admin");
+    }
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
       const r = roleFromEmail(data.session?.user.email);
@@ -163,44 +170,33 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
 
   if (status === "login") {
+    const isAdmin = role === "admin";
+    const switchTo = (r: Role) => {
+      setRole(r);
+      setError("");
+      setPassword("");
+      // نحدّث الرابط ليطابق وضع الدخول (يبقى عند التحديث)
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        if (r === "admin") url.searchParams.set("admin", "1");
+        else url.searchParams.delete("admin");
+        window.history.replaceState(null, "", url.toString());
+      }
+    };
     return (
       <main className="flex min-h-dvh items-center justify-center px-4 py-8">
         <div className="card w-full max-w-sm rounded-3xl p-6 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="الماهر" className="mx-auto mb-5 h-20 w-auto" />
-
-          <div className="mb-4 grid grid-cols-3 gap-2">
-            {(Object.keys(ROLE_META) as Role[]).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => {
-                  setRole(r);
-                  setError("");
-                  setPassword("");
-                }}
-                className={`flex flex-col items-center gap-1 rounded-2xl border-2 py-3 transition ${
-                  role === r
-                    ? "border-plum-600 bg-plum-50"
-                    : "border-cream-dark bg-cream/40"
-                }`}
-              >
-                <span className="text-2xl">{ROLE_META[r].icon}</span>
-                <span
-                  className={`font-kufi text-sm font-bold ${
-                    role === r ? "text-plum-800" : "text-silver-600"
-                  }`}
-                >
-                  {ROLE_META[r].label}
-                </span>
-              </button>
-            ))}
-          </div>
+          <img src="/logo.png" alt="الماهر" className="mx-auto mb-4 h-20 w-auto" />
 
           <h1 className="font-kufi text-xl font-bold text-plum-800">
-            دخول {ROLE_META[role].label}
+            {isAdmin ? "🗝️ دخول الإدارة" : "🌸 دخول الطالبات"}
           </h1>
-          <p className="mb-4 mt-1 text-sm text-silver-600">{ROLE_META[role].hint}</p>
+          <p className="mb-4 mt-1 text-sm text-silver-600">
+            {isAdmin
+              ? "أدخلي كلمة مرور الإدارة"
+              : "أدخلي رمزك الخاص من الإدارة"}
+          </p>
 
           <form
             onSubmit={(e) => {
@@ -209,22 +205,26 @@ export function AuthGate({ children }: { children: ReactNode }) {
             }}
           >
             <input
-              type={role === "student" ? "text" : "password"}
-              inputMode={role === "student" ? "numeric" : undefined}
+              type={isAdmin ? "password" : "text"}
+              inputMode={isAdmin ? undefined : "numeric"}
               className={`${inputCls} mb-3 text-center ${
-                role === "student" ? "tracking-[0.3em] text-lg" : ""
+                isAdmin ? "" : "tracking-[0.3em] text-lg"
               }`}
-              placeholder={
-                role === "student"
-                  ? "رمز الطالبة"
-                  : `كلمة مرور ${ROLE_META[role].label}`
-              }
+              placeholder={isAdmin ? "كلمة مرور الإدارة" : "رمز الطالبة"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
             {error && <p className="mb-3 text-sm font-bold text-red-600">{error}</p>}
             <PrimaryBtn type="submit">{busy ? "لحظة…" : "دخول"}</PrimaryBtn>
           </form>
+
+          <button
+            type="button"
+            onClick={() => switchTo(isAdmin ? "student" : "admin")}
+            className="mt-5 text-xs font-bold text-silver-500 underline"
+          >
+            {isAdmin ? "🌸 دخول الطالبات" : "🗝️ دخول الإدارة"}
+          </button>
         </div>
       </main>
     );
