@@ -33,6 +33,7 @@ import { Field, inputCls, PrimaryBtn, Ribbon } from "./ui";
 import { NotificationsCenter, PinnedNotice } from "./notifications-card";
 import { PushToggle } from "./push-toggle";
 import { ReciteLogger } from "./recite-log";
+import { MotivationPanel } from "./motivation-panel";
 
 /** شاشة الطالبة: تدخل برمزها فتُعرض أهدافها مباشرة (قراءة فقط) */
 // تبويبات صفحة الطالبة (التجويد لاحقاً)
@@ -238,6 +239,9 @@ export function StudentHome() {
       {/* شاشة القرآن */}
       {tab === "quran" && (
         <section>
+          {/* لوحة التحفيز — رحلتي مع القرآن */}
+          <MotivationPanel student={me} halaqa={halaqa} />
+
           {/* الطالبة تُدخل بداية الحفظ/المراجعة وأوجه اللقاء بنفسها */}
           <MyPlanEditor student={me} />
 
