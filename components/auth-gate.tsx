@@ -171,18 +171,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   if (status === "login") {
     const isAdmin = role === "admin";
-    const switchTo = (r: Role) => {
-      setRole(r);
-      setError("");
-      setPassword("");
-      // نحدّث الرابط ليطابق وضع الدخول (يبقى عند التحديث)
-      if (typeof window !== "undefined") {
-        const url = new URL(window.location.href);
-        if (r === "admin") url.searchParams.set("admin", "1");
-        else url.searchParams.delete("admin");
-        window.history.replaceState(null, "", url.toString());
-      }
-    };
     return (
       <main className="flex min-h-dvh items-center justify-center px-4 py-8">
         <div className="card w-full max-w-sm rounded-3xl p-6 text-center">
@@ -217,14 +205,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
             {error && <p className="mb-3 text-sm font-bold text-red-600">{error}</p>}
             <PrimaryBtn type="submit">{busy ? "لحظة…" : "دخول"}</PrimaryBtn>
           </form>
-
-          <button
-            type="button"
-            onClick={() => switchTo(isAdmin ? "student" : "admin")}
-            className="mt-5 text-xs font-bold text-silver-500 underline"
-          >
-            {isAdmin ? "🌸 دخول الطالبات" : "🗝️ دخول الإدارة"}
-          </button>
         </div>
       </main>
     );
