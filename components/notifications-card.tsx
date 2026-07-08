@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  actions,
   Announcement,
   formatNotifDate,
   getReadIds,
@@ -112,10 +113,12 @@ function SmartItem({ s, isNew }: { s: SmartNotif; isNew: boolean }) {
 export function NotificationsCenter({
   halaqaIds,
   smart = [],
+  studentId,
   onRead,
 }: {
   halaqaIds: string[];
   smart?: SmartNotif[];
+  studentId?: string;
   onRead?: () => void;
 }) {
   const { announcements, halaqas } = useApp();
@@ -130,6 +133,8 @@ export function NotificationsCenter({
     setReadSnap(getReadIds());
     const t = setTimeout(() => {
       markNotifsRead([...list.map((n) => n.id), ...smart.map((s) => s.id)]);
+      // إيصال القراءة للإدارة (إشعارات الإدارة فقط)
+      if (studentId) actions.recordNotifRead(studentId, list.map((n) => n.id));
       onRead?.();
     }, 1200);
     return () => clearTimeout(t);

@@ -7,6 +7,7 @@ import {
   halaqaTitle,
   NOTIF_TYPES,
   notifTypeMeta,
+  readCountFor,
   type NotifType,
   useApp,
 } from "@/lib/store";
@@ -28,7 +29,7 @@ export default function AnnouncementsPage() {
 }
 
 function AnnouncementsInner() {
-  const { halaqas, announcements, students } = useApp();
+  const { halaqas, announcements, students, notifReads } = useApp();
   const hydrated = useHydrated();
   const [body, setBody] = useState("");
   const [target, setTarget] = useState(""); // "" = كل الطالبات
@@ -137,6 +138,11 @@ function AnnouncementsInner() {
           {announcements.map((n) => {
             const h = halaqas.find((x) => x.id === n.halaqaId);
             const meta = notifTypeMeta(n.type);
+            const reach =
+              n.halaqaId === ""
+                ? students.length
+                : students.filter((s) => s.halaqaId === n.halaqaId).length;
+            const readN = readCountFor(notifReads, n.id);
             return (
               <div
                 key={n.id}
@@ -155,6 +161,10 @@ function AnnouncementsInner() {
                   )}
                 </div>
                 <p className="whitespace-pre-wrap text-sm text-ink">{n.body}</p>
+                <p className="mt-1.5 text-[11px] font-bold text-plum-700">
+                  👁️ قرأه {readN.toLocaleString("ar-EG")} من{" "}
+                  {reach.toLocaleString("ar-EG")}
+                </p>
                 <div className="mt-2 flex items-center justify-between">
                   <span className="text-[11px] font-bold text-silver-600">
                     {formatNotifDate(n.createdAt)}

@@ -406,6 +406,7 @@ export function StudentHome() {
           <NotificationsCenter
             halaqaIds={myHalaqaIds}
             smart={smartNotifs}
+            studentId={me.id}
             onRead={() => setReadIds(getReadIds())}
           />
         </section>

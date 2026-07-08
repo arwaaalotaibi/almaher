@@ -148,12 +148,19 @@ export interface Book {
   createdAt: string;
 }
 
+/** سجل قراءة إشعار من طالبة (لإيصال القراءة للإدارة) */
+export interface NotifRead {
+  announcementId: string;
+  studentId: string;
+}
+
 export interface AppState {
   halaqas: Halaqa[];
   teachers: Teacher[];
   students: Student[];
   announcements: Announcement[];
   books: Book[];
+  notifReads: NotifRead[];
 }
 
 export const EMPTY_GOALS: Goals = {};
@@ -385,6 +392,7 @@ const SEED: AppState = {
   students: [],
   announcements: [],
   books: [],
+  notifReads: [],
 };
 
 /* ================== المخزن المحلي (نسخة سريعة للعرض) ================== */
@@ -408,6 +416,7 @@ function load(): AppState {
           ? parsed.announcements
           : [],
         books: Array.isArray(parsed.books) ? parsed.books : [],
+        notifReads: Array.isArray(parsed.notifReads) ? parsed.notifReads : [],
       };
     } else {
       cache = SEED;
@@ -504,7 +513,7 @@ function run(op: () => PromiseLike<{ error: unknown }>) {
 
 /** جلب كل البيانات من قاعدة البيانات وتحديث العرض */
 export async function pullRemote(): Promise<void> {
-  const [h, t, s, a, b] = await Promise.all([
+  const [h, t, s, a, b, r] = await Promise.all([
     supabase
       .from("almaher_halaqas")
       .select("id,mosque,day,term_start,term_sessions")
@@ -522,6 +531,9 @@ export async function pullRemote(): Promise<void> {
       .from("almaher_books")
       .select("id,title,url,pages,img_base,reading_plan,created_at")
       .order("created_at", { ascending: false }),
+    supabase
+      .from("almaher_notif_reads")
+      .select("announcement_id,student_id"),
   ]);
   if (h.error || t.error || s.error || a.error || b.error) {
     throw h.error ?? t.error ?? s.error ?? a.error ?? b.error;
@@ -575,6 +587,10 @@ export async function pullRemote(): Promise<void> {
         ? (row.reading_plan as ReadingSegment[])
         : [],
       createdAt: row.created_at as string,
+    })),
+    notifReads: (r.data ?? []).map((row) => ({
+      announcementId: row.announcement_id as string,
+      studentId: row.student_id as string,
     })),
   });
 }
@@ -686,6 +702,7 @@ export function subscribeRealtime() {
     "almaher_students",
     "almaher_announcements",
     "almaher_books",
+    "almaher_notif_reads",
   ]) {
     channel.on("postgres_changes", { event: "*", schema: "public", table }, refresh);
   }
@@ -904,6 +921,19 @@ export const actions = {
     }));
     run(() => supabase.from("almaher_announcements").delete().eq("id", id));
   },
+  /** تسجّل الطالبة قراءتها لإشعارات (لإيصال القراءة للإدارة) */
+  recordNotifRead(studentId: string, announcementIds: string[]) {
+    if (!studentId || announcementIds.length === 0) return;
+    run(() =>
+      supabase.from("almaher_notif_reads").upsert(
+        announcementIds.map((announcement_id) => ({
+          announcement_id,
+          student_id: studentId,
+        })),
+        { onConflict: "announcement_id,student_id", ignoreDuplicates: true }
+      )
+    );
+  },
 
   setBookPlan(id: string, plan: ReadingSegment[]) {
     setState((s) => ({
@@ -953,6 +983,9 @@ export const actions = {
           ? parsed.announcements
           : [],
         books: Array.isArray(parsed.books) ? parsed.books : getState().books,
+        notifReads: Array.isArray(parsed.notifReads)
+          ? parsed.notifReads
+          : getState().notifReads,
       };
       persist(state);
       pushAll(state).catch(() => syncAlert());
@@ -1248,6 +1281,11 @@ export function visibleAnnouncements(
     if (n.expiresAt && new Date(n.expiresAt).getTime() <= now) return false;
     return true;
   });
+}
+
+/** عدد الطالبات اللواتي قرأن إشعاراً معيّناً */
+export function readCountFor(reads: NotifRead[], announcementId: string): number {
+  return reads.filter((x) => x.announcementId === announcementId).length;
 }
 
 /** الإشعار المثبّت على الواجهة (إن وُجد ضمن الظاهرة) */
