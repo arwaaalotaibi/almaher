@@ -10,6 +10,7 @@ import {
   markNotifsRead,
   notifTypeMeta,
   pinnedAnnouncement,
+  SmartNotif,
   useApp,
   visibleAnnouncements,
 } from "@/lib/store";
@@ -87,12 +88,34 @@ export function PinnedNotice({
   );
 }
 
-/** مركز الإشعارات — الأرشيف كاملاً مجمّعاً بالتاريخ مع مقروء/غير مقروء */
+/** تذكير ذكي واحد */
+function SmartItem({ s, isNew }: { s: SmartNotif; isNew: boolean }) {
+  const meta = notifTypeMeta(s.type);
+  return (
+    <div
+      className={`rounded-xl border-s-4 px-3 py-2.5 ${
+        isNew ? meta.cls : "border-cream-dark bg-cream/40"
+      }`}
+    >
+      <div className="mb-0.5 flex items-center gap-1.5">
+        <span className="text-sm">{s.icon}</span>
+        <span className="font-kufi text-sm font-bold text-plum-800">
+          {s.title}
+        </span>
+      </div>
+      <p className="whitespace-pre-wrap text-sm text-ink">{s.body}</p>
+    </div>
+  );
+}
+
+/** مركز الإشعارات — تذكيراتك الذكية + أرشيف إشعارات الإدارة بالتاريخ */
 export function NotificationsCenter({
   halaqaIds,
+  smart = [],
   onRead,
 }: {
   halaqaIds: string[];
+  smart?: SmartNotif[];
   onRead?: () => void;
 }) {
   const { announcements, halaqas } = useApp();
@@ -106,22 +129,22 @@ export function NotificationsCenter({
   useEffect(() => {
     setReadSnap(getReadIds());
     const t = setTimeout(() => {
-      markNotifsRead(list.map((n) => n.id));
+      markNotifsRead([...list.map((n) => n.id), ...smart.map((s) => s.id)]);
       onRead?.();
     }, 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [list.length]);
+  }, [list.length, smart.length]);
 
   const groups = useMemo(() => groupByDate(list), [list]);
 
-  if (list.length === 0) {
+  if (list.length === 0 && smart.length === 0) {
     return (
       <div className="card rounded-2xl p-8 text-center">
         <p className="text-3xl">🔔</p>
         <p className="mt-2 font-kufi font-bold text-plum-800">لا إشعارات بعد</p>
         <p className="mt-1 text-sm text-silver-600">
-          ستظهر هنا إشعارات الإدارة أولاً بأول
+          ستظهر هنا تذكيراتك وإشعارات الإدارة أولاً بأول
         </p>
       </div>
     );
@@ -134,6 +157,18 @@ export function NotificationsCenter({
 
   return (
     <div className="grid gap-4">
+      {smart.length > 0 && (
+        <section>
+          <h3 className="mb-2 font-kufi text-sm font-bold text-plum-600">
+            🔔 تذكيراتك
+          </h3>
+          <div className="grid gap-2">
+            {smart.map((s) => (
+              <SmartItem key={s.id} s={s} isNew={!readSnap.has(s.id)} />
+            ))}
+          </div>
+        </section>
+      )}
       {groups.map((g) => (
         <section key={g.label}>
           <h3 className="mb-2 font-kufi text-sm font-bold text-plum-600">

@@ -1283,6 +1283,93 @@ export function formatNotifDate(iso: string): string {
   });
 }
 
+/* ===== إشعارات ذكية تلقائية (تُولَّد من بيانات الطالبة، بلا إدخال) ===== */
+
+export interface SmartNotif {
+  id: string; // ثابت ليعمل تتبّع القراءة
+  type: NotifType;
+  icon: string;
+  title: string;
+  body: string;
+}
+
+function daysUntil(d: Date): number {
+  const startToday = new Date();
+  startToday.setHours(0, 0, 0, 0);
+  const target = new Date(d);
+  target.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - startToday.getTime()) / 86400000);
+}
+
+function whenLabel(days: number): string {
+  if (days <= 0) return "اليوم";
+  if (days === 1) return "غداً";
+  if (days === 2) return "بعد يومين";
+  return `بعد ${days.toLocaleString("ar-EG")} أيام`;
+}
+
+/** تذكيرات الطالبة المولّدة تلقائياً من جدولها وخطط قراءتها */
+export function autoNotifsFor(
+  student: Student,
+  halaqa: Halaqa | undefined,
+  books: Book[]
+): SmartNotif[] {
+  const out: SmartNotif[] = [];
+
+  // اللقاء القادم (خلال ٣ أيام) أو اكتمال الفصل
+  if (halaqa) {
+    const sched = buildSchedule(halaqa, student.plan);
+    if (sched && sched.length > 0) {
+      const idx = currentSessionIndex(sched);
+      if (idx > 0) {
+        const row = sched[idx - 1];
+        const days = daysUntil(row.date);
+        if (days >= 0 && days <= 3) {
+          const hifz = row.hifzLabel || (row.hifz ? `${row.hifz} أوجه` : "—");
+          const mur =
+            row.murajaahLabel || (row.murajaah ? `${row.murajaah} أوجه` : "—");
+          out.push({
+            id: `auto:meeting:${row.n}:${ymd(row.date)}`,
+            type: "reminder",
+            icon: "📅",
+            title: `لقاؤك ${whenLabel(days)}`,
+            body: `المطلوب — 📖 حفظ: ${hifz}\n🔁 مراجعة: ${mur}`,
+          });
+        }
+      } else {
+        out.push({
+          id: `auto:term-done:${sched.length}`,
+          type: "congrats",
+          icon: "🎉",
+          title: "اكتمل الفصل",
+          body: "أتممتِ لقاءات الفصل كاملةً، أحسنتِ وبوركتِ! 🌟",
+        });
+      }
+    }
+  }
+
+  // اختبارات القراءة القريبة (خلال ٥ أيام)
+  for (const b of books) {
+    const ts = todaySegment(b.readingPlan);
+    if (ts && ts.seg.isExam && ts.when !== "past") {
+      const days = daysUntil(new Date(`${ts.seg.date}T00:00:00`));
+      if (days >= 0 && days <= 5) {
+        out.push({
+          id: `auto:exam:${b.id}:${ts.seg.id}`,
+          type: "important",
+          icon: "📝",
+          title: `اختبار «${b.title}» ${whenLabel(days)}`,
+          body: `استعدّي لاختبار كتاب «${b.title}» — ${segDateLabel(
+            ts.seg.date
+          )}`,
+        });
+      }
+    }
+  }
+
+  return out;
+}
+
 /* ===== تتبّع القراءة لكل إشعار على حِدة (على الجهاز) ===== */
 const READ_KEY = "almaher-notif-read";
 

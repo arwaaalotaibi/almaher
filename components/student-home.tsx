@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import {
   actions,
+  autoNotifsFor,
   buildSchedule,
   CoursePlan,
   countUnread,
@@ -94,13 +95,16 @@ export function StudentHome() {
     return <TermsGate student={me} onLogout={logout} />;
   }
 
-  const myHalaqaIds = me.halaqaId ? [me.halaqaId] : [];
-  const notifList = visibleAnnouncements(announcements, myHalaqaIds);
-  const unreadNotifs = countUnread(notifList, readIds);
-
   const halaqa = halaqas.find((h) => h.id === me.halaqaId);
   const teacher = teachers.find((t) => t.id === me.teacherId);
   const schedule = halaqa ? buildSchedule(halaqa, me.plan) : null;
+
+  const myHalaqaIds = me.halaqaId ? [me.halaqaId] : [];
+  const notifList = visibleAnnouncements(announcements, myHalaqaIds);
+  const smartNotifs = autoNotifsFor(me, halaqa, books);
+  const unreadNotifs =
+    countUnread(notifList, readIds) +
+    smartNotifs.filter((s) => !readIds.has(s.id)).length;
   const curIdx = schedule ? currentSessionIndex(schedule) : 0;
   const passed = schedule ? (curIdx > 0 ? curIdx - 1 : schedule.length) : 0;
   const totalFaces =
@@ -401,6 +405,7 @@ export function StudentHome() {
         <section>
           <NotificationsCenter
             halaqaIds={myHalaqaIds}
+            smart={smartNotifs}
             onRead={() => setReadIds(getReadIds())}
           />
         </section>
