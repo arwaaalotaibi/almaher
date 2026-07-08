@@ -5,6 +5,7 @@ import {
   type CoursePlan,
   type Halaqa,
   type RecitationLog,
+  type RecitePart,
   type Student,
 } from "./store";
 
@@ -38,15 +39,20 @@ export function juzLabel(juz: number): string {
   return `الجزء ${juz.toLocaleString("ar-EG")}`;
 }
 
-/** عدد أوجه المقطع في سجلّ (to - from + 1)، أو ١ إن لم تُحدَّد الآيات */
-function faces(surah?: string, from?: number, to?: number): number {
-  if (!surah) return 0;
-  if (from && to) {
-    const a = pageOf(surahNumber(surah), from);
-    const b = pageOf(surahNumber(surah), to);
-    return Math.max(1, b - a + 1);
-  }
-  return 1;
+/** صفحة نهاية المقطع (موضع «إلى») */
+function partEndPage(part?: RecitePart): number {
+  if (!part || part.status !== "done" || !part.fromSurah) return 0;
+  const s = part.toSurah || part.fromSurah;
+  const a = part.toAyah ?? part.fromAyah ?? 1;
+  return pageOf(surahNumber(s), a);
+}
+
+/** عدد أوجه المقطع = صفحات من «من» إلى «إلى» */
+function faces(part?: RecitePart): number {
+  if (!part || part.status !== "done" || !part.fromSurah) return 0;
+  const a = pageOf(surahNumber(part.fromSurah), part.fromAyah ?? 1);
+  const b = partEndPage(part);
+  return Math.max(1, b - a + 1);
 }
 
 /* ================== حساب التقدّم ================== */
@@ -84,10 +90,8 @@ export function computeProgress(
   // أبعد صفحة من سجلّ التسميع (الحفظ الجديد)
   let currentPage = 0;
   for (const r of mine) {
-    if (r.tasmiSurah) {
-      const p = pageOf(surahNumber(r.tasmiSurah), r.tasmiTo || r.tasmiFrom || 1);
-      if (p > currentPage) currentPage = p;
-    }
+    const p = partEndPage(r.tasmi);
+    if (p > currentPage) currentPage = p;
   }
 
   const juz = currentPage ? juzOfPage(currentPage) : 1;
@@ -115,14 +119,12 @@ export function computeProgress(
   }
   const aheadPages = currentPage && expectedPage ? currentPage - expectedPage : 0;
 
-  // وتيرة الحفظ
+  // وتيرة الحفظ (متوسط أوجه التسميع في اللقاءات التي سُمّع فيها)
+  const tasmiLogs = mine.filter((r) => r.tasmi.status === "done");
   const avg =
-    mine.length > 0
+    tasmiLogs.length > 0
       ? Math.round(
-          mine.reduce(
-            (n, r) => n + faces(r.tasmiSurah, r.tasmiFrom, r.tasmiTo),
-            0
-          ) / mine.length
+          tasmiLogs.reduce((n, r) => n + faces(r.tasmi), 0) / tasmiLogs.length
         )
       : 0;
   const facesPerSession = Math.max(1, plan.hifz || avg || 1);
@@ -134,25 +136,26 @@ export function computeProgress(
     ? Math.ceil(pagesToJuzEnd / boostFaces)
     : 0;
 
-  // السلسلة: لقاءات متتابعة بلا انقطاع (فجوة ≤ ٨ أيام)
+  // السلسلة: لقاءات حضورية متتابعة بلا انقطاع (فجوة ≤ ٨ أيام)
+  const attended = mine.filter((r) => r.attended);
   let streak = 0;
-  for (let i = 0; i < mine.length; i++) {
+  for (let i = 0; i < attended.length; i++) {
     if (i === 0) {
       streak = 1;
     } else {
       const gap =
-        (new Date(`${mine[i - 1].date}T00:00:00`).getTime() -
-          new Date(`${mine[i].date}T00:00:00`).getTime()) /
+        (new Date(`${attended[i - 1].date}T00:00:00`).getTime() -
+          new Date(`${attended[i].date}T00:00:00`).getTime()) /
         86400000;
       if (gap <= 8) streak++;
       else break;
     }
   }
 
-  // أفضل إنجاز (أكثر أوجه بلقاء)
+  // أفضل إنجاز (أكثر أوجه تسميع بلقاء)
   let personalBest = 0;
   for (const r of mine) {
-    const f = faces(r.tasmiSurah, r.tasmiFrom, r.tasmiTo);
+    const f = faces(r.tasmi);
     if (f > personalBest) personalBest = f;
   }
 

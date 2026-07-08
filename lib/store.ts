@@ -156,20 +156,29 @@ export interface NotifRead {
   readAt?: string; // ISO — وقت القراءة
 }
 
-/** سجلّ تسميع لقاء: ما سمّعته الطالبة (تسميع/مراجعة/تثبيت) — سورة ومن آية إلى آية */
+/** حالة قسم من التسميع: سمّعت (بمقطع) أو لم تسمّع */
+export type ReciteStatus = "done" | "none";
+
+/** مقطع قسم واحد: من (سورة، آية) ← إلى (سورة، آية) */
+export interface RecitePart {
+  status: ReciteStatus;
+  fromSurah?: string;
+  fromAyah?: number;
+  toSurah?: string;
+  toAyah?: number;
+}
+
+export const EMPTY_PART: RecitePart = { status: "none" };
+
+/** سجلّ تسميع لقاء: حضور + الأقسام الثلاثة (كل قسم من سورة/آية إلى سورة/آية) */
 export interface RecitationLog {
   id: string;
   studentId: string;
   date: string; // yyyy-mm-dd
-  tasmiSurah?: string;
-  tasmiFrom?: number;
-  tasmiTo?: number;
-  murajaSurah?: string;
-  murajaFrom?: number;
-  murajaTo?: number;
-  tathbitSurah?: string;
-  tathbitFrom?: number;
-  tathbitTo?: number;
+  attended: boolean; // false = غائبة
+  tasmi: RecitePart;
+  muraja: RecitePart;
+  tathbit: RecitePart;
   note?: string;
   createdAt?: string;
 }
@@ -180,6 +189,29 @@ export const RECITE_PARTS = [
   { key: "muraja", label: "المراجعة", icon: "🔁" },
   { key: "tathbit", label: "التثبيت", icon: "📌" },
 ] as const;
+
+function normPart(p: unknown): RecitePart {
+  const o = (p ?? {}) as Record<string, unknown>;
+  return {
+    status: o.status === "done" ? "done" : "none",
+    fromSurah: (o.fromSurah as string) || undefined,
+    fromAyah: (o.fromAyah as number) ?? undefined,
+    toSurah: (o.toSurah as string) || undefined,
+    toAyah: (o.toAyah as number) ?? undefined,
+  };
+}
+
+/** نص مقطع قسم: «الملك ١» أو «الملك ١ ← القلم ٥» */
+export function recitePartLabel(part?: RecitePart): string {
+  if (!part || part.status !== "done" || !part.fromSurah) return "";
+  const a = `${part.fromSurah} ${(part.fromAyah ?? 1).toLocaleString("ar-EG")}`;
+  const b = `${part.toSurah || part.fromSurah} ${(
+    part.toAyah ??
+    part.fromAyah ??
+    1
+  ).toLocaleString("ar-EG")}`;
+  return a === b ? a : `${a} ← ${b}`;
+}
 
 export interface AppState {
   halaqas: Halaqa[];
@@ -567,9 +599,7 @@ export async function pullRemote(): Promise<void> {
       .select("announcement_id,student_id,read_at"),
     supabase
       .from("almaher_sessions")
-      .select(
-        "id,student_id,log_date,tasmi_surah,tasmi_from,tasmi_to,muraja_surah,muraja_from,muraja_to,tathbit_surah,tathbit_from,tathbit_to,note,created_at"
-      )
+      .select("id,student_id,log_date,attended,parts,note,created_at")
       .order("log_date", { ascending: false }),
   ]);
   if (h.error || t.error || s.error || a.error || b.error) {
@@ -631,22 +661,20 @@ export async function pullRemote(): Promise<void> {
       studentId: row.student_id as string,
       readAt: (row.read_at as string) ?? undefined,
     })),
-    recitations: (sess.data ?? []).map((row) => ({
-      id: row.id as string,
-      studentId: row.student_id as string,
-      date: row.log_date as string,
-      tasmiSurah: (row.tasmi_surah as string) || undefined,
-      tasmiFrom: (row.tasmi_from as number) ?? undefined,
-      tasmiTo: (row.tasmi_to as number) ?? undefined,
-      murajaSurah: (row.muraja_surah as string) || undefined,
-      murajaFrom: (row.muraja_from as number) ?? undefined,
-      murajaTo: (row.muraja_to as number) ?? undefined,
-      tathbitSurah: (row.tathbit_surah as string) || undefined,
-      tathbitFrom: (row.tathbit_from as number) ?? undefined,
-      tathbitTo: (row.tathbit_to as number) ?? undefined,
-      note: (row.note as string) || undefined,
-      createdAt: (row.created_at as string) ?? undefined,
-    })),
+    recitations: (sess.data ?? []).map((row) => {
+      const parts = (row.parts ?? {}) as Record<string, unknown>;
+      return {
+        id: row.id as string,
+        studentId: row.student_id as string,
+        date: row.log_date as string,
+        attended: (row.attended as boolean) ?? true,
+        tasmi: normPart(parts.tasmi),
+        muraja: normPart(parts.muraja),
+        tathbit: normPart(parts.tathbit),
+        note: (row.note as string) || undefined,
+        createdAt: (row.created_at as string) ?? undefined,
+      };
+    }),
   });
 }
 
@@ -1022,15 +1050,8 @@ export const actions = {
         id: rec.id,
         student_id: rec.studentId,
         log_date: rec.date,
-        tasmi_surah: rec.tasmiSurah ?? "",
-        tasmi_from: rec.tasmiFrom ?? null,
-        tasmi_to: rec.tasmiTo ?? null,
-        muraja_surah: rec.murajaSurah ?? "",
-        muraja_from: rec.murajaFrom ?? null,
-        muraja_to: rec.murajaTo ?? null,
-        tathbit_surah: rec.tathbitSurah ?? "",
-        tathbit_from: rec.tathbitFrom ?? null,
-        tathbit_to: rec.tathbitTo ?? null,
+        attended: rec.attended,
+        parts: { tasmi: rec.tasmi, muraja: rec.muraja, tathbit: rec.tathbit },
         note: rec.note ?? "",
       })
     );
@@ -1415,19 +1436,6 @@ export function notifReadMap(
   for (const x of reads)
     if (x.announcementId === announcementId) m[x.studentId] = x.readAt ?? "";
   return m;
-}
-
-/** نص مقطع التسميع: «الملك ١–٥» */
-export function reciteRangeLabel(
-  surah?: string,
-  from?: number,
-  to?: number
-): string {
-  if (!surah) return "";
-  const f = from ? from.toLocaleString("ar-EG") : "";
-  const t = to ? to.toLocaleString("ar-EG") : "";
-  const range = f && t ? `${f}–${t}` : f || t;
-  return range ? `${surah} ${range}` : surah;
 }
 
 /** وقت نسبي بالعربية: الآن / قبل ٥ دقائق / أمس / التاريخ */
