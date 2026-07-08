@@ -936,18 +936,22 @@ export const actions = {
     }));
     run(() => supabase.from("almaher_announcements").delete().eq("id", id));
   },
-  /** تسجّل الطالبة قراءتها لإشعارات (لإيصال القراءة للإدارة) */
+  /** تسجّل الطالبة قراءتها لإشعارات (لإيصال القراءة للإدارة) — عبر دالة آمنة،
+     تتبّع غير حرج فلا ننبّه المستخدم عند الفشل. */
   recordNotifRead(studentId: string, announcementIds: string[]) {
     if (!studentId || announcementIds.length === 0) return;
-    run(() =>
-      supabase.from("almaher_notif_reads").upsert(
-        announcementIds.map((announcement_id) => ({
-          announcement_id,
-          student_id: studentId,
-        })),
-        { onConflict: "announcement_id,student_id", ignoreDuplicates: true }
+    for (const announcement_id of announcementIds) {
+      Promise.resolve(
+        supabase.rpc("almaher_record_read", {
+          p_aid: announcement_id,
+          p_sid: studentId,
+        })
       )
-    );
+        .then(({ error }) => {
+          if (error) console.error("notif read", error);
+        })
+        .catch((e) => console.error("notif read", e));
+    }
   },
 
   setBookPlan(id: string, plan: ReadingSegment[]) {

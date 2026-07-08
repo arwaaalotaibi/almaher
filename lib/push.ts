@@ -98,16 +98,14 @@ export async function enablePush(
     }));
 
   const json = sub.toJSON();
-  const { error } = await supabase.from("almaher_push_subs").upsert(
-    {
-      endpoint: sub.endpoint,
-      p256dh: json.keys?.p256dh ?? "",
-      auth: json.keys?.auth ?? "",
-      student_id: studentId,
-      halaqa_id: halaqaId,
-    },
-    { onConflict: "endpoint" }
-  );
+  // عبر دالة آمنة (SECURITY DEFINER) لتجاوز قيود RLS على الكتابة
+  const { error } = await supabase.rpc("almaher_save_push_sub", {
+    p_endpoint: sub.endpoint,
+    p_p256dh: json.keys?.p256dh ?? "",
+    p_auth: json.keys?.auth ?? "",
+    p_sid: studentId,
+    p_halaqa: halaqaId,
+  });
   if (error) throw error;
   return "subscribed";
 }
@@ -118,7 +116,7 @@ export async function disablePush(): Promise<PushState> {
   const reg = await navigator.serviceWorker.getRegistration();
   const sub = await reg?.pushManager.getSubscription();
   if (sub) {
-    await supabase.from("almaher_push_subs").delete().eq("endpoint", sub.endpoint);
+    await supabase.rpc("almaher_delete_push_sub", { p_endpoint: sub.endpoint });
     await sub.unsubscribe();
   }
   return "default";
