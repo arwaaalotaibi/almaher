@@ -31,6 +31,7 @@ const ar = (n: number) => n.toLocaleString("ar-EG");
 import Link from "next/link";
 import { Field, inputCls, PrimaryBtn, Ribbon } from "./ui";
 import { NotificationsCenter, PinnedNotice } from "./notifications-card";
+import { PushToggle } from "./push-toggle";
 
 /** شاشة الطالبة: تدخل برمزها فتُعرض أهدافها مباشرة (قراءة فقط) */
 // تبويبات صفحة الطالبة (التجويد لاحقاً)
@@ -403,6 +404,7 @@ export function StudentHome() {
       {/* شاشة الإشعارات — الأرشيف كاملاً */}
       {tab === "notifications" && (
         <section>
+          <PushToggle studentId={me.id} halaqaId={me.halaqaId} />
           <NotificationsCenter
             halaqaIds={myHalaqaIds}
             smart={smartNotifs}

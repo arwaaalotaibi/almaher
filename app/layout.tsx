@@ -20,10 +20,16 @@ const naskh = Noto_Naskh_Arabic({
 export const metadata: Metadata = {
   title: "الماهر — حلقات التحفيظ",
   description: "متابعة حلقات حفظ القرآن الكريم — جمعية الماهر بالقرآن وعلومه",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "الماهر",
+  },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#7d5a6c",
+  themeColor: "#5d3f4e",
 };
 
 export default function RootLayout({

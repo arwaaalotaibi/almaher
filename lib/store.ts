@@ -883,7 +883,7 @@ export const actions = {
           .eq("pinned", true)
       );
     }
-    run(() =>
+    Promise.resolve(
       supabase.from("almaher_announcements").insert({
         id: note.id,
         body: note.body,
@@ -892,7 +892,22 @@ export const actions = {
         type: note.type,
         pinned: note.pinned,
       })
-    );
+    )
+      .then(({ error }) => {
+        if (error) {
+          console.error(error);
+          syncAlert();
+          return;
+        }
+        // إرسال Web Push للأجهزة المشتركة (لا يعطّل الحفظ إن فشل)
+        supabase.functions
+          .invoke("send-push", { body: { announcementId: note.id } })
+          .catch((e) => console.error("push", e));
+      })
+      .catch((e) => {
+        console.error(e);
+        syncAlert();
+      });
   },
   /** تثبيت إشعار واحد على الواجهة (يُلغي تثبيت الباقي)، أو فكّ التثبيت */
   setAnnouncementPinned(id: string, pinned: boolean) {
