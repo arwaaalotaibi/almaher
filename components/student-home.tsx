@@ -104,6 +104,7 @@ export function StudentHome() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 pb-16 pt-10">
+      <WelcomeSplash name={me.name} />
       <div className="mb-4 text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.png" alt="الماهر" className="mx-auto mb-3 h-16 w-auto" />
@@ -385,6 +386,53 @@ export function StudentHome() {
         🚪 تسجيل الخروج
       </button>
     </main>
+  );
+}
+
+/** عبارات ترحيب تتبدّل عند كل دخول */
+const WELCOME_PHRASES = [
+  "طوبى لكِ يا حاملة القرآن",
+  "«خَيْرُكُم مَن تَعَلَّمَ القُرآنَ وعَلَّمَه»",
+  "نوّرتِ الماهر ✨",
+  "بوركتِ وبورك سعيكِ في حفظ كتاب الله",
+];
+
+/** شاشة ترحيب لطيفة تظهر لحظةً عند كل دخول للحافظة ثم تختفي */
+function WelcomeSplash({ name }: { name: string }) {
+  const [show, setShow] = useState(true);
+  const [leaving, setLeaving] = useState(false);
+  const [phrase] = useState(
+    () => WELCOME_PHRASES[Math.floor(Math.random() * WELCOME_PHRASES.length)]
+  );
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setLeaving(true), 2200);
+    const t2 = setTimeout(() => setShow(false), 2750);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, []);
+
+  if (!show) return null;
+
+  return (
+    <div
+      onClick={() => setLeaving(true)}
+      className={`fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 bg-cream px-6 text-center transition-opacity duration-500 ${
+        leaving ? "opacity-0" : "opacity-100"
+      }`}
+    >
+      <div className="welcome-in flex flex-col items-center gap-3">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.png" alt="الماهر" className="h-20 w-auto" />
+        <p className="font-kufi text-lg font-bold text-plum-600">حيّاكِ الله</p>
+        <h1 className="font-kufi text-3xl font-bold text-plum-800">{name} 🌸</h1>
+        <p className="mt-1 max-w-xs font-body text-base leading-relaxed text-plum-700">
+          {phrase}
+        </p>
+      </div>
+    </div>
   );
 }
 
