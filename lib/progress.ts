@@ -64,6 +64,7 @@ export interface Progress {
   juzPct: number; // نسبة إتمام الجزء الحالي
   mushafPct: number;
   pagesToJuzEnd: number; // = أوجه متبقية لإتمام الجزء
+  nearJuzEnd: boolean; // قريبة جداً من ختم الجزء
   expectedPage: number; // المتوقّع اليوم حسب الخطة
   aheadPages: number; // + متقدّمة، − متأخّرة
   facesPerSession: number; // وتيرة الحفظ
@@ -135,6 +136,9 @@ export function computeProgress(
   const sessionsToJuzEndBoost = pagesToJuzEnd
     ? Math.ceil(pagesToJuzEnd / boostFaces)
     : 0;
+  // قريبة جداً: تُنهي الجزء في لقاء واحد أو باقٍ ≤ ٥ أوجه
+  const nearJuzEnd =
+    pagesToJuzEnd > 0 && (sessionsToJuzEnd <= 1 || pagesToJuzEnd <= 5);
 
   // السلسلة: لقاءات حضورية متتابعة بلا انقطاع (فجوة ≤ ٨ أيام)
   const attended = mine.filter((r) => r.attended);
@@ -170,6 +174,7 @@ export function computeProgress(
     juzPct,
     mushafPct,
     pagesToJuzEnd,
+    nearJuzEnd,
     expectedPage,
     aheadPages,
     facesPerSession,

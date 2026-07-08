@@ -75,10 +75,18 @@ export function ProgressSummary({
         ))}
       </div>
 
-      <p className="rounded-xl bg-cream/60 px-3 py-2 text-[11px] font-bold text-plum-700">
-        {p.pagesToJuzEnd > 0
-          ? `📖 باقي ${ar(p.pagesToJuzEnd)} أوجه لإتمام ${juzLabel(p.juz)}`
-          : `🎉 أتمّت ${juzLabel(p.juz)}`}
+      <p
+        className={`rounded-xl px-3 py-2 text-[11px] font-bold ${
+          p.nearJuzEnd ? "bg-plum-100 text-plum-800" : "bg-cream/60 text-plum-700"
+        }`}
+      >
+        {p.pagesToJuzEnd === 0
+          ? `🎉 أتمّت ${juzLabel(p.juz)}`
+          : p.nearJuzEnd
+            ? `🎯 على وشك ختم ${juzLabel(p.juz)} — باقي ${ar(
+                p.pagesToJuzEnd
+              )} أوجه فقط!`
+            : `📖 باقي ${ar(p.pagesToJuzEnd)} أوجه لإتمام ${juzLabel(p.juz)}`}
         {p.termSessionsLeft > 0
           ? ` · 🏁 ${ar(p.termSessionsLeft)} حصص للفصل`
           : ""}
@@ -123,6 +131,25 @@ export function MotivationPanel({
         </span>
       </div>
 
+      {/* تشجيع بارز: على وشك ختم الجزء */}
+      {p.nearJuzEnd && (
+        <div
+          className="mb-2.5 rounded-2xl p-4 text-center text-white shadow"
+          style={{ background: "linear-gradient(135deg,#5d3f4e,#a8894f)" }}
+        >
+          <p className="text-2xl">🎯</p>
+          <p className="mt-1 font-kufi text-base font-bold">
+            على وشك ختم {jl}!
+          </p>
+          <p className="mt-1 text-sm">
+            باقي {ar(p.pagesToJuzEnd)} أوجه فقط
+            {p.sessionsToJuzEnd <= 1
+              ? " — أنجزيها في اللقاء القادم واختمي الجزء! 🎉"
+              : ` — أنتِ على بُعد ${ar(p.sessionsToJuzEnd)} لقاء`}
+          </p>
+        </div>
+      )}
+
       {/* تقدّم الجزء */}
       <div className="card mb-2.5 rounded-2xl p-4">
         <div className="flex items-center justify-between">
@@ -162,16 +189,16 @@ export function MotivationPanel({
           </div>
         )}
 
-        {p.pagesToJuzEnd > 0 ? (
+        {p.pagesToJuzEnd === 0 ? (
+          <div className="rounded-xl bg-emerald-50 px-3 py-2.5 text-sm font-bold text-emerald-700">
+            🎉 أتممتِ {jl}! انطلقي للجزء التالي بإذن الله
+          </div>
+        ) : !p.nearJuzEnd ? (
           <div className="rounded-xl bg-plum-600 px-3 py-2.5 text-sm font-bold text-white">
             📖 باقي {ar(p.pagesToJuzEnd)} أوجه لإتمام {jl} — أنجزيها في{" "}
             {ar(p.sessionsToJuzEnd)} لقاء!
           </div>
-        ) : (
-          <div className="rounded-xl bg-emerald-50 px-3 py-2.5 text-sm font-bold text-emerald-700">
-            🎉 أتممتِ {jl}! انطلقي للجزء التالي بإذن الله
-          </div>
-        )}
+        ) : null}
 
         {p.termSessionsLeft > 0 && (
           <div className="rounded-xl bg-cream px-3 py-2.5 text-sm font-bold text-plum-700">
