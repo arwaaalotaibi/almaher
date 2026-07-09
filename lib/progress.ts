@@ -90,12 +90,21 @@ function partEndPage(part?: RecitePart): number {
   return pageOf(surahNumber(s), a);
 }
 
-/** عدد أوجه المقطع = صفحات من «من» إلى «إلى» */
+/** عدد الأوجه المكتملة في المقطع.
+    الوجه لا يُحسب إلا إذا سُمّع حتى آخر آية فيه — الوقوف في منتصف
+    صفحة لا يجعلها وجهاً (آية من أول ص٦٢ ≠ وجه كامل).
+    البداية من منتصف صفحة تُحسب صفحتها، لأن المطلوب نفسه يُبنى هكذا. */
 function faces(part?: RecitePart): number {
   if (!part || part.status !== "done" || !part.fromSurah) return 0;
   const a = pageOf(surahNumber(part.fromSurah), part.fromAyah ?? 1);
-  const b = partEndPage(part);
-  return Math.max(1, b - a + 1);
+  const endPage = partEndPage(part);
+  const pe = pageEnd(endPage);
+  const toSurah = surahNumber(part.toSurah || part.fromSurah);
+  const toAyah = part.toAyah ?? part.fromAyah ?? 1;
+  const reachedEnd =
+    toSurah > pe.surah || (toSurah === pe.surah && toAyah >= pe.ayah);
+  const completed = reachedEnd ? endPage : endPage - 1;
+  return Math.max(0, completed - a + 1);
 }
 
 /* ================== مقارنة المُنجَز بالمطلوب ================== */
@@ -112,8 +121,9 @@ export function partVerdict(
   part: RecitePart | undefined,
   required: number
 ): PartVerdict | null {
+  // لا حكم إلا على قسم سُمّع فعلاً (وإن لم يكتمل منه وجه واحد)
+  if (!part || part.status !== "done" || !part.fromSurah) return null;
   const done = faces(part);
-  if (done <= 0) return null;
   const req = Math.max(0, Math.round(required || 0));
   const diff = done - req;
   return {
