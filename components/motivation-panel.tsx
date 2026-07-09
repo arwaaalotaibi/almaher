@@ -1,7 +1,14 @@
 "use client";
 
 import { badgesFor, computeProgress, juzLabel } from "@/lib/progress";
-import { byPages, facesAcc, facesLabel, facesPlain, meetingsLabel } from "@/lib/arabic";
+import {
+  byMeetings,
+  byPages,
+  facesAcc,
+  facesLabel,
+  facesPlain,
+  meetingsLabel,
+} from "@/lib/arabic";
 import { useApp, type Halaqa, type Student } from "@/lib/store";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
@@ -215,9 +222,15 @@ export function MotivationPanel({
             ✨ لو زدتِ وجهين كل لقاء
           </p>
           <p className="mt-1 text-xs text-silver-600">
-            يصير حفظكِ {facesAcc(p.boostFaces)} كل لقاء، فتختمين {jl} في{" "}
-            {meetingsLabel(p.sessionsToJuzEndBoost)} بدل{" "}
-            {ar(p.sessionsToJuzEnd)} — أسرع بإذن الله!
+            تختمين {jl} في {meetingsLabel(p.sessionsToJuzEndBoost)} بدل{" "}
+            {meetingsLabel(p.sessionsToJuzEnd)}
+            {p.termSessionsLeft > 0 &&
+            p.sessionsToJuzEndBoost <= p.termSessionsLeft &&
+            p.sessionsToJuzEnd > p.termSessionsLeft
+              ? " — أي تختمينه قبل نهاية الفصل بإذن الله! 🎉"
+              : ` — أبكر ${byMeetings(
+                  p.sessionsToJuzEnd - p.sessionsToJuzEndBoost
+                )} بإذن الله! 🎉`}
           </p>
         </div>
       )}
