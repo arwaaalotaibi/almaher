@@ -422,12 +422,17 @@ export function currentSessionIndex(
   logs?: { date: string }[]
 ): number {
   const startOfToday = new Date().setHours(0, 0, 0, 0);
+  const endOfToday = new Date().setHours(23, 59, 59, 999);
   const upcoming = rows.find((r) => r.date.getTime() >= startOfToday);
   let idx = upcoming ? upcoming.n : 0;
   if (idx > 0 && logs?.length) {
     const logged = new Set(logs.map((l) => l.date));
-    let last = 0; // آخر لقاء له سجلّ تسميع
-    for (const r of rows) if (logged.has(dateKey(r.date))) last = r.n;
+    // آخر لقاء وقع فعلاً (تاريخه ≤ اليوم) وله سجلّ — سجلّ بتاريخ
+    // لقاء لم يحن بعدُ لا يقدّم المؤشر
+    let last = 0;
+    for (const r of rows)
+      if (r.date.getTime() <= endOfToday && logged.has(dateKey(r.date)))
+        last = r.n;
     if (last >= idx) idx = last + 1 > rows.length ? 0 : last + 1;
   }
   return idx;

@@ -373,6 +373,11 @@ export function StudentHome() {
                   const tasmiLabel = log ? recitePartLabel(log.tasmi) : "";
                   const thLabel = log ? recitePartLabel(log.tathbit) : "";
                   const murLabel = log ? recitePartLabel(log.muraja) : "";
+                  // اللقاءات القادمة: المقطع مُسقَط من الموضع الفعلي (كالبطاقة)
+                  const pj = !log ? prog.projected[s.n] : undefined;
+                  const hifzPlan = pj?.hifzLabel || s.hifzLabel;
+                  const tathbitPlan = pj?.tathbitLabel || s.tathbitLabel;
+                  const murPlan = pj?.murajaahLabel || s.murajaahLabel;
                   // حكم كل قسم: أنجزت المطلوب / زادت / ناقص
                   const vH = att && log ? partVerdict(log.tasmi, s.hifz) : null;
                   const vT = att && log ? partVerdict(log.tathbit, s.tathbit) : null;
@@ -417,11 +422,11 @@ export function StudentHome() {
                             📖{" "}
                             {tasmiLabel
                               ? `سُمّع: ${tasmiLabel}`
-                              : s.hifzLabel ||
+                              : hifzPlan ||
                                 (s.hifz ? `${ar(s.hifz)} أوجه` : "—")}{" "}
                             <VerdictChip v={vH} />
                           </p>
-                          {(s.tathbit > 0 || thLabel) && (
+                          {(s.tathbit > 0 || thLabel || tathbitPlan) && (
                             <p
                               className={`text-[11px] ${
                                 isCur ? "text-white/85" : "text-silver-600"
@@ -430,7 +435,7 @@ export function StudentHome() {
                               📌 تثبيت{" "}
                               {att && thLabel
                                 ? `سُمّع: ${thLabel}`
-                                : s.tathbitLabel ||
+                                : tathbitPlan ||
                                   (s.tathbit ? `${ar(s.tathbit)} أوجه` : "—")}{" "}
                               <VerdictChip v={vT} />
                             </p>
@@ -443,7 +448,7 @@ export function StudentHome() {
                             🔁 مراجعة{" "}
                             {att && murLabel
                               ? `سُمّع: ${murLabel}`
-                              : s.murajaahLabel ||
+                              : murPlan ||
                                 (s.murajaah ? `${ar(s.murajaah)} أوجه` : "—")}{" "}
                             <VerdictChip v={vM} />
                           </p>

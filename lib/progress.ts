@@ -43,6 +43,7 @@ function nextLabel(from: Pos | null, perH: number): {
 import {
   buildSchedule,
   currentSessionIndex,
+  recitePartLabel,
   type CoursePlan,
   type Halaqa,
   type RecitationLog,
@@ -166,6 +167,12 @@ export interface Progress {
   // المطلوب القادم للمراجعة — من موضع المراجعة الفعلي + أوجه المراجعة
   nextMurLabel: string;
   currentMurLabel: string; // آخر موضع رُوجع
+  // إسقاط الخطة على اللقاءات المتبقية من الموضع الفعلي —
+  // ليطابق الجدولُ بطاقةَ «المطلوب القادم» (مفتاحها رقم اللقاء)
+  projected: Record<
+    number,
+    { hifzLabel: string; tathbitLabel: string; murajaahLabel: string }
+  >;
   expectedPage: number; // المتوقّع اليوم حسب الخطة
   aheadPages: number; // + متقدّمة، − متأخّرة
   facesPerSession: number; // وتيرة الحفظ
@@ -206,10 +213,11 @@ export function computeProgress(
   const schedule = halaqa ? buildSchedule(halaqa, plan) : null;
   let expectedPage = 0;
   let termSessionsLeft = 0;
+  let nextIdx = 0; // اللقاء القادم بعد آخر مسجَّل (0 = انتهى)
   if (schedule && schedule.length) {
-    const idx = currentSessionIndex(schedule, mine); // اللقاء القادم بعد آخر مسجَّل (0 = انتهى)
-    const passed = idx > 0 ? idx - 1 : schedule.length;
-    termSessionsLeft = idx > 0 ? schedule.length - passed : 0;
+    nextIdx = currentSessionIndex(schedule, mine);
+    const passed = nextIdx > 0 ? nextIdx - 1 : schedule.length;
+    termSessionsLeft = nextIdx > 0 ? schedule.length - passed : 0;
     const startPage = plan.startSurah
       ? pageOf(surahNumber(plan.startSurah), plan.startAyah || 1)
       : 1;
@@ -240,6 +248,35 @@ export function computeProgress(
     : null;
   const nextMurFrom = lastMuraja ? ayahAfter(lastMuraja) : murStartPos;
   const nextMurLabel = nextLabel(nextMurFrom, perMplan).label;
+
+  // إسقاط الخطة على اللقاءات المتبقية من الموضع الفعلي —
+  // كل لقاء قادم يبدأ حيث ينتهي سابقه (لا من الخطة الثابتة)
+  const projected: Progress["projected"] = {};
+  if (schedule && nextIdx > 0) {
+    let hFrom: Pos | null = nextHifzFrom;
+    let mFrom: Pos | null = nextMurFrom;
+    // تثبيت أول لقاء قادم = آخر مقطع سُمّع حفظاً فعلاً
+    const lastTasmiLog = mine.find((r) => r.tasmi.status === "done");
+    let prevHifz = recitePartLabel(lastTasmiLog?.tasmi);
+    for (let n = nextIdx; n <= schedule.length; n++) {
+      const nh2 = nextLabel(hFrom, perHplan);
+      const nm2 = nextLabel(mFrom, perMplan);
+      projected[n] = {
+        hifzLabel: nh2.label,
+        tathbitLabel: prevHifz,
+        murajaahLabel: nm2.label,
+      };
+      hFrom =
+        nh2.toPage > 0 && nh2.toPage < MUSHAF_PAGES
+          ? ayahAfter(pageEnd(nh2.toPage))
+          : null;
+      mFrom =
+        nm2.toPage > 0 && nm2.toPage < MUSHAF_PAGES
+          ? ayahAfter(pageEnd(nm2.toPage))
+          : null;
+      prevHifz = nh2.label || prevHifz;
+    }
+  }
 
   // وتيرة الحفظ (متوسط أوجه التسميع في اللقاءات التي سُمّع فيها)
   const tasmiLogs = mine.filter((r) => r.tasmi.status === "done");
@@ -306,6 +343,7 @@ export function computeProgress(
     currentMurLabel: lastMuraja
       ? refLabel(lastMuraja.surah, lastMuraja.ayah)
       : "",
+    projected,
     expectedPage,
     aheadPages,
     facesPerSession,

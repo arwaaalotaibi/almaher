@@ -4,7 +4,6 @@ import { useMemo, useRef, useState } from "react";
 import {
   actions,
   buildSchedule,
-  currentSessionIndex,
   dateKey,
   formatSchedDate,
   RECITE_PARTS,
@@ -299,9 +298,13 @@ export function ReciteLogger({
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(() => {
     if (schedule && schedule.length) {
-      const idx = currentSessionIndex(schedule);
-      const row = idx > 0 ? schedule[idx - 1] : schedule[schedule.length - 1];
-      return dateKey(row.date);
+      // الافتراضي: آخر لقاء وقع فعلاً — التسجيل يكون بعد اللقاء لا قبله،
+      // وإلا التصق السجلّ بلقاءٍ مستقبلي وأفسد حسبة «اللقاء القادم»
+      const endOfToday = new Date().setHours(23, 59, 59, 999);
+      const passed = [...schedule]
+        .reverse()
+        .find((s) => s.date.getTime() <= endOfToday);
+      return dateKey((passed ?? schedule[0]).date);
     }
     return todayISO();
   });

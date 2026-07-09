@@ -19,7 +19,7 @@ import {
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 import { ayahCount, SURAHS } from "@/lib/surahs";
-import { partVerdict, sessionVerdict } from "@/lib/progress";
+import { computeProgress, partVerdict, sessionVerdict } from "@/lib/progress";
 import { printHifzSchedule } from "@/lib/print-schedule";
 import { DangerBtn, Field, inputCls, PrimaryBtn, Sheet } from "./ui";
 import { ReciteLogger, SessionVerdictChip, VerdictChip } from "./recite-log";
@@ -84,6 +84,8 @@ export function StudentSheet({
 
   const halaqa = halaqas.find((h) => h.id === halaqaId);
   const schedule = halaqa ? buildSchedule(halaqa, plan) : null;
+  // الإسقاط التكيّفي للّقاءات القادمة (من الموضع الفعلي للطالبة)
+  const prog = computeProgress(student, recitations, halaqa);
 
   const printSchedule = () => {
     if (!schedule || !halaqa) return;
@@ -299,6 +301,11 @@ export function StudentSheet({
               const vT = att && log ? partVerdict(log.tathbit, s.tathbit) : null;
               const vM = att && log ? partVerdict(log.muraja, s.murajaah) : null;
               const overall = att && log ? sessionVerdict(log, s) : null;
+              // اللقاءات القادمة: المقطع مُسقَط من الموضع الفعلي
+              const pj = !log ? prog.projected[s.n] : undefined;
+              const hifzPlan = pj?.hifzLabel || s.hifzLabel;
+              const tathbitPlan = pj?.tathbitLabel || s.tathbitLabel;
+              const murPlan = pj?.murajaahLabel || s.murajaahLabel;
               return (
                 <div key={s.n} className="rounded-xl bg-cream px-3 py-2">
                   <div className="flex items-center justify-between text-[11px]">
@@ -319,15 +326,15 @@ export function StudentSheet({
                     📖{" "}
                     {att && tasmiLabel
                       ? `سُمّع: ${tasmiLabel}`
-                      : s.hifzLabel || (s.hifz ? `${ar(s.hifz)} أوجه` : "—")}{" "}
+                      : hifzPlan || (s.hifz ? `${ar(s.hifz)} أوجه` : "—")}{" "}
                     <VerdictChip v={vH} />
                   </p>
-                  {(s.tathbit > 0 || thLabel) && (
+                  {(s.tathbit > 0 || thLabel || tathbitPlan) && (
                     <p className="text-[11px] text-silver-600">
                       📌 تثبيت:{" "}
                       {att && thLabel
                         ? `سُمّع: ${thLabel}`
-                        : s.tathbitLabel ||
+                        : tathbitPlan ||
                           (s.tathbit ? `${ar(s.tathbit)} أوجه` : "—")}{" "}
                       <VerdictChip v={vT} />
                     </p>
@@ -336,7 +343,7 @@ export function StudentSheet({
                     🔁 مراجعة:{" "}
                     {att && murLabel
                       ? `سُمّع: ${murLabel}`
-                      : s.murajaahLabel ||
+                      : murPlan ||
                         (s.murajaah ? `${ar(s.murajaah)} أوجه` : "—")}{" "}
                     <VerdictChip v={vM} />
                   </p>
