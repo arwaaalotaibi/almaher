@@ -1,11 +1,45 @@
-import {
-  hifzRangeLabel,
-  MUSHAF_PAGES,
-  pageEnd,
-  pageOf,
-  refLabel,
-  surahNumber,
-} from "./mushaf";
+import { MUSHAF_PAGES, pageEnd, pageOf, refLabel, surahNumber } from "./mushaf";
+import { SURAH_AYAHS } from "./surahs";
+
+type Pos = { surah: number; ayah: number };
+
+/** الآية التي تلي موضعاً معيّناً (تنتقل للسورة التالية عند نهاية السورة) */
+function ayahAfter(p: Pos): Pos {
+  const count = SURAH_AYAHS[p.surah - 1] ?? 1;
+  if (p.ayah < count) return { surah: p.surah, ayah: p.ayah + 1 };
+  if (p.surah < 114) return { surah: p.surah + 1, ayah: 1 };
+  return p;
+}
+
+/** أبعد موضع نهاية لقسم «سمّعت» عبر السجلات */
+function furthestEnd(
+  logs: { part: RecitePart }[]
+): Pos | null {
+  let best: Pos | null = null;
+  for (const { part } of logs) {
+    if (part.status !== "done" || !part.toSurah) continue;
+    const surah = surahNumber(part.toSurah);
+    const ayah = part.toAyah ?? part.fromAyah ?? 1;
+    if (!best || surah > best.surah || (surah === best.surah && ayah > best.ayah))
+      best = { surah, ayah };
+  }
+  return best;
+}
+
+/** نص المطلوب القادم: من (الآية التالية) بمقدار perH أوجه */
+function nextLabel(from: Pos | null, perH: number): {
+  label: string;
+  fromPage: number;
+  toPage: number;
+} {
+  if (!from || perH <= 0) return { label: "", fromPage: 0, toPage: 0 };
+  const fromPage = pageOf(from.surah, from.ayah);
+  const toPage = Math.min(MUSHAF_PAGES, fromPage + perH - 1);
+  const end = pageEnd(toPage);
+  const a = refLabel(from.surah, from.ayah);
+  const b = refLabel(end.surah, end.ayah);
+  return { label: a === b ? a : `${a} ← ${b}`, fromPage, toPage };
+}
 import {
   buildSchedule,
   currentSessionIndex,
@@ -103,12 +137,9 @@ export function computeProgress(
     .filter((r) => r.studentId === student.id)
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  // أبعد صفحة من سجلّ التسميع (الحفظ الجديد)
-  let currentPage = 0;
-  for (const r of mine) {
-    const p = partEndPage(r.tasmi);
-    if (p > currentPage) currentPage = p;
-  }
+  // أبعد موضع (آية) من سجلّ التسميع، وصفحته
+  const lastTasmi = furthestEnd(mine.map((r) => ({ part: r.tasmi })));
+  const currentPage = lastTasmi ? pageOf(lastTasmi.surah, lastTasmi.ayah) : 0;
 
   const juz = currentPage ? juzOfPage(currentPage) : 1;
   const jStart = juzStartPage(juz);
@@ -135,40 +166,28 @@ export function computeProgress(
   }
   const aheadPages = currentPage && expectedPage ? currentPage - expectedPage : 0;
 
-  // المطلوب القادم = من (موضعها الفعلي + ١) بمقدار أوجه الخطة
-  const startPage = plan.startSurah
-    ? pageOf(surahNumber(plan.startSurah), plan.startAyah || 1)
-    : 1;
+  // المطلوب القادم للحفظ = من الآية التالية لآخر ما سُمّع، بمقدار أوجه الخطة
   const perHplan = Math.max(0, Math.round(plan.hifz || 0));
-  const nextFromPage = Math.min(
-    MUSHAF_PAGES,
-    currentPage > 0 ? currentPage + 1 : startPage
-  );
-  const nextToPage = Math.min(MUSHAF_PAGES, nextFromPage + Math.max(1, perHplan) - 1);
-  const nextHifzLabel =
-    perHplan > 0 && (plan.startSurah || currentPage > 0) && nextFromPage <= MUSHAF_PAGES
-      ? hifzRangeLabel(nextFromPage, nextToPage)
-      : "";
+  const hifzStartPos: Pos | null = plan.startSurah
+    ? { surah: surahNumber(plan.startSurah), ayah: plan.startAyah || 1 }
+    : null;
+  const nextHifzFrom = lastTasmi ? ayahAfter(lastTasmi) : hifzStartPos;
+  const nh = nextLabel(nextHifzFrom, perHplan);
+  const nextHifzLabel = nh.label;
+  const nextFromPage = nh.fromPage;
+  const nextToPage = nh.toPage;
 
-  // المراجعة التكيّفية: من موضع المراجعة الفعلي + أوجه المراجعة
-  let currentReviewPage = 0;
-  for (const r of mine) {
-    const p = partEndPage(r.muraja);
-    if (p > currentReviewPage) currentReviewPage = p;
-  }
-  const murStartPage = plan.murStartSurah
-    ? pageOf(surahNumber(plan.murStartSurah), plan.murStartAyah || 1)
+  // المطلوب القادم للمراجعة = من الآية التالية لآخر ما رُوجع
+  const lastMuraja = furthestEnd(mine.map((r) => ({ part: r.muraja })));
+  const currentReviewPage = lastMuraja
+    ? pageOf(lastMuraja.surah, lastMuraja.ayah)
     : 0;
   const perMplan = Math.max(0, Math.round(plan.murajaah || 0));
-  const murFrom = Math.min(
-    MUSHAF_PAGES,
-    currentReviewPage > 0 ? currentReviewPage + 1 : murStartPage
-  );
-  const murTo = Math.min(MUSHAF_PAGES, murFrom + Math.max(1, perMplan) - 1);
-  const nextMurLabel =
-    perMplan > 0 && murFrom >= 1 && (plan.murStartSurah || currentReviewPage > 0)
-      ? hifzRangeLabel(murFrom, murTo)
-      : "";
+  const murStartPos: Pos | null = plan.murStartSurah
+    ? { surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 }
+    : null;
+  const nextMurFrom = lastMuraja ? ayahAfter(lastMuraja) : murStartPos;
+  const nextMurLabel = nextLabel(nextMurFrom, perMplan).label;
 
   // وتيرة الحفظ (متوسط أوجه التسميع في اللقاءات التي سُمّع فيها)
   const tasmiLogs = mine.filter((r) => r.tasmi.status === "done");
@@ -228,12 +247,12 @@ export function computeProgress(
     nextFromPage,
     nextToPage,
     nextHifzLabel,
-    currentTasmiLabel: currentPage
-      ? refLabel(pageEnd(currentPage).surah, pageEnd(currentPage).ayah)
+    currentTasmiLabel: lastTasmi
+      ? refLabel(lastTasmi.surah, lastTasmi.ayah)
       : "",
     nextMurLabel,
-    currentMurLabel: currentReviewPage
-      ? refLabel(pageEnd(currentReviewPage).surah, pageEnd(currentReviewPage).ayah)
+    currentMurLabel: lastMuraja
+      ? refLabel(lastMuraja.surah, lastMuraja.ayah)
       : "",
     expectedPage,
     aheadPages,
