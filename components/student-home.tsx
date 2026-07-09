@@ -329,6 +329,11 @@ export function StudentHome() {
                             s.hifzLabel ||
                             (s.hifz ? `${ar(s.hifz)} أوجه` : "—")}
                         </p>
+                        {prog.currentTasmiLabel && (
+                          <p className="mt-1 text-[10px] font-bold text-silver-500">
+                            📍 آخر ما حفظتِ: {prog.currentTasmiLabel}
+                          </p>
+                        )}
                       </div>
                       <div className="mt-2 rounded-xl bg-white p-3 text-center">
                         <p className="text-[11px] font-bold text-silver-600">
@@ -339,6 +344,11 @@ export function StudentHome() {
                             s.murajaahLabel ||
                             (s.murajaah ? `${ar(s.murajaah)} أوجه` : "—")}
                         </p>
+                        {prog.currentMurLabel && (
+                          <p className="mt-1 text-[10px] font-bold text-silver-500">
+                            📍 آخر ما راجعتِ: {prog.currentMurLabel}
+                          </p>
+                        )}
                       </div>
                     </div>
                   );

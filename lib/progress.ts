@@ -1,4 +1,11 @@
-import { hifzRangeLabel, MUSHAF_PAGES, pageOf, surahNumber } from "./mushaf";
+import {
+  hifzRangeLabel,
+  MUSHAF_PAGES,
+  pageEnd,
+  pageOf,
+  refLabel,
+  surahNumber,
+} from "./mushaf";
 import {
   buildSchedule,
   currentSessionIndex,
@@ -69,8 +76,10 @@ export interface Progress {
   nextFromPage: number;
   nextToPage: number;
   nextHifzLabel: string;
+  currentTasmiLabel: string; // آخر موضع حُفظ (لتوضيح أساس الحساب)
   // المطلوب القادم للمراجعة — من موضع المراجعة الفعلي + أوجه المراجعة
   nextMurLabel: string;
+  currentMurLabel: string; // آخر موضع رُوجع
   expectedPage: number; // المتوقّع اليوم حسب الخطة
   aheadPages: number; // + متقدّمة، − متأخّرة
   facesPerSession: number; // وتيرة الحفظ
@@ -219,7 +228,13 @@ export function computeProgress(
     nextFromPage,
     nextToPage,
     nextHifzLabel,
+    currentTasmiLabel: currentPage
+      ? refLabel(pageEnd(currentPage).surah, pageEnd(currentPage).ayah)
+      : "",
     nextMurLabel,
+    currentMurLabel: currentReviewPage
+      ? refLabel(pageEnd(currentReviewPage).surah, pageEnd(currentReviewPage).ayah)
+      : "",
     expectedPage,
     aheadPages,
     facesPerSession,
