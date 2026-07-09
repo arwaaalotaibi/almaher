@@ -120,7 +120,12 @@ export function StudentHome() {
   const unreadNotifs =
     countUnread(notifList, readIds) +
     smartNotifs.filter((s) => !readIds.has(s.id)).length;
-  const curIdx = schedule ? currentSessionIndex(schedule) : 0;
+  const curIdx = schedule
+    ? currentSessionIndex(
+        schedule,
+        recitations.filter((r) => r.studentId === me.id)
+      )
+    : 0;
   const passed = schedule ? (curIdx > 0 ? curIdx - 1 : schedule.length) : 0;
   const totalFaces =
     (me.plan?.hifz ?? 0) + (me.plan?.tathbit ?? 0) + (me.plan?.murajaah ?? 0);

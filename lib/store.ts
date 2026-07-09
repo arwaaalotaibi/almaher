@@ -414,12 +414,23 @@ export function buildSchedule(
   return rows;
 }
 
-/** رقم اللقاء الحالي/القادم بالنسبة لليوم (1-based)، و0 إن انتهى الفصل */
-export function currentSessionIndex(rows: ScheduleRow[]): number {
-  const today = new Date();
-  today.setHours(23, 59, 59, 999);
-  const upcoming = rows.find((r) => r.date.getTime() >= new Date().setHours(0, 0, 0, 0));
-  return upcoming ? upcoming.n : 0;
+/** رقم اللقاء الحالي/القادم (1-based)، و0 إن انتهى الفصل.
+    يُبنى على آخر لقاء مسجَّل: إن سُجّل تسميع لقاء اليوم (أو أبعد)
+    فالقادم هو ما يليه — لا نظل نشير للقاءٍ انتهى وسُمّع. */
+export function currentSessionIndex(
+  rows: ScheduleRow[],
+  logs?: { date: string }[]
+): number {
+  const startOfToday = new Date().setHours(0, 0, 0, 0);
+  const upcoming = rows.find((r) => r.date.getTime() >= startOfToday);
+  let idx = upcoming ? upcoming.n : 0;
+  if (idx > 0 && logs?.length) {
+    const logged = new Set(logs.map((l) => l.date));
+    let last = 0; // آخر لقاء له سجلّ تسميع
+    for (const r of rows) if (logged.has(dateKey(r.date))) last = r.n;
+    if (last >= idx) idx = last + 1 > rows.length ? 0 : last + 1;
+  }
+  return idx;
 }
 
 /** مفتاح تاريخ yyyy-mm-dd (لمطابقة سجلّ التسميع باللقاء) */

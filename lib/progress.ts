@@ -207,7 +207,7 @@ export function computeProgress(
   let expectedPage = 0;
   let termSessionsLeft = 0;
   if (schedule && schedule.length) {
-    const idx = currentSessionIndex(schedule); // اللقاء القادم (0 = انتهى)
+    const idx = currentSessionIndex(schedule, mine); // اللقاء القادم بعد آخر مسجَّل (0 = انتهى)
     const passed = idx > 0 ? idx - 1 : schedule.length;
     termSessionsLeft = idx > 0 ? schedule.length - passed : 0;
     const startPage = plan.startSurah
