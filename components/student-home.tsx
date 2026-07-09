@@ -332,10 +332,11 @@ export function StudentHome() {
                       </div>
                       <div className="mt-2 rounded-xl bg-white p-3 text-center">
                         <p className="text-[11px] font-bold text-silver-600">
-                          🔁 المراجعة
+                          🔁 المراجعة (من حيث وصلتِ فعلاً)
                         </p>
                         <p className="mt-0.5 font-kufi text-lg font-bold text-plum-700">
-                          {s.murajaahLabel ||
+                          {prog.nextMurLabel ||
+                            s.murajaahLabel ||
                             (s.murajaah ? `${ar(s.murajaah)} أوجه` : "—")}
                         </p>
                       </div>
@@ -354,6 +355,7 @@ export function StudentHome() {
                   const isCur = s.n === curIdx;
                   const log = logFor(s.date);
                   const tasmiLabel = log ? recitePartLabel(log.tasmi) : "";
+                  const murLabel = log ? recitePartLabel(log.muraja) : "";
                   return (
                     <div
                       key={s.n}
@@ -406,8 +408,10 @@ export function StudentHome() {
                         }`}
                       >
                         🔁 مراجعة{" "}
-                        {s.murajaahLabel ||
-                          (s.murajaah ? `${ar(s.murajaah)} أوجه` : "—")}
+                        {log && log.attended && murLabel
+                          ? `سُمّع: ${murLabel}`
+                          : s.murajaahLabel ||
+                            (s.murajaah ? `${ar(s.murajaah)} أوجه` : "—")}
                       </p>
                     </div>
                   );

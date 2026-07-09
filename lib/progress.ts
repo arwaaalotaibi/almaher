@@ -69,6 +69,8 @@ export interface Progress {
   nextFromPage: number;
   nextToPage: number;
   nextHifzLabel: string;
+  // المطلوب القادم للمراجعة — من موضع المراجعة الفعلي + أوجه المراجعة
+  nextMurLabel: string;
   expectedPage: number; // المتوقّع اليوم حسب الخطة
   aheadPages: number; // + متقدّمة، − متأخّرة
   facesPerSession: number; // وتيرة الحفظ
@@ -139,6 +141,26 @@ export function computeProgress(
       ? hifzRangeLabel(nextFromPage, nextToPage)
       : "";
 
+  // المراجعة التكيّفية: من موضع المراجعة الفعلي + أوجه المراجعة
+  let currentReviewPage = 0;
+  for (const r of mine) {
+    const p = partEndPage(r.muraja);
+    if (p > currentReviewPage) currentReviewPage = p;
+  }
+  const murStartPage = plan.murStartSurah
+    ? pageOf(surahNumber(plan.murStartSurah), plan.murStartAyah || 1)
+    : 0;
+  const perMplan = Math.max(0, Math.round(plan.murajaah || 0));
+  const murFrom = Math.min(
+    MUSHAF_PAGES,
+    currentReviewPage > 0 ? currentReviewPage + 1 : murStartPage
+  );
+  const murTo = Math.min(MUSHAF_PAGES, murFrom + Math.max(1, perMplan) - 1);
+  const nextMurLabel =
+    perMplan > 0 && murFrom >= 1 && (plan.murStartSurah || currentReviewPage > 0)
+      ? hifzRangeLabel(murFrom, murTo)
+      : "";
+
   // وتيرة الحفظ (متوسط أوجه التسميع في اللقاءات التي سُمّع فيها)
   const tasmiLogs = mine.filter((r) => r.tasmi.status === "done");
   const avg =
@@ -197,6 +219,7 @@ export function computeProgress(
     nextFromPage,
     nextToPage,
     nextHifzLabel,
+    nextMurLabel,
     expectedPage,
     aheadPages,
     facesPerSession,
