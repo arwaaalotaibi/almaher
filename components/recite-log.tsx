@@ -3,9 +3,14 @@
 import { useMemo, useState } from "react";
 import {
   actions,
+  buildSchedule,
+  currentSessionIndex,
+  dateKey,
+  formatSchedDate,
   RECITE_PARTS,
   recitePartLabel,
   useApp,
+  type Halaqa,
   type RecitePart,
   type Student,
 } from "@/lib/store";
@@ -165,9 +170,23 @@ export function ReciteHistory({
 }
 
 /** نموذج تسجّل فيه الطالبة/المعلّمة ما سُمّع في اللقاء */
-export function ReciteLogger({ student }: { student: Student }) {
+export function ReciteLogger({
+  student,
+  halaqa,
+}: {
+  student: Student;
+  halaqa?: Halaqa;
+}) {
+  const schedule = halaqa ? buildSchedule(halaqa, student.plan) : null;
   const [open, setOpen] = useState(false);
-  const [date, setDate] = useState(todayISO());
+  const [date, setDate] = useState(() => {
+    if (schedule && schedule.length) {
+      const idx = currentSessionIndex(schedule);
+      const row = idx > 0 ? schedule[idx - 1] : schedule[schedule.length - 1];
+      return dateKey(row.date);
+    }
+    return todayISO();
+  });
   const [attended, setAttended] = useState(true);
   const [note, setNote] = useState("");
   const [saved, setSaved] = useState(false);
@@ -255,14 +274,30 @@ export function ReciteLogger({ student }: { student: Student }) {
 
       {open && (
         <div className="mt-3">
-          <Field label="تاريخ اللقاء" icon="📅">
-            <input
-              type="date"
-              className={inputCls}
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            />
-          </Field>
+          {schedule && schedule.length ? (
+            <Field label="اللقاء" icon="📅">
+              <select
+                className={inputCls}
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              >
+                {schedule.map((s) => (
+                  <option key={s.n} value={dateKey(s.date)}>
+                    لقاء {ar(s.n)} · {formatSchedDate(s.date)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : (
+            <Field label="تاريخ اللقاء" icon="📅">
+              <input
+                type="date"
+                className={inputCls}
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </Field>
+          )}
 
           {/* حضور / غياب */}
           <div className="mb-3 grid grid-cols-2 gap-2">

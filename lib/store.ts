@@ -422,6 +422,13 @@ export function currentSessionIndex(rows: ScheduleRow[]): number {
   return upcoming ? upcoming.n : 0;
 }
 
+/** مفتاح تاريخ yyyy-mm-dd (لمطابقة سجلّ التسميع باللقاء) */
+export function dateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+}
+
 export function formatSchedDate(d: Date): string {
   return d.toLocaleDateString("ar-u-ca-gregory-nu-arab", {
     weekday: "short",

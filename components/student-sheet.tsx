@@ -318,7 +318,7 @@ export function StudentSheet({
       </div>
 
       {/* سجلّ تسميع الطالبة — الإدارة/المعلّمة تقدر تُدخل أيضاً */}
-      <ReciteLogger student={student} />
+      <ReciteLogger student={student} halaqa={halaqa} />
 
       <Field label="ملاحظات" icon="📝">
         <textarea

@@ -9,9 +9,11 @@ import {
   CoursePlan,
   countUnread,
   currentSessionIndex,
+  dateKey,
   EMPTY_PLAN,
   formatSchedDate,
   getReadIds,
+  recitePartLabel,
   halaqaTitle,
   hifzStartLabel,
   normalizeDigits,
@@ -34,6 +36,7 @@ import { NotificationsCenter, PinnedNotice } from "./notifications-card";
 import { PushToggle } from "./push-toggle";
 import { ReciteLogger } from "./recite-log";
 import { MotivationPanel } from "./motivation-panel";
+import { computeProgress } from "@/lib/progress";
 
 /** شاشة الطالبة: تدخل برمزها فتُعرض أهدافها مباشرة (قراءة فقط) */
 // تبويبات صفحة الطالبة (التجويد لاحقاً)
@@ -45,7 +48,8 @@ const STUDENT_TABS = [
 type StudentTab = (typeof STUDENT_TABS)[number]["key"];
 
 export function StudentHome() {
-  const { halaqas, teachers, students, books, announcements } = useApp();
+  const { halaqas, teachers, students, books, announcements, recitations } =
+    useApp();
   const [myId, setMyId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState<StudentTab>("reading");
@@ -106,6 +110,9 @@ export function StudentHome() {
   const halaqa = halaqas.find((h) => h.id === me.halaqaId);
   const teacher = teachers.find((t) => t.id === me.teacherId);
   const schedule = halaqa ? buildSchedule(halaqa, me.plan) : null;
+  const prog = computeProgress(me, recitations, halaqa);
+  const logFor = (d: Date) =>
+    recitations.find((r) => r.studentId === me.id && r.date === dateKey(d));
 
   const myHalaqaIds = me.halaqaId ? [me.halaqaId] : [];
   const notifList = visibleAnnouncements(announcements, myHalaqaIds);
@@ -246,7 +253,7 @@ export function StudentHome() {
           <MyPlanEditor student={me} />
 
           {/* سجلّ التسميع بعد كل لقاء */}
-          <ReciteLogger student={me} />
+          <ReciteLogger student={me} halaqa={halaqa} />
 
           {/* خطة الفصل — جدول مولّد تلقائياً */}
           {schedule ? (
@@ -315,10 +322,12 @@ export function StudentHome() {
                       </div>
                       <div className="mt-3 rounded-xl bg-white p-3 text-center shadow-sm">
                         <p className="text-[11px] font-bold text-silver-600">
-                          📖 الحفظ الجديد
+                          📖 الحفظ الجديد (من حيث وصلتِ فعلاً)
                         </p>
                         <p className="mt-0.5 font-kufi text-lg font-bold text-plum-800">
-                          {s.hifzLabel || (s.hifz ? `${ar(s.hifz)} أوجه` : "—")}
+                          {prog.nextHifzLabel ||
+                            s.hifzLabel ||
+                            (s.hifz ? `${ar(s.hifz)} أوجه` : "—")}
                         </p>
                       </div>
                       <div className="mt-2 rounded-xl bg-white p-3 text-center">
@@ -343,32 +352,54 @@ export function StudentHome() {
               <div className="grid gap-1.5">
                 {schedule.map((s) => {
                   const isCur = s.n === curIdx;
+                  const log = logFor(s.date);
+                  const tasmiLabel = log ? recitePartLabel(log.tasmi) : "";
                   return (
                     <div
                       key={s.n}
                       className={`rounded-xl px-3 py-2.5 ${
-                        isCur
-                          ? "bg-plum-600 text-white"
-                          : "card"
+                        isCur ? "bg-plum-600 text-white" : "card"
                       }`}
                     >
                       <div className="flex items-center justify-between text-[11px]">
                         <span
-                          className={`font-bold ${isCur ? "text-white" : "text-plum-700"}`}
+                          className={`flex items-center gap-1.5 font-bold ${isCur ? "text-white" : "text-plum-700"}`}
                         >
                           لقاء {ar(s.n)}
+                          {log && !log.attended && (
+                            <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] text-white">
+                              غائبة
+                            </span>
+                          )}
+                          {log && log.attended && tasmiLabel && (
+                            <span className="rounded-full bg-emerald-500 px-1.5 py-0.5 text-[10px] text-white">
+                              ✓ سُمّع
+                            </span>
+                          )}
                         </span>
                         <span className={isCur ? "text-white/85" : "text-silver-600"}>
                           {formatSchedDate(s.date)}
                         </span>
                       </div>
-                      <p
-                        className={`mt-0.5 font-kufi text-sm font-bold ${
-                          isCur ? "text-white" : "text-plum-800"
-                        }`}
-                      >
-                        📖 {s.hifzLabel || (s.hifz ? `${ar(s.hifz)} أوجه` : "—")}
-                      </p>
+                      {log && !log.attended ? (
+                        <p
+                          className={`mt-0.5 text-sm font-bold ${isCur ? "text-white/90" : "text-amber-700"}`}
+                        >
+                          🚫 غائبة في هذا اللقاء
+                        </p>
+                      ) : (
+                        <p
+                          className={`mt-0.5 font-kufi text-sm font-bold ${
+                            isCur ? "text-white" : "text-plum-800"
+                          }`}
+                        >
+                          📖{" "}
+                          {tasmiLabel
+                            ? `سُمّع: ${tasmiLabel}`
+                            : s.hifzLabel ||
+                              (s.hifz ? `${ar(s.hifz)} أوجه` : "—")}
+                        </p>
+                      )}
                       <p
                         className={`text-[11px] ${
                           isCur ? "text-white/85" : "text-silver-600"

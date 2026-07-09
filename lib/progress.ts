@@ -1,4 +1,4 @@
-import { MUSHAF_PAGES, pageOf, surahNumber } from "./mushaf";
+import { hifzRangeLabel, MUSHAF_PAGES, pageOf, surahNumber } from "./mushaf";
 import {
   buildSchedule,
   currentSessionIndex,
@@ -65,6 +65,10 @@ export interface Progress {
   mushafPct: number;
   pagesToJuzEnd: number; // = أوجه متبقية لإتمام الجزء
   nearJuzEnd: boolean; // قريبة جداً من ختم الجزء
+  // المطلوب في اللقاء القادم — يُحسب من موضعها الفعلي + أوجه كل لقاء
+  nextFromPage: number;
+  nextToPage: number;
+  nextHifzLabel: string;
   expectedPage: number; // المتوقّع اليوم حسب الخطة
   aheadPages: number; // + متقدّمة، − متأخّرة
   facesPerSession: number; // وتيرة الحفظ
@@ -119,6 +123,21 @@ export function computeProgress(
     expectedPage = startPage + cum - 1;
   }
   const aheadPages = currentPage && expectedPage ? currentPage - expectedPage : 0;
+
+  // المطلوب القادم = من (موضعها الفعلي + ١) بمقدار أوجه الخطة
+  const startPage = plan.startSurah
+    ? pageOf(surahNumber(plan.startSurah), plan.startAyah || 1)
+    : 1;
+  const perHplan = Math.max(0, Math.round(plan.hifz || 0));
+  const nextFromPage = Math.min(
+    MUSHAF_PAGES,
+    currentPage > 0 ? currentPage + 1 : startPage
+  );
+  const nextToPage = Math.min(MUSHAF_PAGES, nextFromPage + Math.max(1, perHplan) - 1);
+  const nextHifzLabel =
+    perHplan > 0 && (plan.startSurah || currentPage > 0) && nextFromPage <= MUSHAF_PAGES
+      ? hifzRangeLabel(nextFromPage, nextToPage)
+      : "";
 
   // وتيرة الحفظ (متوسط أوجه التسميع في اللقاءات التي سُمّع فيها)
   const tasmiLogs = mine.filter((r) => r.tasmi.status === "done");
@@ -175,6 +194,9 @@ export function computeProgress(
     mushafPct,
     pagesToJuzEnd,
     nearJuzEnd,
+    nextFromPage,
+    nextToPage,
+    nextHifzLabel,
     expectedPage,
     aheadPages,
     facesPerSession,
