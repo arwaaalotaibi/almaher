@@ -1,6 +1,7 @@
 "use client";
 
 import { badgesFor, computeProgress, juzLabel } from "@/lib/progress";
+import { byPages, facesAcc, facesLabel, facesPlain, meetingsLabel } from "@/lib/arabic";
 import { useApp, type Halaqa, type Student } from "@/lib/store";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
@@ -55,17 +56,17 @@ export function ProgressSummary({
           }`}
         >
           {p.aheadPages > 0
-            ? `🌟 متقدّمة بـ${ar(p.aheadPages)} صفحة عن الخطة`
+            ? `🌟 متقدّمة ${byPages(p.aheadPages)} عن الخطة`
             : p.aheadPages === 0
               ? "✅ على الخطة تماماً"
-              : `⏳ متأخّرة بـ${ar(-p.aheadPages)} صفحة`}
+              : `⏳ متأخّرة ${byPages(-p.aheadPages)}`}
         </div>
       )}
 
       <div className="grid grid-cols-3 gap-2 text-center">
         {[
-          { l: "🔥 سلسلة", v: `${ar(p.streak)} لقاء` },
-          { l: "🏅 أفضل", v: `${ar(p.personalBest)} أوجه` },
+          { l: "🔥 سلسلة", v: meetingsLabel(p.streak) },
+          { l: "🏅 أفضل", v: facesLabel(p.personalBest) },
           { l: "🎖️ أجزاء", v: ar(p.completedJuz) },
         ].map((x) => (
           <div key={x.l} className="rounded-xl bg-cream px-1 py-2">
@@ -83,12 +84,12 @@ export function ProgressSummary({
         {p.pagesToJuzEnd === 0
           ? `🎉 أتمّت ${juzLabel(p.juz)}`
           : p.nearJuzEnd
-            ? `🎯 على وشك ختم ${juzLabel(p.juz)} — باقي ${ar(
+            ? `🎯 على وشك ختم ${juzLabel(p.juz)} — باقي ${facesPlain(
                 p.pagesToJuzEnd
-              )} أوجه فقط!`
-            : `📖 باقي ${ar(p.pagesToJuzEnd)} أوجه لإتمام ${juzLabel(p.juz)}`}
+              )} فقط!`
+            : `📖 باقي ${facesPlain(p.pagesToJuzEnd)} لإتمام ${juzLabel(p.juz)}`}
         {p.termSessionsLeft > 0
-          ? ` · 🏁 ${ar(p.termSessionsLeft)} حصص للفصل`
+          ? ` · 🏁 ${meetingsLabel(p.termSessionsLeft)} على نهاية الفصل`
           : ""}
       </p>
     </div>
@@ -142,10 +143,10 @@ export function MotivationPanel({
             على وشك ختم {jl}!
           </p>
           <p className="mt-1 text-sm">
-            باقي {ar(p.pagesToJuzEnd)} أوجه فقط
+            باقي {facesPlain(p.pagesToJuzEnd)} فقط
             {p.sessionsToJuzEnd <= 1
               ? " — أنجزيها في اللقاء القادم واختمي الجزء! 🎉"
-              : ` — أنتِ على بُعد ${ar(p.sessionsToJuzEnd)} لقاء`}
+              : ` — بينكِ وبين الختم ${meetingsLabel(p.sessionsToJuzEnd)}`}
           </p>
         </div>
       )}
@@ -182,10 +183,10 @@ export function MotivationPanel({
             }`}
           >
             {p.aheadPages > 0
-              ? `🌟 متقدّمة بـ${ar(p.aheadPages)} صفحة عن خطتكِ — أحسنتِ!`
+              ? `🌟 أنتِ متقدّمة ${byPages(p.aheadPages)} عن خطتكِ — أحسنتِ!`
               : p.aheadPages === 0
                 ? "✅ أنتِ تماماً على خطتكِ — واصلي!"
-                : `💪 متأخّرة بـ${ar(-p.aheadPages)} صفحة — ${ar(-p.aheadPages)} أوجه إضافية تعيدكِ للمقدّمة`}
+                : `💪 أنتِ متأخّرة ${byPages(-p.aheadPages)} — أضيفي ${facesAcc(-p.aheadPages)} لتعودي للمقدّمة`}
           </div>
         )}
 
@@ -195,14 +196,14 @@ export function MotivationPanel({
           </div>
         ) : !p.nearJuzEnd ? (
           <div className="rounded-xl bg-plum-600 px-3 py-2.5 text-sm font-bold text-white">
-            📖 باقي {ar(p.pagesToJuzEnd)} أوجه لإتمام {jl} — أنجزيها في{" "}
-            {ar(p.sessionsToJuzEnd)} لقاء!
+            📖 باقي {facesPlain(p.pagesToJuzEnd)} لإتمام {jl} — يكفيكِ{" "}
+            {meetingsLabel(p.sessionsToJuzEnd)}!
           </div>
         ) : null}
 
         {p.termSessionsLeft > 0 && (
           <div className="rounded-xl bg-cream px-3 py-2.5 text-sm font-bold text-plum-700">
-            🏁 باقي {ar(p.termSessionsLeft)} حصص لإنهاء الفصل
+            🏁 باقي {meetingsLabel(p.termSessionsLeft)} على نهاية الفصل
           </div>
         )}
       </div>
@@ -214,9 +215,9 @@ export function MotivationPanel({
             ✨ لو زدتِ وجهين كل لقاء
           </p>
           <p className="mt-1 text-xs text-silver-600">
-            تصير {ar(p.boostFaces)} أوجه، فتُنهين {jl} في{" "}
-            {ar(p.sessionsToJuzEndBoost)} لقاء بدل {ar(p.sessionsToJuzEnd)} —
-            أسرع!
+            يصير حفظكِ {facesAcc(p.boostFaces)} كل لقاء، فتختمين {jl} في{" "}
+            {meetingsLabel(p.sessionsToJuzEndBoost)} بدل{" "}
+            {ar(p.sessionsToJuzEnd)} — أسرع بإذن الله!
           </p>
         </div>
       )}
@@ -228,10 +229,10 @@ export function MotivationPanel({
         </p>
         <div className="mb-3 flex flex-wrap gap-2">
           <span className="rounded-full bg-plum-50 px-3 py-1 text-xs font-bold text-plum-700">
-            🔥 سلسلة: {ar(p.streak)} لقاء
+            🔥 سلسلتكِ: {meetingsLabel(p.streak)}
           </span>
           <span className="rounded-full bg-plum-50 px-3 py-1 text-xs font-bold text-plum-700">
-            🏅 أفضل إنجاز: {ar(p.personalBest)} أوجه
+            🏅 أفضل إنجازكِ: {facesLabel(p.personalBest)}
           </span>
         </div>
         <div className="grid grid-cols-4 gap-2">

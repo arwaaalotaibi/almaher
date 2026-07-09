@@ -37,6 +37,7 @@ import { PushToggle } from "./push-toggle";
 import { ReciteLogger, SessionVerdictChip, VerdictChip } from "./recite-log";
 import { MotivationPanel } from "./motivation-panel";
 import { computeProgress, partVerdict, sessionVerdict } from "@/lib/progress";
+import { facesLabel } from "@/lib/arabic";
 
 /** شاشة الطالبة: تدخل برمزها فتُعرض أهدافها مباشرة (قراءة فقط) */
 // تبويبات صفحة الطالبة (التجويد لاحقاً)
@@ -332,7 +333,7 @@ export function StudentHome() {
                         <p className="mt-0.5 font-kufi text-lg font-bold text-plum-800">
                           {prog.nextHifzLabel ||
                             s.hifzLabel ||
-                            (s.hifz ? `${ar(s.hifz)} أوجه` : "—")}
+                            (s.hifz ? facesLabel(s.hifz) : "—")}
                         </p>
                         {prog.currentTasmiLabel && (
                           <p className="mt-1 text-[10px] font-bold text-silver-500">
@@ -347,7 +348,7 @@ export function StudentHome() {
                         <p className="mt-0.5 font-kufi text-lg font-bold text-plum-700">
                           {prog.nextMurLabel ||
                             s.murajaahLabel ||
-                            (s.murajaah ? `${ar(s.murajaah)} أوجه` : "—")}
+                            (s.murajaah ? facesLabel(s.murajaah) : "—")}
                         </p>
                         {prog.currentMurLabel && (
                           <p className="mt-1 text-[10px] font-bold text-silver-500">
@@ -410,7 +411,7 @@ export function StudentHome() {
                         <p
                           className={`mt-0.5 text-sm font-bold ${isCur ? "text-white/90" : "text-amber-700"}`}
                         >
-                          🚫 غائبة في هذا اللقاء
+                          🚫 كنتِ غائبة في هذا اللقاء
                         </p>
                       ) : (
                         <>
@@ -421,9 +422,9 @@ export function StudentHome() {
                           >
                             📖{" "}
                             {tasmiLabel
-                              ? `سُمّع: ${tasmiLabel}`
+                              ? `سمّعتِ: ${tasmiLabel}`
                               : hifzPlan ||
-                                (s.hifz ? `${ar(s.hifz)} أوجه` : "—")}{" "}
+                                (s.hifz ? facesLabel(s.hifz) : "—")}{" "}
                             <VerdictChip v={vH} />
                           </p>
                           {(s.tathbit > 0 || thLabel || tathbitPlan) && (
@@ -434,9 +435,9 @@ export function StudentHome() {
                             >
                               📌 تثبيت{" "}
                               {att && thLabel
-                                ? `سُمّع: ${thLabel}`
+                                ? `سمّعتِ: ${thLabel}`
                                 : tathbitPlan ||
-                                  (s.tathbit ? `${ar(s.tathbit)} أوجه` : "—")}{" "}
+                                  (s.tathbit ? facesLabel(s.tathbit) : "—")}{" "}
                               <VerdictChip v={vT} />
                             </p>
                           )}
@@ -447,9 +448,9 @@ export function StudentHome() {
                           >
                             🔁 مراجعة{" "}
                             {att && murLabel
-                              ? `سُمّع: ${murLabel}`
+                              ? `سمّعتِ: ${murLabel}`
                               : murPlan ||
-                                (s.murajaah ? `${ar(s.murajaah)} أوجه` : "—")}{" "}
+                                (s.murajaah ? facesLabel(s.murajaah) : "—")}{" "}
                             <VerdictChip v={vM} />
                           </p>
                         </>

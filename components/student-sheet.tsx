@@ -20,6 +20,7 @@ import {
 const ar = (n: number) => n.toLocaleString("ar-EG");
 import { ayahCount, SURAHS } from "@/lib/surahs";
 import { computeProgress, partVerdict, sessionVerdict } from "@/lib/progress";
+import { facesLabel } from "@/lib/arabic";
 import { printHifzSchedule } from "@/lib/print-schedule";
 import { DangerBtn, Field, inputCls, PrimaryBtn, Sheet } from "./ui";
 import { ReciteLogger, SessionVerdictChip, VerdictChip } from "./recite-log";
@@ -316,7 +317,7 @@ export function StudentSheet({
                           غائبة
                         </span>
                       )}
-                      <SessionVerdictChip status={overall} />
+                      <SessionVerdictChip status={overall} voice="admin" />
                     </span>
                     <span className="text-silver-600">
                       {formatSchedDate(s.date)}
@@ -326,8 +327,8 @@ export function StudentSheet({
                     📖{" "}
                     {att && tasmiLabel
                       ? `سُمّع: ${tasmiLabel}`
-                      : hifzPlan || (s.hifz ? `${ar(s.hifz)} أوجه` : "—")}{" "}
-                    <VerdictChip v={vH} />
+                      : hifzPlan || (s.hifz ? facesLabel(s.hifz) : "—")}{" "}
+                    <VerdictChip v={vH} voice="admin" />
                   </p>
                   {(s.tathbit > 0 || thLabel || tathbitPlan) && (
                     <p className="text-[11px] text-silver-600">
@@ -335,8 +336,8 @@ export function StudentSheet({
                       {att && thLabel
                         ? `سُمّع: ${thLabel}`
                         : tathbitPlan ||
-                          (s.tathbit ? `${ar(s.tathbit)} أوجه` : "—")}{" "}
-                      <VerdictChip v={vT} />
+                          (s.tathbit ? facesLabel(s.tathbit) : "—")}{" "}
+                      <VerdictChip v={vT} voice="admin" />
                     </p>
                   )}
                   <p className="text-[11px] text-silver-600">
@@ -344,8 +345,8 @@ export function StudentSheet({
                     {att && murLabel
                       ? `سُمّع: ${murLabel}`
                       : murPlan ||
-                        (s.murajaah ? `${ar(s.murajaah)} أوجه` : "—")}{" "}
-                    <VerdictChip v={vM} />
+                        (s.murajaah ? facesLabel(s.murajaah) : "—")}{" "}
+                    <VerdictChip v={vM} voice="admin" />
                   </p>
                 </div>
               );
@@ -367,7 +368,7 @@ export function StudentSheet({
       </div>
 
       {/* سجلّ تسميع الطالبة — الإدارة/المعلّمة تقدر تُدخل أيضاً */}
-      <ReciteLogger student={student} halaqa={halaqa} />
+      <ReciteLogger student={student} halaqa={halaqa} voice="admin" />
 
       <Field label="ملاحظات" icon="📝">
         <textarea

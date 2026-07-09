@@ -16,13 +16,23 @@ import {
   type Student,
 } from "@/lib/store";
 import { partVerdict, sessionVerdict, type PartVerdict } from "@/lib/progress";
+import { facesAcc, facesPlain } from "@/lib/arabic";
 import { ayahCount, SURAHS } from "@/lib/surahs";
 import { Field, inputCls, PrimaryBtn } from "./ui";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 
-/** شارة قسم واحد: أنجزت المطلوب / زادت عنه / ناقص */
-export function VerdictChip({ v }: { v: PartVerdict | null }) {
+/** صوت الخطاب: الطالبة تُخاطَب («زدتِ»)، والإدارة تقرأ عنها («زادت») */
+export type ChipVoice = "student" | "admin";
+
+/** شارة قسم واحد: أنجزتِ المطلوب / زدتِ عنه / ناقص */
+export function VerdictChip({
+  v,
+  voice = "student",
+}: {
+  v: PartVerdict | null;
+  voice?: ChipVoice;
+}) {
   if (!v) return null;
   if (v.status === "exceeded")
     return (
@@ -30,18 +40,18 @@ export function VerdictChip({ v }: { v: PartVerdict | null }) {
         className="inline-block rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
         style={{ background: "linear-gradient(135deg,#b7973f,#8a6d3b)" }}
       >
-        🌟 زادت {ar(v.diff)} {v.diff === 1 ? "وجهاً" : "أوجه"}
+        🌟 {voice === "student" ? "زدتِ" : "زادت"} {facesAcc(v.diff)}
       </span>
     );
   if (v.status === "met")
     return (
       <span className="inline-block rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-white">
-        ✓ أنجزت المطلوب
+        ✓ {voice === "student" ? "أنجزتِ" : "أنجزت"} المطلوب
       </span>
     );
   return (
     <span className="inline-block rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-700">
-      ⏳ ناقص {ar(-v.diff)} {-v.diff === 1 ? "وجه" : "أوجه"}
+      ⏳ ناقص {facesPlain(-v.diff)}
     </span>
   );
 }
@@ -49,8 +59,10 @@ export function VerdictChip({ v }: { v: PartVerdict | null }) {
 /** شارة اللقاء كاملاً (الحفظ + التثبيت + المراجعة) */
 export function SessionVerdictChip({
   status,
+  voice = "student",
 }: {
   status: PartVerdict["status"] | null;
+  voice?: ChipVoice;
 }) {
   if (!status) return null;
   if (status === "exceeded")
@@ -65,7 +77,7 @@ export function SessionVerdictChip({
   if (status === "met")
     return (
       <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-white">
-        ✓ أنجزت المطلوب
+        ✓ {voice === "student" ? "أنجزتِ" : "أنجزت"} المطلوب
       </span>
     );
   return (
@@ -177,12 +189,14 @@ export function ReciteHistory({
   schedule,
   onEdit,
   editingId,
+  voice = "student",
 }: {
   studentId: string;
   canDelete?: boolean;
   schedule?: ScheduleRow[] | null;
   onEdit?: (r: RecitationLog) => void;
   editingId?: string | null;
+  voice?: ChipVoice;
 }) {
   const { recitations } = useApp();
   const mine = useMemo(
@@ -234,7 +248,7 @@ export function ReciteHistory({
                     ✏️ قيد التعديل
                   </span>
                 ) : (
-                  <SessionVerdictChip status={overall} />
+                  <SessionVerdictChip status={overall} voice={voice} />
                 )}
               </span>
               <span className="flex items-center gap-2.5">
@@ -273,7 +287,7 @@ export function ReciteHistory({
                   <p key={p.key} className="text-sm font-bold text-plum-800">
                     {p.icon} {p.label.replace(" (الحفظ الجديد)", "")}:{" "}
                     <span className="text-ink">{label}</span>{" "}
-                    <VerdictChip v={verdict} />
+                    <VerdictChip v={verdict} voice={voice} />
                   </p>
                 ))}
               </div>
@@ -290,9 +304,11 @@ export function ReciteHistory({
 export function ReciteLogger({
   student,
   halaqa,
+  voice = "student",
 }: {
   student: Student;
   halaqa?: Halaqa;
+  voice?: ChipVoice;
 }) {
   const schedule = halaqa ? buildSchedule(halaqa, student.plan) : null;
   const [open, setOpen] = useState(false);
@@ -580,6 +596,7 @@ export function ReciteLogger({
             schedule={schedule}
             onEdit={startEdit}
             editingId={editingId}
+            voice={voice}
           />
         </div>
       )}
