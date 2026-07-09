@@ -1074,6 +1074,26 @@ export const actions = {
       })
     );
   },
+  /** تعديل سجلّ تسميع موجود — تصحيح خطأ دون إعادة الإدخال من البداية */
+  updateRecitation(id: string, data: Omit<RecitationLog, "id" | "createdAt">) {
+    setState((s) => ({
+      ...s,
+      recitations: s.recitations.map((x) =>
+        x.id === id ? { ...x, ...data } : x
+      ),
+    }));
+    run(() =>
+      supabase
+        .from("almaher_sessions")
+        .update({
+          log_date: data.date,
+          attended: data.attended,
+          parts: { tasmi: data.tasmi, muraja: data.muraja, tathbit: data.tathbit },
+          note: data.note ?? "",
+        })
+        .eq("id", id)
+    );
+  },
   removeRecitation(id: string) {
     setState((s) => ({
       ...s,

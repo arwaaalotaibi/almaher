@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   actions,
   buildSchedule,
@@ -11,6 +11,7 @@ import {
   recitePartLabel,
   useApp,
   type Halaqa,
+  type RecitationLog,
   type RecitePart,
   type ScheduleRow,
   type Student,
@@ -106,6 +107,19 @@ const EMPTY: PartForm = {
   toAyah: 1,
 };
 
+/** تحويل قسم محفوظ إلى نموذج قابل للتعديل */
+function partToForm(p?: RecitePart): PartForm {
+  return p && p.status === "done" && p.fromSurah
+    ? {
+        status: "done",
+        fromSurah: p.fromSurah,
+        fromAyah: p.fromAyah ?? 1,
+        toSurah: p.toSurah || p.fromSurah,
+        toAyah: p.toAyah ?? p.fromAyah ?? 1,
+      }
+    : { ...EMPTY };
+}
+
 /** قائمة اختيار السورة + الآية */
 function SurahAyah({
   surah,
@@ -162,10 +176,14 @@ export function ReciteHistory({
   studentId,
   canDelete = false,
   schedule,
+  onEdit,
+  editingId,
 }: {
   studentId: string;
   canDelete?: boolean;
   schedule?: ScheduleRow[] | null;
+  onEdit?: (r: RecitationLog) => void;
+  editingId?: string | null;
 }) {
   const { recitations } = useApp();
   const mine = useMemo(
@@ -201,24 +219,48 @@ export function ReciteHistory({
         })).filter((x) => x.label);
         const overall = row && r.attended ? sessionVerdict(r, row) : null;
         return (
-          <div key={r.id} className="rounded-xl bg-cream/60 px-3 py-2.5">
+          <div
+            key={r.id}
+            className={`rounded-xl px-3 py-2.5 ${
+              editingId === r.id
+                ? "bg-plum-50 ring-2 ring-plum-500"
+                : "bg-cream/60"
+            }`}
+          >
             <div className="mb-1 flex items-center justify-between">
               <span className="flex items-center gap-1.5 text-[11px] font-bold text-plum-700">
                 📅 {fmtDate(r.date)}
-                <SessionVerdictChip status={overall} />
+                {editingId === r.id ? (
+                  <span className="rounded-full bg-plum-600 px-1.5 py-0.5 text-[10px] text-white">
+                    ✏️ قيد التعديل
+                  </span>
+                ) : (
+                  <SessionVerdictChip status={overall} />
+                )}
               </span>
-              {canDelete && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (window.confirm("حذف هذا السجلّ؟"))
-                      actions.removeRecitation(r.id);
-                  }}
-                  className="text-[11px] font-bold text-red-600"
-                >
-                  حذف
-                </button>
-              )}
+              <span className="flex items-center gap-2.5">
+                {onEdit && (
+                  <button
+                    type="button"
+                    onClick={() => onEdit(r)}
+                    className="text-[11px] font-bold text-plum-700"
+                  >
+                    ✏️ تعديل
+                  </button>
+                )}
+                {canDelete && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm("حذف هذا السجلّ؟"))
+                        actions.removeRecitation(r.id);
+                    }}
+                    className="text-[11px] font-bold text-red-600"
+                  >
+                    حذف
+                  </button>
+                )}
+              </span>
             </div>
             {!r.attended ? (
               <p className="text-sm font-bold text-amber-700">🚫 غائبة</p>
@@ -266,6 +308,9 @@ export function ReciteLogger({
   const [attended, setAttended] = useState(true);
   const [note, setNote] = useState("");
   const [saved, setSaved] = useState(false);
+  // سجلّ قيد التعديل — تصحيح خطأ دون إعادة الإدخال من البداية
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const formTop = useRef<HTMLDivElement>(null);
   const [parts, setParts] = useState<Record<string, PartForm>>({
     tasmi: { ...EMPTY },
     muraja: { ...EMPTY },
@@ -279,6 +324,21 @@ export function ReciteLogger({
     setParts({ tasmi: { ...EMPTY }, muraja: { ...EMPTY }, tathbit: { ...EMPTY } });
     setNote("");
     setAttended(true);
+    setEditingId(null);
+  };
+
+  /** تعبئة النموذج ببيانات سجلّ موجود لتعديله */
+  const startEdit = (r: RecitationLog) => {
+    setEditingId(r.id);
+    setDate(r.date);
+    setAttended(r.attended);
+    setNote(r.note ?? "");
+    setParts({
+      tasmi: partToForm(r.tasmi),
+      muraja: partToForm(r.muraja),
+      tathbit: partToForm(r.tathbit),
+    });
+    formTop.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const save = () => {
@@ -293,6 +353,7 @@ export function ReciteLogger({
           }
         : { status: "none" };
 
+    let data: Omit<RecitationLog, "id" | "createdAt">;
     if (attended) {
       const t = build(parts.tasmi),
         m = build(parts.muraja),
@@ -303,7 +364,7 @@ export function ReciteLogger({
         );
         return;
       }
-      actions.addRecitation({
+      data = {
         studentId: student.id,
         date,
         attended: true,
@@ -311,9 +372,9 @@ export function ReciteLogger({
         muraja: m,
         tathbit: th,
         note: note.trim() || undefined,
-      });
+      };
     } else {
-      actions.addRecitation({
+      data = {
         studentId: student.id,
         date,
         attended: false,
@@ -321,8 +382,10 @@ export function ReciteLogger({
         muraja: { status: "none" },
         tathbit: { status: "none" },
         note: note.trim() || undefined,
-      });
+      };
     }
+    if (editingId) actions.updateRecitation(editingId, data);
+    else actions.addRecitation(data);
     reset();
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -349,7 +412,21 @@ export function ReciteLogger({
       </button>
 
       {open && (
-        <div className="mt-3">
+        <div className="mt-3" ref={formTop}>
+          {editingId && (
+            <div className="mb-3 flex items-center justify-between rounded-xl bg-plum-600 px-3 py-2.5">
+              <span className="text-sm font-bold text-white">
+                ✏️ تعديل سجلّ {fmtDate(date)}
+              </span>
+              <button
+                type="button"
+                onClick={reset}
+                className="rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-bold text-white"
+              >
+                ✕ إلغاء التعديل
+              </button>
+            </div>
+          )}
           {schedule && schedule.length ? (
             <Field label="اللقاء" icon="📅">
               <select
@@ -357,6 +434,10 @@ export function ReciteLogger({
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
               >
+                {/* سجلّ قديم بتاريخ خارج الجدول — نُبقيه خياراً حتى لا يضيع */}
+                {!schedule.some((s) => dateKey(s.date) === date) && (
+                  <option value={date}>{fmtDate(date)}</option>
+                )}
                 {schedule.map((s) => (
                   <option key={s.n} value={dateKey(s.date)}>
                     لقاء {ar(s.n)} · {formatSchedDate(s.date)}
@@ -480,13 +561,23 @@ export function ReciteLogger({
           </Field>
 
           <PrimaryBtn onClick={save}>
-            {saved ? "تم الحفظ ✓" : "حفظ التسميع"}
+            {saved
+              ? "تم الحفظ ✓"
+              : editingId
+                ? "حفظ التعديل"
+                : "حفظ التسميع"}
           </PrimaryBtn>
 
           <p className="mt-4 mb-2 font-kufi text-sm font-bold text-plum-700">
             السجلّات السابقة
           </p>
-          <ReciteHistory studentId={student.id} canDelete schedule={schedule} />
+          <ReciteHistory
+            studentId={student.id}
+            canDelete
+            schedule={schedule}
+            onEdit={startEdit}
+            editingId={editingId}
+          />
         </div>
       )}
     </div>
