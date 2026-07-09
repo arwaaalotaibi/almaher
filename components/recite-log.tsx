@@ -12,12 +12,68 @@ import {
   useApp,
   type Halaqa,
   type RecitePart,
+  type ScheduleRow,
   type Student,
 } from "@/lib/store";
+import { partVerdict, sessionVerdict, type PartVerdict } from "@/lib/progress";
 import { ayahCount, SURAHS } from "@/lib/surahs";
 import { Field, inputCls, PrimaryBtn } from "./ui";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
+
+/** شارة قسم واحد: أنجزت المطلوب / زادت عنه / ناقص */
+export function VerdictChip({ v }: { v: PartVerdict | null }) {
+  if (!v) return null;
+  if (v.status === "exceeded")
+    return (
+      <span
+        className="inline-block rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+        style={{ background: "linear-gradient(135deg,#b7973f,#8a6d3b)" }}
+      >
+        🌟 زادت {ar(v.diff)} {v.diff === 1 ? "وجهاً" : "أوجه"}
+      </span>
+    );
+  if (v.status === "met")
+    return (
+      <span className="inline-block rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-white">
+        ✓ أنجزت المطلوب
+      </span>
+    );
+  return (
+    <span className="inline-block rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-700">
+      ⏳ ناقص {ar(-v.diff)} {-v.diff === 1 ? "وجه" : "أوجه"}
+    </span>
+  );
+}
+
+/** شارة اللقاء كاملاً (الحفظ + التثبيت + المراجعة) */
+export function SessionVerdictChip({
+  status,
+}: {
+  status: PartVerdict["status"] | null;
+}) {
+  if (!status) return null;
+  if (status === "exceeded")
+    return (
+      <span
+        className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+        style={{ background: "linear-gradient(135deg,#b7973f,#8a6d3b)" }}
+      >
+        🌟 فوق المطلوب
+      </span>
+    );
+  if (status === "met")
+    return (
+      <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-white">
+        ✓ أنجزت المطلوب
+      </span>
+    );
+  return (
+    <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-700">
+      ⏳ لم يكتمل المطلوب
+    </span>
+  );
+}
 
 function todayISO(): string {
   const d = new Date();
@@ -94,13 +150,22 @@ function SurahAyah({
   );
 }
 
+/** مطلوب كل قسم من صفّ الجدول — بمفاتيح أقسام التسميع */
+const ROW_REQ: Record<string, "hifz" | "tathbit" | "murajaah"> = {
+  tasmi: "hifz",
+  tathbit: "tathbit",
+  muraja: "murajaah",
+};
+
 /** سجلّ التسميع لطالبة — يُعرض في صفحتها وفي بيانات الإدارة */
 export function ReciteHistory({
   studentId,
   canDelete = false,
+  schedule,
 }: {
   studentId: string;
   canDelete?: boolean;
+  schedule?: ScheduleRow[] | null;
 }) {
   const { recitations } = useApp();
   const mine = useMemo(
@@ -110,6 +175,9 @@ export function ReciteHistory({
         .sort((a, b) => b.date.localeCompare(a.date)),
     [recitations, studentId]
   );
+  // صفّ الجدول الموافق لتاريخ السجلّ — لمقارنة المُنجَز بالمطلوب
+  const rowFor = (dateISO: string) =>
+    schedule?.find((s) => dateKey(s.date) === dateISO);
 
   if (mine.length === 0) {
     return (
@@ -122,15 +190,22 @@ export function ReciteHistory({
   return (
     <div className="grid gap-2">
       {mine.map((r) => {
+        const row = rowFor(r.date);
         const done = RECITE_PARTS.map((p) => ({
           p,
           label: recitePartLabel(r[p.key] as RecitePart),
+          verdict:
+            row && r.attended
+              ? partVerdict(r[p.key] as RecitePart, row[ROW_REQ[p.key]])
+              : null,
         })).filter((x) => x.label);
+        const overall = row && r.attended ? sessionVerdict(r, row) : null;
         return (
           <div key={r.id} className="rounded-xl bg-cream/60 px-3 py-2.5">
             <div className="mb-1 flex items-center justify-between">
-              <span className="text-[11px] font-bold text-plum-700">
+              <span className="flex items-center gap-1.5 text-[11px] font-bold text-plum-700">
                 📅 {fmtDate(r.date)}
+                <SessionVerdictChip status={overall} />
               </span>
               {canDelete && (
                 <button
@@ -153,10 +228,11 @@ export function ReciteHistory({
               </p>
             ) : (
               <div className="grid gap-0.5">
-                {done.map(({ p, label }) => (
+                {done.map(({ p, label, verdict }) => (
                   <p key={p.key} className="text-sm font-bold text-plum-800">
                     {p.icon} {p.label.replace(" (الحفظ الجديد)", "")}:{" "}
-                    <span className="text-ink">{label}</span>
+                    <span className="text-ink">{label}</span>{" "}
+                    <VerdictChip v={verdict} />
                   </p>
                 ))}
               </div>
@@ -410,7 +486,7 @@ export function ReciteLogger({
           <p className="mt-4 mb-2 font-kufi text-sm font-bold text-plum-700">
             السجلّات السابقة
           </p>
-          <ReciteHistory studentId={student.id} canDelete />
+          <ReciteHistory studentId={student.id} canDelete schedule={schedule} />
         </div>
       )}
     </div>

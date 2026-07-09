@@ -34,9 +34,9 @@ import Link from "next/link";
 import { Field, inputCls, PrimaryBtn, Ribbon } from "./ui";
 import { NotificationsCenter, PinnedNotice } from "./notifications-card";
 import { PushToggle } from "./push-toggle";
-import { ReciteLogger } from "./recite-log";
+import { ReciteLogger, SessionVerdictChip, VerdictChip } from "./recite-log";
 import { MotivationPanel } from "./motivation-panel";
-import { computeProgress } from "@/lib/progress";
+import { computeProgress, partVerdict, sessionVerdict } from "@/lib/progress";
 
 /** شاشة الطالبة: تدخل برمزها فتُعرض أهدافها مباشرة (قراءة فقط) */
 // تبويبات صفحة الطالبة (التجويد لاحقاً)
@@ -364,8 +364,15 @@ export function StudentHome() {
                 {schedule.map((s) => {
                   const isCur = s.n === curIdx;
                   const log = logFor(s.date);
+                  const att = !!log?.attended;
                   const tasmiLabel = log ? recitePartLabel(log.tasmi) : "";
+                  const thLabel = log ? recitePartLabel(log.tathbit) : "";
                   const murLabel = log ? recitePartLabel(log.muraja) : "";
+                  // حكم كل قسم: أنجزت المطلوب / زادت / ناقص
+                  const vH = att && log ? partVerdict(log.tasmi, s.hifz) : null;
+                  const vT = att && log ? partVerdict(log.tathbit, s.tathbit) : null;
+                  const vM = att && log ? partVerdict(log.muraja, s.murajaah) : null;
+                  const overall = att && log ? sessionVerdict(log, s) : null;
                   return (
                     <div
                       key={s.n}
@@ -383,11 +390,7 @@ export function StudentHome() {
                               غائبة
                             </span>
                           )}
-                          {log && log.attended && tasmiLabel && (
-                            <span className="rounded-full bg-emerald-500 px-1.5 py-0.5 text-[10px] text-white">
-                              ✓ سُمّع
-                            </span>
-                          )}
+                          <SessionVerdictChip status={overall} />
                         </span>
                         <span className={isCur ? "text-white/85" : "text-silver-600"}>
                           {formatSchedDate(s.date)}
@@ -400,29 +403,47 @@ export function StudentHome() {
                           🚫 غائبة في هذا اللقاء
                         </p>
                       ) : (
-                        <p
-                          className={`mt-0.5 font-kufi text-sm font-bold ${
-                            isCur ? "text-white" : "text-plum-800"
-                          }`}
-                        >
-                          📖{" "}
-                          {tasmiLabel
-                            ? `سُمّع: ${tasmiLabel}`
-                            : s.hifzLabel ||
-                              (s.hifz ? `${ar(s.hifz)} أوجه` : "—")}
-                        </p>
+                        <>
+                          <p
+                            className={`mt-0.5 font-kufi text-sm font-bold ${
+                              isCur ? "text-white" : "text-plum-800"
+                            }`}
+                          >
+                            📖{" "}
+                            {tasmiLabel
+                              ? `سُمّع: ${tasmiLabel}`
+                              : s.hifzLabel ||
+                                (s.hifz ? `${ar(s.hifz)} أوجه` : "—")}{" "}
+                            <VerdictChip v={vH} />
+                          </p>
+                          {(s.tathbit > 0 || thLabel) && (
+                            <p
+                              className={`text-[11px] ${
+                                isCur ? "text-white/85" : "text-silver-600"
+                              }`}
+                            >
+                              📌 تثبيت{" "}
+                              {att && thLabel
+                                ? `سُمّع: ${thLabel}`
+                                : s.tathbitLabel ||
+                                  (s.tathbit ? `${ar(s.tathbit)} أوجه` : "—")}{" "}
+                              <VerdictChip v={vT} />
+                            </p>
+                          )}
+                          <p
+                            className={`text-[11px] ${
+                              isCur ? "text-white/85" : "text-silver-600"
+                            }`}
+                          >
+                            🔁 مراجعة{" "}
+                            {att && murLabel
+                              ? `سُمّع: ${murLabel}`
+                              : s.murajaahLabel ||
+                                (s.murajaah ? `${ar(s.murajaah)} أوجه` : "—")}{" "}
+                            <VerdictChip v={vM} />
+                          </p>
+                        </>
                       )}
-                      <p
-                        className={`text-[11px] ${
-                          isCur ? "text-white/85" : "text-silver-600"
-                        }`}
-                      >
-                        🔁 مراجعة{" "}
-                        {log && log.attended && murLabel
-                          ? `سُمّع: ${murLabel}`
-                          : s.murajaahLabel ||
-                            (s.murajaah ? `${ar(s.murajaah)} أوجه` : "—")}
-                      </p>
                     </div>
                   );
                 })}

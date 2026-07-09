@@ -47,6 +47,7 @@ import {
   type Halaqa,
   type RecitationLog,
   type RecitePart,
+  type ScheduleRow,
   type Student,
 } from "./store";
 
@@ -94,6 +95,57 @@ function faces(part?: RecitePart): number {
   const a = pageOf(surahNumber(part.fromSurah), part.fromAyah ?? 1);
   const b = partEndPage(part);
   return Math.max(1, b - a + 1);
+}
+
+/* ================== مقارنة المُنجَز بالمطلوب ================== */
+
+/** حكم قسم واحد في لقاء: ما سُمّع فعلاً مقابل المطلوب (بالأوجه) */
+export interface PartVerdict {
+  done: number; // أوجه سُمّعت فعلاً
+  required: number; // أوجه المطلوب في اللقاء
+  diff: number; // + زيادة عن المطلوب / − نقص
+  status: "exceeded" | "met" | "partial";
+}
+
+export function partVerdict(
+  part: RecitePart | undefined,
+  required: number
+): PartVerdict | null {
+  const done = faces(part);
+  if (done <= 0) return null;
+  const req = Math.max(0, Math.round(required || 0));
+  const diff = done - req;
+  return {
+    done,
+    required: req,
+    diff,
+    status: diff > 0 ? "exceeded" : diff === 0 ? "met" : "partial",
+  };
+}
+
+/** حكم اللقاء كاملاً عبر الأقسام الثلاثة: الحفظ والتثبيت والمراجعة */
+export function sessionVerdict(
+  log: RecitationLog,
+  row: Pick<ScheduleRow, "hifz" | "tathbit" | "murajaah">
+): PartVerdict["status"] | null {
+  const pairs: [RecitePart | undefined, number][] = [
+    [log.tasmi, row.hifz],
+    [log.tathbit, row.tathbit],
+    [log.muraja, row.murajaah],
+  ];
+  let any = false;
+  let exceeded = false;
+  let short = false;
+  for (const [part, req] of pairs) {
+    const v = partVerdict(part, req);
+    if (v) any = true;
+    if (v?.status === "exceeded") exceeded = true;
+    // قسم مطلوب لم يُسمَّع، أو سُمّع أقل من مطلوبه ⇒ لم يكتمل
+    if ((req > 0 && !v) || v?.status === "partial") short = true;
+  }
+  if (!any) return null;
+  if (short) return "partial";
+  return exceeded ? "exceeded" : "met";
 }
 
 /* ================== حساب التقدّم ================== */

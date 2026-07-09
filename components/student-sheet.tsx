@@ -5,21 +5,24 @@ import {
   actions,
   buildSchedule,
   CoursePlan,
+  dateKey,
   EMPTY_PLAN,
   formatSchedDate,
   halaqaTitle,
   hifzStartLabel,
   normalizeDigits,
   PLAN_FIELDS,
+  recitePartLabel,
   useApp,
   type Student,
 } from "@/lib/store";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 import { ayahCount, SURAHS } from "@/lib/surahs";
+import { partVerdict, sessionVerdict } from "@/lib/progress";
 import { printHifzSchedule } from "@/lib/print-schedule";
 import { DangerBtn, Field, inputCls, PrimaryBtn, Sheet } from "./ui";
-import { ReciteLogger } from "./recite-log";
+import { ReciteLogger, SessionVerdictChip, VerdictChip } from "./recite-log";
 import { ProgressSummary } from "./motivation-panel";
 
 /** نافذة بيانات الطالبة: الاسم + المعلّمة + بداية الحفظ + خطة الفصل */
@@ -30,7 +33,7 @@ export function StudentSheet({
   student: Student | null;
   onClose: () => void;
 }) {
-  const { teachers, halaqas } = useApp();
+  const { teachers, halaqas, recitations } = useApp();
   const [name, setName] = useState("");
   const [teacherId, setTeacherId] = useState("");
   const [halaqaId, setHalaqaId] = useState("");
@@ -283,24 +286,63 @@ export function StudentSheet({
             </button>
           </div>
           <div className="grid gap-1.5">
-            {schedule.map((s) => (
-              <div key={s.n} className="rounded-xl bg-cream px-3 py-2">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="font-bold text-plum-700">لقاء {ar(s.n)}</span>
-                  <span className="text-silver-600">
-                    {formatSchedDate(s.date)}
-                  </span>
+            {schedule.map((s) => {
+              const log = recitations.find(
+                (r) => r.studentId === student.id && r.date === dateKey(s.date)
+              );
+              const att = !!log?.attended;
+              const tasmiLabel = log ? recitePartLabel(log.tasmi) : "";
+              const thLabel = log ? recitePartLabel(log.tathbit) : "";
+              const murLabel = log ? recitePartLabel(log.muraja) : "";
+              // حكم كل قسم: أنجزت / زادت / ناقص — مقارنةً بمطلوب اللقاء
+              const vH = att && log ? partVerdict(log.tasmi, s.hifz) : null;
+              const vT = att && log ? partVerdict(log.tathbit, s.tathbit) : null;
+              const vM = att && log ? partVerdict(log.muraja, s.murajaah) : null;
+              const overall = att && log ? sessionVerdict(log, s) : null;
+              return (
+                <div key={s.n} className="rounded-xl bg-cream px-3 py-2">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="flex items-center gap-1.5 font-bold text-plum-700">
+                      لقاء {ar(s.n)}
+                      {log && !log.attended && (
+                        <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] text-white">
+                          غائبة
+                        </span>
+                      )}
+                      <SessionVerdictChip status={overall} />
+                    </span>
+                    <span className="text-silver-600">
+                      {formatSchedDate(s.date)}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 font-kufi text-sm font-bold text-plum-800">
+                    📖{" "}
+                    {att && tasmiLabel
+                      ? `سُمّع: ${tasmiLabel}`
+                      : s.hifzLabel || (s.hifz ? `${ar(s.hifz)} أوجه` : "—")}{" "}
+                    <VerdictChip v={vH} />
+                  </p>
+                  {(s.tathbit > 0 || thLabel) && (
+                    <p className="text-[11px] text-silver-600">
+                      📌 تثبيت:{" "}
+                      {att && thLabel
+                        ? `سُمّع: ${thLabel}`
+                        : s.tathbitLabel ||
+                          (s.tathbit ? `${ar(s.tathbit)} أوجه` : "—")}{" "}
+                      <VerdictChip v={vT} />
+                    </p>
+                  )}
+                  <p className="text-[11px] text-silver-600">
+                    🔁 مراجعة:{" "}
+                    {att && murLabel
+                      ? `سُمّع: ${murLabel}`
+                      : s.murajaahLabel ||
+                        (s.murajaah ? `${ar(s.murajaah)} أوجه` : "—")}{" "}
+                    <VerdictChip v={vM} />
+                  </p>
                 </div>
-                <p className="mt-0.5 font-kufi text-sm font-bold text-plum-800">
-                  📖 {s.hifzLabel || (s.hifz ? `${ar(s.hifz)} أوجه` : "—")}
-                </p>
-                <p className="text-[11px] text-silver-600">
-                  🔁 مراجعة:{" "}
-                  {s.murajaahLabel ||
-                    (s.murajaah ? `${ar(s.murajaah)} أوجه` : "—")}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ) : (plan.hifz || plan.murajaah) && halaqa ? (
