@@ -90,6 +90,13 @@ function partEndPage(part?: RecitePart): number {
   return pageOf(surahNumber(s), a);
 }
 
+/** الصفحة المكتملة عند موضعٍ ما: صفحتُه إن كان آخرَ آيةٍ فيها، وإلا السابقة */
+function completedPageOf(pos: Pos): number {
+  const p = pageOf(pos.surah, pos.ayah);
+  const pe = pageEnd(p);
+  return pos.surah === pe.surah && pos.ayah >= pe.ayah ? p : p - 1;
+}
+
 /** عدد الأوجه المكتملة في المقطع.
     الوجه لا يُحسب إلا إذا سُمّع حتى آخر آية فيه — الوقوف في منتصف
     صفحة لا يجعلها وجهاً (آية من أول ص٦٢ ≠ وجه كامل).
@@ -184,7 +191,10 @@ export interface Progress {
     { hifzLabel: string; tathbitLabel: string; murajaahLabel: string }
   >;
   expectedPage: number; // المتوقّع اليوم حسب الخطة
-  aheadPages: number; // + متقدّمة، − متأخّرة
+  aheadPages: number; // + متقدّمة، − متأخّرة (بالصفحات المكتملة)
+  // المراجعة مقابل خطتها (تراكمياً)
+  aheadMurPages: number;
+  hasMurPlan: boolean;
   facesPerSession: number; // وتيرة الحفظ
   sessionsToJuzEnd: number;
   sessionsToJuzEndBoost: number; // لو زادت وجهين
@@ -234,7 +244,9 @@ export function computeProgress(
     const cum = passed > 0 ? schedule[passed - 1].cumHifz : 0;
     expectedPage = startPage + cum - 1;
   }
-  const aheadPages = currentPage && expectedPage ? currentPage - expectedPage : 0;
+  // المقارنة بالخطة تكون بالصفحات «المكتملة» (كقاعدة عدّ الأوجه)
+  const aheadPages =
+    lastTasmi && expectedPage ? completedPageOf(lastTasmi) - expectedPage : 0;
 
   // المطلوب القادم للحفظ = من الآية التالية لآخر ما سُمّع، بمقدار أوجه الخطة
   const perHplan = Math.max(0, Math.round(plan.hifz || 0));
@@ -258,6 +270,20 @@ export function computeProgress(
     : null;
   const nextMurFrom = lastMuraja ? ayahAfter(lastMuraja) : murStartPos;
   const nextMurLabel = nextLabel(nextMurFrom, perMplan).label;
+
+  // موقع المراجعة مقابل خطتها (تراكمياً) — كمؤشر الحفظ
+  let expectedMurPage = 0;
+  if (schedule && schedule.length && murStartPos) {
+    const passed = nextIdx > 0 ? nextIdx - 1 : schedule.length;
+    const cumM = passed > 0 ? schedule[passed - 1].cumMurajaah : 0;
+    if (cumM > 0)
+      expectedMurPage = pageOf(murStartPos.surah, murStartPos.ayah) + cumM - 1;
+  }
+  const aheadMurPages =
+    lastMuraja && expectedMurPage
+      ? completedPageOf(lastMuraja) - expectedMurPage
+      : 0;
+  const hasMurPlan = Boolean(lastMuraja && expectedMurPage > 0);
 
   // إسقاط الخطة على اللقاءات المتبقية من الموضع الفعلي —
   // كل لقاء قادم يبدأ حيث ينتهي سابقه (لا من الخطة الثابتة)
@@ -356,6 +382,8 @@ export function computeProgress(
     projected,
     expectedPage,
     aheadPages,
+    aheadMurPages,
+    hasMurPlan,
     facesPerSession,
     sessionsToJuzEnd,
     sessionsToJuzEndBoost,

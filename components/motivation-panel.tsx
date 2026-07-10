@@ -2,8 +2,8 @@
 
 import { badgesFor, computeProgress, juzLabel } from "@/lib/progress";
 import {
+  byFaces,
   byMeetings,
-  byPages,
   facesAcc,
   facesLabel,
   facesPlain,
@@ -63,10 +63,26 @@ export function ProgressSummary({
           }`}
         >
           {p.aheadPages > 0
-            ? `🌟 متقدّمة ${byPages(p.aheadPages)} عن الخطة`
+            ? `🌟 الحفظ متقدّم ${byFaces(p.aheadPages)} عن الخطة`
             : p.aheadPages === 0
-              ? "✅ على الخطة تماماً"
-              : `⏳ متأخّرة ${byPages(-p.aheadPages)}`}
+              ? "✅ الحفظ على الخطة تماماً"
+              : `⏳ الحفظ متأخّر ${byFaces(-p.aheadPages)}`}
+        </div>
+      )}
+
+      {p.hasMurPlan && (
+        <div
+          className={`rounded-xl px-3 py-2 text-xs font-bold ${
+            p.aheadMurPages >= 0
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-amber-50 text-amber-700"
+          }`}
+        >
+          {p.aheadMurPages > 0
+            ? `🌟 المراجعة متقدّمة ${byFaces(p.aheadMurPages)} عن الخطة`
+            : p.aheadMurPages === 0
+              ? "✅ المراجعة على الخطة تماماً"
+              : `⏳ المراجعة متأخّرة ${byFaces(-p.aheadMurPages)}`}
         </div>
       )}
 
@@ -190,10 +206,27 @@ export function MotivationPanel({
             }`}
           >
             {p.aheadPages > 0
-              ? `🌟 أنتِ متقدّمة ${byPages(p.aheadPages)} عن خطتكِ — أحسنتِ!`
+              ? `🌟 حفظكِ متقدّم ${byFaces(p.aheadPages)} عن الخطة — أحسنتِ!`
               : p.aheadPages === 0
-                ? "✅ أنتِ تماماً على خطتكِ — واصلي!"
-                : `💪 أنتِ متأخّرة ${byPages(-p.aheadPages)} — أضيفي ${facesAcc(-p.aheadPages)} لتعودي للمقدّمة`}
+                ? "✅ حفظكِ على الخطة تماماً — واصلي!"
+                : `💪 حفظكِ متأخّر ${byFaces(-p.aheadPages)} — أضيفي ${facesAcc(-p.aheadPages)} لتعودي للمقدّمة`}
+          </div>
+        )}
+
+        {/* المراجعة مقابل خطتها — الزيادة التراكمية تبقى مرئية دائماً */}
+        {p.hasMurPlan && (
+          <div
+            className={`rounded-xl px-3 py-2.5 text-sm font-bold ${
+              p.aheadMurPages >= 0
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-plum-50 text-plum-700"
+            }`}
+          >
+            {p.aheadMurPages > 0
+              ? `🌟 مراجعتكِ متقدّمة ${byFaces(p.aheadMurPages)} عن الخطة — أحسنتِ!`
+              : p.aheadMurPages === 0
+                ? "✅ مراجعتكِ على الخطة تماماً — واصلي!"
+                : `💪 مراجعتكِ متأخّرة ${byFaces(-p.aheadMurPages)} — عوّضيها في اللقاءات القادمة`}
           </div>
         )}
 
