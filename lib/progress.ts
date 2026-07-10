@@ -101,8 +101,9 @@ function completedPageOf(pos: Pos): number {
     الوجه لا يُحسب إلا إذا سُمّع حتى آخر آية فيه — الوقوف في منتصف
     صفحة لا يجعلها وجهاً (آية من أول ص٦٢ ≠ وجه كامل).
     البداية من منتصف صفحة تُحسب صفحتها، لأن المطلوب نفسه يُبنى هكذا. */
-function faces(part?: RecitePart): number {
-  if (!part || part.status !== "done" || !part.fromSurah) return 0;
+function facesInfo(part?: RecitePart): { done: number; partial: boolean } {
+  if (!part || part.status !== "done" || !part.fromSurah)
+    return { done: 0, partial: false };
   const a = pageOf(surahNumber(part.fromSurah), part.fromAyah ?? 1);
   const endPage = partEndPage(part);
   const pe = pageEnd(endPage);
@@ -111,16 +112,25 @@ function faces(part?: RecitePart): number {
   const reachedEnd =
     toSurah > pe.surah || (toSurah === pe.surah && toAyah >= pe.ayah);
   const completed = reachedEnd ? endPage : endPage - 1;
-  return Math.max(0, completed - a + 1);
+  return {
+    done: Math.max(0, completed - a + 1),
+    // بدأت وجهاً آخر ولم تبلغي آخر آيةٍ فيه
+    partial: !reachedEnd,
+  };
+}
+
+function faces(part?: RecitePart): number {
+  return facesInfo(part).done;
 }
 
 /* ================== مقارنة المُنجَز بالمطلوب ================== */
 
 /** حكم قسم واحد في لقاء: ما سُمّع فعلاً مقابل المطلوب (بالأوجه) */
 export interface PartVerdict {
-  done: number; // أوجه سُمّعت فعلاً
+  done: number; // أوجه مكتملة سُمّعت فعلاً
   required: number; // أوجه المطلوب في اللقاء
   diff: number; // + زيادة عن المطلوب / − نقص
+  partialFace: boolean; // بدأت وجهاً إضافياً ولم تكمليه (سُمّع أوله)
   status: "exceeded" | "met" | "partial";
 }
 
@@ -130,13 +140,14 @@ export function partVerdict(
 ): PartVerdict | null {
   // لا حكم إلا على قسم سُمّع فعلاً (وإن لم يكتمل منه وجه واحد)
   if (!part || part.status !== "done" || !part.fromSurah) return null;
-  const done = faces(part);
+  const { done, partial } = facesInfo(part);
   const req = Math.max(0, Math.round(required || 0));
   const diff = done - req;
   return {
     done,
     required: req,
     diff,
+    partialFace: partial,
     status: diff > 0 ? "exceeded" : diff === 0 ? "met" : "partial",
   };
 }

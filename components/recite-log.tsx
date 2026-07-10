@@ -51,7 +51,13 @@ export function VerdictChip({
     );
   return (
     <span className="inline-block rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-700">
-      ⏳ ناقص {facesPlain(-v.diff)}
+      ⏳ ناقص{" "}
+      {v.partialFace
+        ? // بدأت الوجه الأخير ولم تكمليه — النقص أقل من عدده الكامل
+          -v.diff === 1
+          ? "أقل من وجه"
+          : `أقل من ${facesPlain(-v.diff)}`
+        : facesPlain(-v.diff)}
     </span>
   );
 }
