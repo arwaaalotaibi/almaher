@@ -114,7 +114,103 @@ export function ProgressSummary({
         {p.termSessionsLeft > 0
           ? ` · 🏁 ${meetingsLabel(p.termSessionsLeft)} على نهاية الفصل`
           : ""}
+        {p.termPlan
+          ? ` · 🎯 أُنجز ${p.termPlan.pct.toLocaleString("ar-EG")}٪ من خطة الفصل`
+          : ""}
       </p>
+    </div>
+  );
+}
+
+/** بطاقة «سباق خطة الفصل»: نسبة إنجاز الخطة كاملة + وصفة كل لقاء متبقٍّ */
+function TermRaceCard({
+  tp,
+}: {
+  tp: NonNullable<ReturnType<typeof computeProgress>["termPlan"]>;
+}) {
+  if (tp.status === "done") {
+    return (
+      <div
+        className="mb-2.5 rounded-2xl p-5 text-center text-white shadow"
+        style={{ background: "linear-gradient(135deg,#8a6d3b,#b7973f)" }}
+      >
+        <p className="text-3xl">🏆</p>
+        <p className="mt-1 font-kufi text-lg font-bold">
+          أتممتِ خطة الفصل كاملة!
+        </p>
+        <p className="mt-1 text-sm text-white/90">
+          ما شاء الله تبارك الله — حفظاً ومراجعةً، أنجزتِها كلها 🌟
+        </p>
+      </div>
+    );
+  }
+
+  const recipe: string[] = [];
+  if (tp.remHifz > 0) recipe.push(`${facesPlain(tp.needHifz)} حفظاً`);
+  if (tp.remMur > 0) recipe.push(`${facesPlain(tp.needMur)} مراجعةً`);
+
+  return (
+    <div className="card mb-2.5 overflow-hidden rounded-2xl">
+      <div className="flex items-center justify-between bg-gradient-to-l from-plum-500 to-plum-700 px-4 py-2.5">
+        <span className="font-kufi text-sm font-bold text-white">
+          🏁 سباق خطة الفصل
+        </span>
+        <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-sm font-bold text-white">
+          {tp.pct.toLocaleString("ar-EG")}٪
+        </span>
+      </div>
+      <div className="p-4">
+        {/* مسار السباق */}
+        <div className="relative h-3.5 overflow-hidden rounded-full bg-cream-dark">
+          <div
+            className="h-full rounded-full transition-all duration-700"
+            style={{
+              width: `${tp.pct}%`,
+              background: "linear-gradient(90deg,#5d3f4e,#a8894f)",
+            }}
+          />
+        </div>
+
+        {/* المتبقي */}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <span className="rounded-full bg-plum-50 px-3 py-1 text-xs font-bold text-plum-700">
+            📖 حفظ: {tp.remHifz > 0 ? `باقي ${facesPlain(tp.remHifz)}` : "اكتمل ✓"}
+          </span>
+          <span className="rounded-full bg-plum-50 px-3 py-1 text-xs font-bold text-plum-700">
+            🔁 مراجعة: {tp.remMur > 0 ? `باقي ${facesPlain(tp.remMur)}` : "اكتمل ✓"}
+          </span>
+        </div>
+
+        {/* وصفة الإتمام */}
+        {tp.status === "ended" ? (
+          <p className="mt-3 rounded-xl bg-cream px-3 py-2.5 text-sm font-bold text-plum-700">
+            🏁 انتهى الفصل — أنجزتِ {tp.pct.toLocaleString("ar-EG")}٪ من الخطة،
+            وكل وجه حفظتِه باقٍ لكِ بإذن الله
+          </p>
+        ) : tp.status === "onTrack" ? (
+          <p className="mt-3 rounded-xl bg-emerald-50 px-3 py-2.5 text-sm font-bold text-emerald-700">
+            ✅ أنتِ على المسار — واصلي بوتيرتكِ وستُتمّين الخطة كاملة بنهاية
+            الفصل 🎉
+          </p>
+        ) : (
+          <div className="mt-3 rounded-xl bg-plum-50 px-3 py-2.5">
+            <p className="text-sm font-bold text-plum-800">
+              🎯 لإتمام الخطة كاملة: {recipe.join(" و")}{" "}
+              {tp.meetingsLeft === 1
+                ? "في اللقاء الأخير"
+                : tp.meetingsLeft === 2
+                  ? "في كلٍّ من اللقاءين الباقيين"
+                  : `في كل لقاء من اللقاءات الباقية (${tp.meetingsLeft.toLocaleString("ar-EG")})`}
+            </p>
+            {tp.extraHifz > 0 && tp.extraHifz <= 3 && (
+              <p className="mt-1 text-xs font-bold text-plum-600">
+                ✨ بزيادة {facesLabel(tp.extraHifz)} فقط عن وتيرتكِ في الحفظ —
+                تُغلقين الخطة وتقفين على منصة التتويج 🏆
+              </p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -247,6 +343,9 @@ export function MotivationPanel({
           </div>
         )}
       </div>
+
+      {/* سباق خطة الفصل — إتمام الخطة كاملة قبل نهاية الفصل */}
+      {p.termPlan && <TermRaceCard tp={p.termPlan} />}
 
       {/* محفّز «لو زدتِ» */}
       {p.pagesToJuzEnd > 0 && p.sessionsToJuzEndBoost < p.sessionsToJuzEnd && (

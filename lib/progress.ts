@@ -195,6 +195,18 @@ export interface Progress {
   // المراجعة مقابل خطتها (تراكمياً)
   aheadMurPages: number;
   hasMurPlan: boolean;
+  // «سباق خطة الفصل» — إتمام خطة الفصل كاملة (حفظاً ومراجعة)
+  termPlan: {
+    pct: number; // نسبة إنجاز الخطة كاملة
+    remHifz: number; // أوجه حفظ متبقية من الخطة
+    remMur: number; // أوجه مراجعة متبقية
+    meetingsLeft: number;
+    needHifz: number; // المطلوب حفظاً كل لقاء متبقٍّ للإتمام
+    needMur: number;
+    extraHifz: number; // الزيادة عن وتيرة الخطة
+    extraMur: number;
+    status: "done" | "onTrack" | "boost" | "ended";
+  } | null;
   facesPerSession: number; // وتيرة الحفظ
   sessionsToJuzEnd: number;
   sessionsToJuzEndBoost: number; // لو زادت وجهين
@@ -284,6 +296,54 @@ export function computeProgress(
       ? completedPageOf(lastMuraja) - expectedMurPage
       : 0;
   const hasMurPlan = Boolean(lastMuraja && expectedMurPage > 0);
+
+  // «سباق خطة الفصل»: كم أُنجز من خطة الفصل كاملة، وما وصفة كل لقاء
+  // متبقٍّ لإتمامها قبل نهاية الفصل
+  let termPlan: Progress["termPlan"] = null;
+  if (schedule && schedule.length) {
+    const lastRow = schedule[schedule.length - 1];
+    const totalH = lastRow.cumHifz;
+    const totalM = lastRow.cumMurajaah;
+    if (totalH + totalM > 0) {
+      const hStart = hifzStartPos
+        ? pageOf(hifzStartPos.surah, hifzStartPos.ayah)
+        : 0;
+      const doneH =
+        lastTasmi && hStart
+          ? Math.max(0, Math.min(totalH, completedPageOf(lastTasmi) - hStart + 1))
+          : 0;
+      const mStart = murStartPos
+        ? pageOf(murStartPos.surah, murStartPos.ayah)
+        : 0;
+      const doneM =
+        lastMuraja && mStart
+          ? Math.max(0, Math.min(totalM, completedPageOf(lastMuraja) - mStart + 1))
+          : 0;
+      const remHifz = totalH - doneH;
+      const remMur = totalM - doneM;
+      const left = termSessionsLeft;
+      const needHifz = left > 0 ? Math.ceil(remHifz / left) : 0;
+      const needMur = left > 0 ? Math.ceil(remMur / left) : 0;
+      termPlan = {
+        pct: Math.round(((doneH + doneM) / (totalH + totalM)) * 100),
+        remHifz,
+        remMur,
+        meetingsLeft: left,
+        needHifz,
+        needMur,
+        extraHifz: Math.max(0, needHifz - perHplan),
+        extraMur: Math.max(0, needMur - perMplan),
+        status:
+          remHifz + remMur <= 0
+            ? "done"
+            : left === 0
+              ? "ended"
+              : needHifz <= perHplan && needMur <= perMplan
+                ? "onTrack"
+                : "boost",
+      };
+    }
+  }
 
   // إسقاط الخطة على اللقاءات المتبقية من الموضع الفعلي —
   // كل لقاء قادم يبدأ حيث ينتهي سابقه (لا من الخطة الثابتة)
@@ -384,6 +444,7 @@ export function computeProgress(
     aheadPages,
     aheadMurPages,
     hasMurPlan,
+    termPlan,
     facesPerSession,
     sessionsToJuzEnd,
     sessionsToJuzEndBoost,
