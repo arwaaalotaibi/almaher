@@ -17,9 +17,16 @@ import {
   inputCls,
   PageHeader,
   PrimaryBtn,
+  Sheet,
   useHydrated,
 } from "@/components/ui";
 import { RoleOnly } from "@/components/admin-only";
+import {
+  formToQuestions,
+  QuestionsBuilder,
+  questionsToForm,
+  type QForm,
+} from "@/components/questions-builder";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 const DAYS = [1, 2, 3, 4, 5, 6, 7].map((i) => ({ dow: i - 1, label: WEEK_DAYS[i] }));
@@ -48,6 +55,9 @@ function Inner({ params }: { params: Promise<{ id: string }> }) {
   const [perDay, setPerDay] = useState("2");
   const [dows, setDows] = useState<number[]>([]);
   const [withExam, setWithExam] = useState(true);
+  // القسم الذي تُحرَّر أسئلته
+  const [qSeg, setQSeg] = useState<ReadingSegment | null>(null);
+  const [qForms, setQForms] = useState<QForm[]>([]);
 
   if (!hydrated) return <main className="mx-auto max-w-2xl px-4 pt-10" />;
   if (!book) {
@@ -199,14 +209,32 @@ function Inner({ params }: { params: Promise<{ id: string }> }) {
                   {segDateLabel(s.date)}
                 </span>
               </span>
-              <button
-                type="button"
-                onClick={() => setPlan(plan.filter((x) => x.id !== s.id))}
-                className="shrink-0 text-xs font-bold text-red-600"
-                aria-label="حذف"
-              >
-                ✕
-              </button>
+              <span className="flex shrink-0 items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQSeg(s);
+                    setQForms(questionsToForm(s.questions ?? []));
+                  }}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                    (s.questions?.length ?? 0) > 0
+                      ? "bg-plum-600 text-white"
+                      : "bg-plum-100 text-plum-700"
+                  }`}
+                >
+                  📝 أسئلة
+                  {(s.questions?.length ?? 0) > 0 &&
+                    ` (${ar(s.questions!.length)})`}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPlan(plan.filter((x) => x.id !== s.id))}
+                  className="text-xs font-bold text-red-600"
+                  aria-label="حذف"
+                >
+                  ✕
+                </button>
+              </span>
             </div>
           ))}
 
@@ -233,6 +261,45 @@ function Inner({ params }: { params: Promise<{ id: string }> }) {
           </button>
         </div>
       )}
+
+      {/* أسئلة القسم — تظهر للطالبة مع ورد القراءة */}
+      <Sheet
+        open={qSeg !== null}
+        onClose={() => setQSeg(null)}
+        title={
+          qSeg?.isExam
+            ? "📝 أسئلة الاختبار"
+            : `📝 أسئلة صفحات ${ar(qSeg?.fromPage ?? 0)}–${ar(qSeg?.toPage ?? 0)}`
+        }
+      >
+        <p className="mb-3 rounded-xl bg-plum-50 px-3 py-2.5 text-xs font-bold text-plum-700">
+          تحلّها الطالبة بعد قراءة القسم وتُحفظ نتيجتها — تظهر لك في الخطة
+        </p>
+        <QuestionsBuilder value={qForms} onChange={setQForms} />
+        <div className="mt-3">
+          <PrimaryBtn
+            onClick={() => {
+              if (!qSeg) return;
+              const built = formToQuestions(qForms);
+              if ("error" in built) {
+                window.alert(built.error);
+                return;
+              }
+              setPlan((p) =>
+                p.map((x) =>
+                  x.id === qSeg.id ? { ...x, questions: built.questions } : x
+                )
+              );
+              setQSeg(null);
+            }}
+          >
+            حفظ الأسئلة
+          </PrimaryBtn>
+          <p className="mt-2 text-center text-xs text-silver-600">
+            لا تنسي «💾 حفظ الخطة» في الأسفل بعد الإغلاق
+          </p>
+        </div>
+      </Sheet>
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-cream-dark bg-white/90 p-3 backdrop-blur">
         <div className="mx-auto max-w-2xl">

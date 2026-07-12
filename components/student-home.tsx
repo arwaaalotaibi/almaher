@@ -33,6 +33,7 @@ const ar = (n: number) => n.toLocaleString("ar-EG");
 import Link from "next/link";
 import { Field, inputCls, PrimaryBtn, Ribbon, Sheet } from "./ui";
 import { TajweedQuiz } from "./tajweed-quiz";
+import { ReadingWards } from "./reading-wards";
 import { NotificationsCenter, PinnedNotice } from "./notifications-card";
 import { PushToggle } from "./push-toggle";
 import { ReciteLogger, SessionVerdictChip, VerdictChip } from "./recite-log";
@@ -262,6 +263,9 @@ export function StudentHome() {
                         )}
                       </div>
                     )}
+
+                    {/* أوراد القراءة: «تم ✓» + اختبار كل قسم */}
+                    <ReadingWards book={b} studentId={me.id} />
                   </div>
                 );
               })}

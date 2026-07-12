@@ -137,6 +137,18 @@ export interface ReadingSegment {
   toPage: number;
   isExam: boolean;
   note?: string;
+  questions?: TajweedQuestion[]; // أسئلة القسم (اختياري)
+}
+
+/** تقدّم الطالبة في ورد قراءة: «تم» + نتيجة اختبار القسم */
+export interface ReadingProgress {
+  bookId: string;
+  segmentId: string;
+  studentId: string;
+  done: boolean;
+  score?: number;
+  total?: number;
+  updatedAt: string;
 }
 
 export interface Book {
@@ -270,6 +282,7 @@ export interface AppState {
   terms: TermArchive[];
   tajweed: TajweedLesson[];
   tajweedResults: TajweedResult[];
+  readingProgress: ReadingProgress[];
 }
 
 export const EMPTY_GOALS: Goals = {};
@@ -529,6 +542,7 @@ const SEED: AppState = {
   terms: [],
   tajweed: [],
   tajweedResults: [],
+  readingProgress: [],
 };
 
 /* ================== المخزن المحلي (نسخة سريعة للعرض) ================== */
@@ -558,6 +572,9 @@ function load(): AppState {
         tajweed: Array.isArray(parsed.tajweed) ? parsed.tajweed : [],
         tajweedResults: Array.isArray(parsed.tajweedResults)
           ? parsed.tajweedResults
+          : [],
+        readingProgress: Array.isArray(parsed.readingProgress)
+          ? parsed.readingProgress
           : [],
       };
     } else {
@@ -656,7 +673,7 @@ function run(op: () => PromiseLike<{ error: unknown }>) {
 
 /** جلب كل البيانات من قاعدة البيانات وتحديث العرض */
 export async function pullRemote(): Promise<void> {
-  const [h, t, s, a, b, r, sess, trm, tj, tjr] = await Promise.all([
+  const [h, t, s, a, b, r, sess, trm, tj, tjr, rdp] = await Promise.all([
     supabase
       .from("almaher_halaqas")
       .select("id,mosque,day,term_start,term_sessions")
@@ -692,6 +709,9 @@ export async function pullRemote(): Promise<void> {
     supabase
       .from("almaher_tajweed_results")
       .select("lesson_id,student_id,score,total,answered_at"),
+    supabase
+      .from("almaher_reading_progress")
+      .select("book_id,segment_id,student_id,done,score,total,updated_at"),
   ]);
   if (h.error || t.error || s.error || a.error || b.error) {
     throw h.error ?? t.error ?? s.error ?? a.error ?? b.error;
@@ -793,6 +813,15 @@ export async function pullRemote(): Promise<void> {
       score: (row.score as number) ?? 0,
       total: (row.total as number) ?? 0,
       answeredAt: (row.answered_at as string) ?? "",
+    })),
+    readingProgress: (rdp.data ?? []).map((row) => ({
+      bookId: row.book_id as string,
+      segmentId: row.segment_id as string,
+      studentId: row.student_id as string,
+      done: (row.done as boolean) ?? false,
+      score: (row.score as number) ?? undefined,
+      total: (row.total as number) ?? undefined,
+      updatedAt: (row.updated_at as string) ?? "",
     })),
   });
 }
@@ -1249,6 +1278,54 @@ export const actions = {
       return supabase.from("almaher_tajweed").delete().eq("id", id);
     });
   },
+  /** تقدّم ورد القراءة: «تم» و/أو نتيجة اختبار القسم (دمج مع الموجود) */
+  saveReadingProgress(
+    bookId: string,
+    segmentId: string,
+    studentId: string,
+    patch: { done?: boolean; score?: number; total?: number }
+  ) {
+    const prev = getState().readingProgress.find(
+      (p) =>
+        p.bookId === bookId &&
+        p.segmentId === segmentId &&
+        p.studentId === studentId
+    );
+    const merged: ReadingProgress = {
+      bookId,
+      segmentId,
+      studentId,
+      done: patch.done ?? prev?.done ?? false,
+      score: patch.score ?? prev?.score,
+      total: patch.total ?? prev?.total,
+      updatedAt: new Date().toISOString(),
+    };
+    setState((s) => ({
+      ...s,
+      readingProgress: [
+        ...s.readingProgress.filter(
+          (p) =>
+            !(
+              p.bookId === bookId &&
+              p.segmentId === segmentId &&
+              p.studentId === studentId
+            )
+        ),
+        merged,
+      ],
+    }));
+    run(() =>
+      supabase.from("almaher_reading_progress").upsert({
+        book_id: bookId,
+        segment_id: segmentId,
+        student_id: studentId,
+        done: merged.done,
+        score: merged.score ?? null,
+        total: merged.total ?? null,
+        updated_at: merged.updatedAt,
+      })
+    );
+  },
   /** حفظ نتيجة الطالبة في أسئلة درس — الأحدث تحلّ محل الأقدم */
   saveTajweedResult(lessonId: string, studentId: string, score: number, total: number) {
     const res: TajweedResult = {
@@ -1366,6 +1443,9 @@ export const actions = {
         tajweedResults: Array.isArray(parsed.tajweedResults)
           ? parsed.tajweedResults
           : getState().tajweedResults,
+        readingProgress: Array.isArray(parsed.readingProgress)
+          ? parsed.readingProgress
+          : getState().readingProgress,
       };
       persist(state);
       pushAll(state).catch(() => syncAlert());
