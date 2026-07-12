@@ -50,6 +50,14 @@ const STUDENT_TABS = [
 ] as const;
 type StudentTab = (typeof STUDENT_TABS)[number]["key"];
 
+// أقسام تبويب القرآن الثلاثة — كل شاشة خفيفة ومريحة
+const QURAN_SECTIONS = [
+  { key: "today", icon: "📌", label: "وِردي" },
+  { key: "journey", icon: "🧭", label: "رحلتي" },
+  { key: "plan", icon: "📅", label: "خطتي" },
+] as const;
+type QuranSec = (typeof QURAN_SECTIONS)[number]["key"];
+
 export function StudentHome() {
   const {
     halaqas,
@@ -65,6 +73,7 @@ export function StudentHome() {
   const [myId, setMyId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState<StudentTab>("reading");
+  const [quranSec, setQuranSec] = useState<QuranSec>("today");
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [quizFor, setQuizFor] = useState<string | null>(null); // درس الأسئلة المفتوح
 
@@ -264,6 +273,27 @@ export function StudentHome() {
       {/* شاشة القرآن */}
       {tab === "quran" && (
         <section>
+          {/* أقسام القرآن — تخفيف الازدحام: كل شاشة تعرض القليل المريح */}
+          <div className="mb-4 flex gap-1 rounded-2xl bg-cream p-1">
+            {QURAN_SECTIONS.map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => setQuranSec(s.key)}
+                className={`flex flex-1 items-center justify-center gap-1 rounded-xl py-2 font-kufi text-sm font-bold transition ${
+                  quranSec === s.key
+                    ? "bg-white text-plum-800 shadow-sm"
+                    : "text-silver-600"
+                }`}
+              >
+                <span>{s.icon}</span>
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          {quranSec === "today" && (
+            <>
           {/* ترحيب بالفصل الجديد — يظهر حتى أول تسجيل تسميع فيه */}
           {(() => {
             const wasArchived = terms.some((t) =>
@@ -295,8 +325,59 @@ export function StudentHome() {
             );
           })()}
 
-          {/* لوحة التحفيز — رحلتي مع القرآن */}
-          <MotivationPanel student={me} halaqa={halaqa} />
+          {/* مطلوب اللقاء القادم — أهم ما تحتاجه الطالبة اليوم */}
+          {schedule &&
+            (curIdx > 0 ? (
+              (() => {
+                const s = schedule[curIdx - 1];
+                return (
+                  <div className="mb-4 rounded-2xl border-2 border-plum-500 bg-plum-50 p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="font-kufi text-base font-bold text-plum-800">
+                        📌 مطلوب اللقاء القادم
+                      </span>
+                      <span className="rounded-full bg-plum-600 px-2.5 py-0.5 text-xs font-bold text-white">
+                        لقاء {ar(s.n)} · {formatSchedDate(s.date)}
+                      </span>
+                    </div>
+                    <div className="mt-3 rounded-xl bg-white p-3 text-center shadow-sm">
+                      <p className="text-[11px] font-bold text-silver-600">
+                        📖 الحفظ الجديد (من حيث وصلتِ فعلاً)
+                      </p>
+                      <p className="mt-0.5 font-kufi text-lg font-bold text-plum-800">
+                        {prog.nextHifzLabel ||
+                          s.hifzLabel ||
+                          (s.hifz ? facesLabel(s.hifz) : "—")}
+                      </p>
+                      {prog.currentTasmiLabel && (
+                        <p className="mt-1 text-[10px] font-bold text-silver-500">
+                          📍 آخر ما حفظتِ: {prog.currentTasmiLabel}
+                        </p>
+                      )}
+                    </div>
+                    <div className="mt-2 rounded-xl bg-white p-3 text-center">
+                      <p className="text-[11px] font-bold text-silver-600">
+                        🔁 المراجعة (من حيث وصلتِ فعلاً)
+                      </p>
+                      <p className="mt-0.5 font-kufi text-lg font-bold text-plum-700">
+                        {prog.nextMurLabel ||
+                          s.murajaahLabel ||
+                          (s.murajaah ? facesLabel(s.murajaah) : "—")}
+                      </p>
+                      {prog.currentMurLabel && (
+                        <p className="mt-1 text-[10px] font-bold text-silver-500">
+                          📍 آخر ما راجعتِ: {prog.currentMurLabel}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()
+            ) : (
+              <div className="mb-4 rounded-2xl bg-plum-50 p-4 text-center font-kufi text-sm font-bold text-plum-700">
+                🎉 اكتمل الفصل — أحسنتِ!
+              </div>
+            ))}
 
           {/* مسمّعي — تحفيظ الورد بالاستماع والتكرار */}
           <Link
@@ -318,16 +399,25 @@ export function StudentHome() {
             <span className="text-xl text-white/70">‹</span>
           </Link>
 
-          {/* الطالبة تُدخل بداية الحفظ/المراجعة وأوجه اللقاء بنفسها */}
-          <MyPlanEditor student={me} />
-
           {/* سجلّ التسميع بعد كل لقاء */}
           <ReciteLogger student={me} halaqa={halaqa} />
+            </>
+          )}
+
+          {/* رحلتي — الخريطة والتحفيز كاملاً */}
+          {quranSec === "journey" && (
+            <MotivationPanel student={me} halaqa={halaqa} />
+          )}
+
+          {quranSec === "plan" && (
+            <>
+          {/* الطالبة تُدخل بداية الحفظ/المراجعة وأوجه اللقاء بنفسها */}
+          <MyPlanEditor student={me} />
 
           {/* خطة الفصل — جدول مولّد تلقائياً */}
           {schedule ? (
             <>
-              <Ribbon className="mb-4 mt-8">خطة الفصل</Ribbon>
+              <Ribbon className="mb-4 mt-2">خطة الفصل</Ribbon>
 
               <button
                 type="button"
@@ -374,59 +464,6 @@ export function StudentHome() {
                   ))}
                 </div>
               </div>
-
-              {/* مطلوب اللقاء القادم */}
-              {curIdx > 0 ? (
-                (() => {
-                  const s = schedule[curIdx - 1];
-                  return (
-                    <div className="mb-3 rounded-2xl border-2 border-plum-500 bg-plum-50 p-4">
-                      <div className="flex items-center justify-between">
-                        <span className="font-kufi text-base font-bold text-plum-800">
-                          📌 مطلوب اللقاء القادم
-                        </span>
-                        <span className="rounded-full bg-plum-600 px-2.5 py-0.5 text-xs font-bold text-white">
-                          لقاء {ar(s.n)} · {formatSchedDate(s.date)}
-                        </span>
-                      </div>
-                      <div className="mt-3 rounded-xl bg-white p-3 text-center shadow-sm">
-                        <p className="text-[11px] font-bold text-silver-600">
-                          📖 الحفظ الجديد (من حيث وصلتِ فعلاً)
-                        </p>
-                        <p className="mt-0.5 font-kufi text-lg font-bold text-plum-800">
-                          {prog.nextHifzLabel ||
-                            s.hifzLabel ||
-                            (s.hifz ? facesLabel(s.hifz) : "—")}
-                        </p>
-                        {prog.currentTasmiLabel && (
-                          <p className="mt-1 text-[10px] font-bold text-silver-500">
-                            📍 آخر ما حفظتِ: {prog.currentTasmiLabel}
-                          </p>
-                        )}
-                      </div>
-                      <div className="mt-2 rounded-xl bg-white p-3 text-center">
-                        <p className="text-[11px] font-bold text-silver-600">
-                          🔁 المراجعة (من حيث وصلتِ فعلاً)
-                        </p>
-                        <p className="mt-0.5 font-kufi text-lg font-bold text-plum-700">
-                          {prog.nextMurLabel ||
-                            s.murajaahLabel ||
-                            (s.murajaah ? facesLabel(s.murajaah) : "—")}
-                        </p>
-                        {prog.currentMurLabel && (
-                          <p className="mt-1 text-[10px] font-bold text-silver-500">
-                            📍 آخر ما راجعتِ: {prog.currentMurLabel}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()
-              ) : (
-                <div className="mb-3 rounded-2xl bg-plum-50 p-4 text-center font-kufi text-sm font-bold text-plum-700">
-                  🎉 اكتمل الفصل — أحسنتِ!
-                </div>
-              )}
 
               {/* جدول اللقاءات كاملاً */}
               <div className="grid gap-1.5">
@@ -550,6 +587,8 @@ export function StudentHome() {
             <p className="mt-6 text-center text-xs text-silver-600">
               آخر تحديث: {updatedLabel}
             </p>
+          )}
+            </>
           )}
         </section>
       )}
