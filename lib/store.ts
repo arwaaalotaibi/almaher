@@ -73,10 +73,37 @@ export interface Student {
   goals: Goals;
   done: GoalsDone;
   note?: string;
+  phone?: string; // جوال الطالبة/وليّة أمرها — لإرسال الرمز عبر واتساب
   updatedAt?: string; // ISO
   agreedAt?: string; // ISO — وقت إقرار الطالبة باللائحة
   agreedVersion?: string; // نسخة اللائحة التي أقرّت بها
   lastSeen?: string; // ISO — آخر مرة فتحت فيها الطالبة التطبيق
+}
+
+/** رابط واتساب برسالة جاهزة — مع رقم (محادثة مباشرة) أو بدونه (اختيار جهة) */
+export function whatsappLink(phone: string | undefined, text: string): string {
+  let p = normalizeDigits(phone ?? "").replace(/[^\d+]/g, "");
+  if (p.startsWith("+")) p = p.slice(1);
+  else if (p.startsWith("00")) p = p.slice(2);
+  else if (p.startsWith("05")) p = `966${p.slice(1)}`; // سعودي محلي
+  else if (p.length === 9 && p.startsWith("5")) p = `966${p}`;
+  const msg = encodeURIComponent(text);
+  return p.length >= 11
+    ? `https://wa.me/${p}?text=${msg}`
+    : `https://wa.me/?text=${msg}`;
+}
+
+/** نص رسالة رمز الدخول */
+export function codeMessage(name: string, code: string): string {
+  const origin =
+    typeof window !== "undefined" ? window.location.origin : "";
+  return (
+    `السلام عليكم ورحمة الله 🌸\n` +
+    `حياكِ الله «${name}» في تطبيق الماهر لحلقات التحفيظ\n\n` +
+    `🔑 رمز دخولك: ${code}\n` +
+    (origin ? `🔗 رابط التطبيق: ${origin}\n\n` : "\n") +
+    `افتحي الرابط ثم أدخلي رمزك، وستجدين وردك وخطتك بإذن الله 🌙`
+  );
 }
 
 export interface Halaqa {
@@ -668,6 +695,7 @@ interface StudentRow {
   goals: Goals;
   done: GoalsDone;
   note: string;
+  phone?: string;
   updated_at: string;
   agreed_at: string | null;
   agreed_version: string;
@@ -705,7 +733,7 @@ export async function pullRemote(): Promise<void> {
     supabase.from("almaher_teachers").select("id,name,halaqa_ids").order("created_at"),
     supabase
       .from("almaher_students")
-      .select("id,name,halaqa_id,teacher_id,code,track,plan,sessions,goals,done,note,updated_at,agreed_at,agreed_version,last_seen")
+      .select("id,name,halaqa_id,teacher_id,code,track,plan,sessions,goals,done,note,phone,updated_at,agreed_at,agreed_version,last_seen")
       .order("created_at"),
     supabase
       .from("almaher_announcements")
@@ -769,6 +797,7 @@ export async function pullRemote(): Promise<void> {
       goals: { ...EMPTY_GOALS, ...row.goals },
       done: { ...EMPTY_DONE, ...row.done },
       note: row.note,
+      phone: row.phone ?? "",
       updatedAt: row.updated_at,
       agreedAt: row.agreed_at ?? undefined,
       agreedVersion: row.agreed_version ?? "",
@@ -877,6 +906,7 @@ function studentToRow(st: Student): StudentRow {
     goals: st.goals,
     done: st.done,
     note: st.note ?? "",
+    phone: st.phone ?? "",
     updated_at: st.updatedAt ?? new Date().toISOString(),
     agreed_at: st.agreedAt ?? null,
     agreed_version: st.agreedVersion ?? "",

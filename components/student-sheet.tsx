@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import {
   actions,
   buildSchedule,
+  codeMessage,
   CoursePlan,
   dateKey,
+  whatsappLink,
   EMPTY_PLAN,
   formatSchedDate,
   halaqaTitle,
@@ -39,6 +41,7 @@ export function StudentSheet({
   const [teacherId, setTeacherId] = useState("");
   const [halaqaId, setHalaqaId] = useState("");
   const [note, setNote] = useState("");
+  const [phone, setPhone] = useState("");
   const [plan, setPlan] = useState<CoursePlan>({ ...EMPTY_PLAN });
   const [copied, setCopied] = useState(false);
 
@@ -49,6 +52,7 @@ export function StudentSheet({
       setHalaqaId(student.halaqaId);
       setPlan({ ...EMPTY_PLAN, ...student.plan });
       setNote(student.note ?? "");
+      setPhone(student.phone ?? "");
     }
   }, [student]);
 
@@ -64,6 +68,7 @@ export function StudentSheet({
       halaqaId,
       plan,
       note: note.trim(),
+      phone: phone.trim(),
     });
     onClose();
   };
@@ -119,22 +124,43 @@ export function StudentSheet({
               {student.code}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              navigator.clipboard?.writeText(student.code).then(
-                () => setCopied(true),
-                () => setCopied(false)
-              );
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1500);
-            }}
-            className="rounded-xl bg-plum-600 px-4 py-2 text-sm font-bold text-white"
-          >
-            {copied ? "تم النسخ ✓" : "نسخ"}
-          </button>
+          <div className="flex flex-col gap-1.5">
+            <a
+              href={whatsappLink(phone, codeMessage(student.name, student.code))}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-xl bg-emerald-500 px-4 py-2 text-center text-sm font-bold text-white"
+            >
+              📲 واتساب
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard?.writeText(student.code).then(
+                  () => setCopied(true),
+                  () => setCopied(false)
+                );
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              }}
+              className="rounded-xl bg-plum-600 px-4 py-2 text-sm font-bold text-white"
+            >
+              {copied ? "تم النسخ ✓" : "نسخ"}
+            </button>
+          </div>
         </div>
       )}
+
+      <Field label="جوال الطالبة / وليّة الأمر (اختياري — للواتساب)" icon="📱">
+        <input
+          className={inputCls}
+          dir="ltr"
+          inputMode="tel"
+          placeholder="05xxxxxxxx"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+        />
+      </Field>
 
       <div className="mb-1 grid grid-cols-2 gap-3">
         <Field label="المعلّمة" icon="👩‍🏫">

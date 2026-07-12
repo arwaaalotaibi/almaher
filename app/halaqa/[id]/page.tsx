@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   actions,
   buildSchedule,
+  codeMessage,
   currentSessionIndex,
   dateKey,
   EMPTY_PLAN,
@@ -12,6 +13,7 @@ import {
   studentCountLabel,
   useApp,
   WEEK_DAYS,
+  whatsappLink,
   type CoursePlan,
   type Student,
 } from "@/lib/store";
@@ -401,14 +403,29 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
           {halaqaStudents.map((s) => (
             <div
               key={s.id}
-              className="flex items-center justify-between rounded-xl bg-cream px-4 py-2.5"
+              className="flex items-center justify-between gap-2 rounded-xl bg-cream px-4 py-2.5"
             >
-              <span className="text-sm font-bold text-plum-800">{s.name}</span>
-              <span
-                className="font-kufi text-lg font-bold tracking-[0.15em] text-plum-700"
-                dir="ltr"
-              >
-                {s.code || "—"}
+              <span className="min-w-0 truncate text-sm font-bold text-plum-800">
+                {s.name}
+              </span>
+              <span className="flex shrink-0 items-center gap-2">
+                <span
+                  className="font-kufi text-lg font-bold tracking-[0.15em] text-plum-700"
+                  dir="ltr"
+                >
+                  {s.code || "—"}
+                </span>
+                {s.code && (
+                  <a
+                    href={whatsappLink(s.phone, codeMessage(s.name, s.code))}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-bold text-white"
+                    aria-label={`إرسال رمز ${s.name} عبر واتساب`}
+                  >
+                    📲
+                  </a>
+                )}
               </span>
             </div>
           ))}
