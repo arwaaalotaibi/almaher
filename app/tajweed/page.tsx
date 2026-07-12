@@ -51,6 +51,7 @@ function TajweedInner() {
   const { tajweed, tajweedResults, students } = useApp();
   const hydrated = useHydrated();
   const fileRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLInputElement>(null);
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<TajweedLesson | null>(null);
@@ -80,21 +81,33 @@ function TajweedInner() {
     setOpen(true);
   };
 
-  /** رفع ملف PDF إلى التخزين وإرجاع رابطه العام */
-  const uploadPdf = async (file: File) => {
-    if (file.type !== "application/pdf") {
+  /** رفع ملف (PDF أو فيديو من ألبوم الجهاز) إلى التخزين */
+  const uploadFile = async (file: File, expect: "pdf" | "video") => {
+    if (expect === "pdf" && file.type !== "application/pdf") {
       window.alert("الملف يجب أن يكون PDF");
       return;
     }
+    if (expect === "video" && !file.type.startsWith("video/")) {
+      window.alert("اختاري ملف فيديو من ألبوم جهازك");
+      return;
+    }
     if (file.size > 50 * 1024 * 1024) {
-      window.alert("حجم الملف كبير (الحد ٥٠ ميجابايت)");
+      window.alert(
+        expect === "video"
+          ? "حجم الفيديو كبير (الحد ٥٠ ميجابايت)\n\nللفيديوهات الطويلة: ارفعيه على يوتيوب بخصوصية «غير مدرج» والصقي رابطه — أو قصّي المقطع/اضغطيه من تطبيق الصور ثم أعيدي المحاولة."
+          : "حجم الملف كبير (الحد ٥٠ ميجابايت)"
+      );
       return;
     }
     setUploading(true);
-    const path = `tajweed/${Date.now()}.pdf`;
+    const ext =
+      expect === "pdf"
+        ? "pdf"
+        : (file.name.split(".").pop() || "mp4").toLowerCase();
+    const path = `tajweed/${Date.now()}.${ext}`;
     const up = await supabase.storage
       .from("almaher-books")
-      .upload(path, file, { contentType: "application/pdf", upsert: true });
+      .upload(path, file, { contentType: file.type, upsert: true });
     setUploading(false);
     if (up.error) {
       window.alert(`تعذّر رفع الملف: ${up.error.message}`);
@@ -115,8 +128,12 @@ function TajweedInner() {
       window.alert(kind === "video" ? "ألصقي رابط الفيديو" : "ارفعي ملف الدرس");
       return;
     }
-    if (kind === "video" && !videoEmbedUrl(url) && !/\.(mp4|webm)(\?|$)/i.test(url)) {
-      window.alert("رابط الفيديو غير مفهوم — يوتيوب أو ملف mp4");
+    if (
+      kind === "video" &&
+      !videoEmbedUrl(url) &&
+      !/\.(mp4|webm|mov|m4v)(\?|$)/i.test(url)
+    ) {
+      window.alert("رابط الفيديو غير مفهوم — يوتيوب أو ملف فيديو (mp4/mov)");
       return;
     }
     // الأسئلة: نُهمل الفارغة، ونتأكد أن لكل سؤال خيارين على الأقل وإجابة ضمنها
@@ -262,15 +279,49 @@ function TajweedInner() {
         </div>
 
         {kind === "video" ? (
-          <Field label="رابط الفيديو (يوتيوب أو mp4)" icon="🔗">
-            <input
-              className={inputCls}
-              dir="ltr"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://youtu.be/…"
-            />
-          </Field>
+          <>
+            <Field label="رابط الفيديو (يوتيوب أو mp4)" icon="🔗">
+              <input
+                className={inputCls}
+                dir="ltr"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://youtu.be/…"
+              />
+            </Field>
+            <p className="mb-2 text-center text-xs font-bold text-silver-500">
+              — أو —
+            </p>
+            <div className="mb-3">
+              <input
+                ref={videoRef}
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void uploadFile(f, "video");
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => videoRef.current?.click()}
+                disabled={uploading}
+                className="w-full rounded-xl border-2 border-dashed border-plum-300 bg-plum-50 py-3 text-sm font-bold text-plum-700 disabled:opacity-50"
+              >
+                {uploading
+                  ? "جارٍ رفع الفيديو… لا تغلقي الصفحة"
+                  : url && url.includes("/tajweed/")
+                    ? "✅ الفيديو مرفوع — اضغطي لاستبداله"
+                    : "📱 رفع فيديو من ألبوم جهازك"}
+              </button>
+              <p className="mt-1.5 text-[11px] text-silver-600">
+                حتى ٥٠ ميجابايت (يناسب المقاطع القصيرة) — الأطول ارفعيه يوتيوب
+                «غير مدرج» والصقي رابطه
+              </p>
+            </div>
+          </>
         ) : (
           <div className="mb-3">
             <input
@@ -280,7 +331,7 @@ function TajweedInner() {
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) void uploadPdf(f);
+                if (f) void uploadFile(f, "pdf");
                 e.target.value = "";
               }}
             />
