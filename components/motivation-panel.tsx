@@ -1,6 +1,7 @@
 "use client";
 
 import { badgesFor, computeProgress, juzLabel } from "@/lib/progress";
+import { JourneyMap } from "./journey-map";
 import {
   byFaces,
   byMeetings,
@@ -269,6 +270,9 @@ export function MotivationPanel({
           </p>
         </div>
       )}
+
+      {/* درب الحفظ — خريطة الرحلة المتحركة عبر الأجزاء */}
+      <JourneyMap juz={p.juz} juzPct={p.juzPct} />
 
       {/* تقدّم الجزء */}
       <div className="card mb-2.5 rounded-2xl p-4">

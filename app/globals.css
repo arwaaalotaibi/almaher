@@ -99,3 +99,39 @@ input, textarea, select {
   -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 2px 14px rgba(77, 51, 64, 0.12);
 }
+
+/* ====== درب الحفظ (خريطة الرحلة المتحركة) ====== */
+/* الزهرة تطفو فوق المحطة الحالية */
+@keyframes jm-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+.jm-float {
+  animation: jm-float 2.2s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+/* نبض المحطة الحالية: حلقة تتوسع وتتلاشى */
+@keyframes jm-pulse {
+  0% { opacity: 0.7; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.9); }
+}
+.jm-pulse {
+  animation: jm-pulse 1.8s ease-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+/* تلألؤ المحطات الذهبية المقطوعة */
+@keyframes jm-sparkle {
+  0%, 100% { opacity: 0.15; transform: scale(0.7); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+.jm-sparkle {
+  animation: jm-sparkle 2.6s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+/* رسم الدرب المقطوع تدريجياً عند فتح الصفحة */
+.jm-draw {
+  transition: stroke-dashoffset 1.6s ease-out;
+}
