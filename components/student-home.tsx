@@ -49,7 +49,7 @@ const STUDENT_TABS = [
 type StudentTab = (typeof STUDENT_TABS)[number]["key"];
 
 export function StudentHome() {
-  const { halaqas, teachers, students, books, announcements, recitations } =
+  const { halaqas, teachers, students, books, announcements, recitations, terms } =
     useApp();
   const [myId, setMyId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -252,6 +252,37 @@ export function StudentHome() {
       {/* شاشة القرآن */}
       {tab === "quran" && (
         <section>
+          {/* ترحيب بالفصل الجديد — يظهر حتى أول تسجيل تسميع فيه */}
+          {(() => {
+            const wasArchived = terms.some((t) =>
+              t.students.some((x) => x.id === me.id)
+            );
+            const loggedThisTerm =
+              !!halaqa?.termStart &&
+              recitations.some(
+                (r) => r.studentId === me.id && r.date >= halaqa.termStart
+              );
+            const startLbl = hifzStartLabel(me.plan);
+            if (!(wasArchived && schedule && curIdx >= 1 && !loggedThisTerm))
+              return null;
+            return (
+              <div
+                className="mb-4 rounded-2xl p-4 text-center text-white shadow"
+                style={{ background: "linear-gradient(135deg,#5d3f4e,#8a5d75)" }}
+              >
+                <p className="text-2xl">🌱</p>
+                <p className="mt-0.5 font-kufi text-base font-bold">
+                  فصل جديد، همّة جديدة!
+                </p>
+                <p className="mt-1 text-sm text-white/90">
+                  {startLbl
+                    ? `تنطلقين هذا الفصل من ${startLbl} — تماماً من حيث وقفتِ 💪`
+                    : "رحلة جديدة تبدأ — واصلي من حيث وقفتِ 💪"}
+                </p>
+              </div>
+            );
+          })()}
+
           {/* لوحة التحفيز — رحلتي مع القرآن */}
           <MotivationPanel student={me} halaqa={halaqa} />
 

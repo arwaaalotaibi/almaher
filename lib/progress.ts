@@ -191,6 +191,9 @@ export interface Progress {
   nextFromPage: number;
   nextToPage: number;
   nextHifzLabel: string;
+  // موضعا الاستئناف (لبدء فصل جديد من حيث وصلت)
+  nextHifzFrom: { surah: number; ayah: number } | null;
+  nextMurFrom: { surah: number; ayah: number } | null;
   currentTasmiLabel: string; // آخر موضع حُفظ (لتوضيح أساس الحساب)
   // المطلوب القادم للمراجعة — من موضع المراجعة الفعلي + أوجه المراجعة
   nextMurLabel: string;
@@ -450,6 +453,8 @@ export function computeProgress(
     currentMurLabel: lastMuraja
       ? refLabel(lastMuraja.surah, lastMuraja.ayah)
       : "",
+    nextHifzFrom,
+    nextMurFrom,
     projected,
     expectedPage,
     aheadPages,

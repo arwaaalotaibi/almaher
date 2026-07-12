@@ -4,12 +4,20 @@ import { use, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   actions,
+  buildSchedule,
+  currentSessionIndex,
+  dateKey,
+  EMPTY_PLAN,
   normalizeDigits,
   studentCountLabel,
   useApp,
   WEEK_DAYS,
+  type CoursePlan,
   type Student,
 } from "@/lib/store";
+import { computeProgress } from "@/lib/progress";
+import { surahName } from "@/lib/mushaf";
+import { meetingsLabel } from "@/lib/arabic";
 import {
   DangerBtn,
   Field,
@@ -40,7 +48,7 @@ export default function HalaqaPage({
 function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const { halaqas, teachers, students } = useApp();
+  const { halaqas, teachers, students, recitations } = useApp();
   const hydrated = useHydrated();
 
   const halaqa = halaqas.find((h) => h.id === id);
@@ -55,6 +63,9 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
   const [newName, setNewName] = useState("");
   const [newTeacher, setNewTeacher] = useState("");
   const [showCodes, setShowCodes] = useState(false);
+  const [newTermOpen, setNewTermOpen] = useState(false);
+  const [newTermStart, setNewTermStart] = useState("");
+  const [newTermCount, setNewTermCount] = useState(0);
 
   if (!hydrated) {
     return <main className="mx-auto max-w-2xl px-4 pt-10" />;
@@ -88,6 +99,81 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
     actions.addStudent(newName, id, newTeacher);
     setNewName("");
     setAdding(false);
+  };
+
+  // هل انتهت كل لقاءات الفصل الحالي؟
+  const termRows = buildSchedule(halaqa, EMPTY_PLAN);
+  const termEnded =
+    !!termRows && termRows.length > 0 && currentSessionIndex(termRows) === 0;
+
+  // موضع استئناف كل طالبة (من آخر ما وصلت فعلاً)
+  const resumeFor = (s: Student) => {
+    const p = computeProgress(s, recitations, halaqa);
+    return {
+      prog: p,
+      hifz:
+        p.hasData && p.nextHifzFrom
+          ? { surah: surahName(p.nextHifzFrom.surah), ayah: p.nextHifzFrom.ayah }
+          : null,
+      mur:
+        p.currentMurLabel && p.nextMurFrom
+          ? { surah: surahName(p.nextMurFrom.surah), ayah: p.nextMurFrom.ayah }
+          : null,
+    };
+  };
+
+  const openNewTerm = () => {
+    // مقترح تلقائي: بعد آخر لقاء بأسبوع، وبنفس عدد اللقاءات
+    if (termRows && termRows.length) {
+      const d = new Date(termRows[termRows.length - 1].date);
+      d.setDate(d.getDate() + 7);
+      setNewTermStart(dateKey(d));
+    }
+    setNewTermCount(halaqa.termSessions || 0);
+    setNewTermOpen(true);
+  };
+
+  const startNewTerm = () => {
+    if (!newTermStart || newTermCount < 1) return;
+    if (
+      !window.confirm(
+        `أرشفة الفصل الحالي وبدء فصل جديد (${newTermCount.toLocaleString("ar-EG")} لقاء)؟\nستنطلق كل طالبة من آخر ما وصلت له.`
+      )
+    )
+      return;
+    // ١) حفظ الفصل المنتهي كاملاً: جدوله + خطة كل طالبة (تبقى الشارات والتاريخ)
+    actions.archiveTerm({
+      halaqaId: id,
+      day: halaqa.day,
+      termStart: halaqa.termStart,
+      termSessions: halaqa.termSessions,
+      students: halaqaStudents.map((s) => ({
+        id: s.id,
+        name: s.name,
+        plan: s.plan,
+      })),
+    });
+    // ٢) الفصل الجديد بتاريخه وعدد لقاءاته
+    actions.updateHalaqa(id, {
+      termStart: newTermStart,
+      termSessions: newTermCount,
+    });
+    // ٣) كل طالبة عائدة تستأنف حفظها ومراجعتها من آخر ما وصلت
+    for (const s of halaqaStudents) {
+      const r = resumeFor(s);
+      const patch: Partial<CoursePlan> = {};
+      if (r.hifz) {
+        patch.startSurah = r.hifz.surah;
+        patch.startAyah = r.hifz.ayah;
+      }
+      if (r.mur) {
+        patch.murStartSurah = r.mur.surah;
+        patch.murStartAyah = r.mur.ayah;
+      }
+      if (Object.keys(patch).length)
+        actions.updateStudent(s.id, { plan: { ...s.plan, ...patch } });
+    }
+    setNewTermOpen(false);
   };
 
   return (
@@ -167,6 +253,30 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
           النظام جدولها تلقائياً.
         </p>
       </div>
+
+      {/* انتهى الفصل — بدء فصل جديد */}
+      {termEnded && (
+        <div
+          className="mb-4 rounded-2xl p-5 text-center text-white shadow"
+          style={{ background: "linear-gradient(135deg,#5d3f4e,#a8894f)" }}
+        >
+          <p className="text-3xl">🎓</p>
+          <p className="mt-1 font-kufi text-lg font-bold">
+            انتهى الفصل — بارك الله في طالباتك!
+          </p>
+          <p className="mt-1 text-sm text-white/90">
+            اكتملت لقاءات الفصل ({meetingsLabel(halaqa.termSessions)}). ابدئي
+            فصلاً جديداً وستنطلق كل طالبة من آخر ما وصلت له تلقائياً.
+          </p>
+          <button
+            type="button"
+            onClick={openNewTerm}
+            className="mt-3 rounded-xl bg-white px-6 py-2.5 font-kufi text-sm font-bold text-plum-800 transition active:scale-[0.98]"
+          >
+            🚀 بدء فصل جديد
+          </button>
+        </div>
+      )}
 
       {halaqaStudents.length > 0 && (
         <button
@@ -303,6 +413,74 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
             </div>
           ))}
         </div>
+      </Sheet>
+
+      {/* بدء فصل جديد */}
+      <Sheet
+        open={newTermOpen}
+        onClose={() => setNewTermOpen(false)}
+        title="🚀 بدء فصل جديد"
+      >
+        <p className="mb-3 rounded-xl bg-plum-50 px-3 py-2.5 text-xs font-bold text-plum-700">
+          يُحفظ الفصل الحالي كاملاً (جدوله وبيانات الطالبات وشاراتهن)، ثم يبدأ
+          الفصل الجديد وكل طالبة تستأنف من آخر ما وصلت له.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="أول لقاء في الفصل الجديد" icon="📅">
+            <input
+              type="date"
+              className={inputCls}
+              value={newTermStart}
+              onChange={(e) => setNewTermStart(e.target.value)}
+            />
+          </Field>
+          <Field label="عدد اللقاءات" icon="🔢">
+            <input
+              type="text"
+              inputMode="numeric"
+              className={inputCls}
+              placeholder="٠"
+              value={newTermCount || ""}
+              onChange={(e) =>
+                setNewTermCount(
+                  Math.max(0, Number(normalizeDigits(e.target.value)) || 0)
+                )
+              }
+            />
+          </Field>
+        </div>
+
+        {halaqaStudents.length > 0 && (
+          <div className="mb-3 rounded-2xl border border-cream-dark p-3">
+            <p className="mb-2 text-xs font-bold text-plum-700">
+              🧭 من أين ستنطلق كل طالبة؟
+            </p>
+            <div className="grid gap-1.5">
+              {halaqaStudents.map((s) => {
+                const r = resumeFor(s);
+                return (
+                  <div
+                    key={s.id}
+                    className="flex items-center justify-between rounded-xl bg-cream px-3 py-2"
+                  >
+                    <span className="text-sm font-bold text-plum-800">
+                      {s.name}
+                    </span>
+                    <span className="text-[11px] font-bold text-silver-600">
+                      {r.hifz
+                        ? `📖 ${r.hifz.surah} ${r.hifz.ayah.toLocaleString("ar-EG")}`
+                        : "تُحدَّد من بياناتها"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <PrimaryBtn onClick={startNewTerm}>
+          🚀 انطلقي بالفصل الجديد
+        </PrimaryBtn>
       </Sheet>
 
       <StudentSheet student={selected} onClose={() => setSelected(null)} />

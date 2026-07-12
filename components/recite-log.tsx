@@ -204,7 +204,7 @@ export function ReciteHistory({
   editingId?: string | null;
   voice?: ChipVoice;
 }) {
-  const { recitations } = useApp();
+  const { recitations, terms } = useApp();
   const mine = useMemo(
     () =>
       recitations
@@ -212,9 +212,37 @@ export function ReciteHistory({
         .sort((a, b) => b.date.localeCompare(a.date)),
     [recitations, studentId]
   );
-  // صفّ الجدول الموافق لتاريخ السجلّ — لمقارنة المُنجَز بالمطلوب
-  const rowFor = (dateISO: string) =>
-    schedule?.find((s) => dateKey(s.date) === dateISO);
+  // مطلوب لقاءات الفصول المؤرشفة — تبقى شارات السجلّ القديم بعد بدء فصل جديد
+  const archivedReqs = useMemo(() => {
+    const map = new Map<
+      string,
+      { hifz: number; tathbit: number; murajaah: number }
+    >();
+    for (const t of terms) {
+      const snap = t.students.find((x) => x.id === studentId);
+      if (!snap) continue;
+      const rows = buildSchedule(
+        { day: t.day, termStart: t.termStart, termSessions: t.termSessions },
+        snap.plan
+      );
+      for (const row of rows ?? []) {
+        const k = dateKey(row.date);
+        if (!map.has(k))
+          map.set(k, {
+            hifz: row.hifz,
+            tathbit: row.tathbit,
+            murajaah: row.murajaah,
+          });
+      }
+    }
+    return map;
+  }, [terms, studentId]);
+  // صفّ الجدول الموافق لتاريخ السجلّ — من الفصل الحالي أو من الأرشيف
+  const rowFor = (
+    dateISO: string
+  ): { hifz: number; tathbit: number; murajaah: number } | undefined =>
+    schedule?.find((s) => dateKey(s.date) === dateISO) ??
+    archivedReqs.get(dateISO);
 
   if (mine.length === 0) {
     return (

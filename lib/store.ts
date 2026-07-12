@@ -213,6 +213,18 @@ export function recitePartLabel(part?: RecitePart): string {
   return a === b ? a : `${a} ← ${b}`;
 }
 
+/** أرشيف فصل منتهٍ: جدوله + لقطة خطة كل طالبة عند الإغلاق —
+    تكفي لإعادة بناء جدول الفصل القديم وأحكام سجلّاته */
+export interface TermArchive {
+  id: string;
+  halaqaId: string;
+  day: string;
+  termStart: string;
+  termSessions: number;
+  students: { id: string; name: string; plan: CoursePlan }[];
+  closedAt: string;
+}
+
 export interface AppState {
   halaqas: Halaqa[];
   teachers: Teacher[];
@@ -221,6 +233,7 @@ export interface AppState {
   books: Book[];
   notifReads: NotifRead[];
   recitations: RecitationLog[];
+  terms: TermArchive[];
 }
 
 export const EMPTY_GOALS: Goals = {};
@@ -477,6 +490,7 @@ const SEED: AppState = {
   books: [],
   notifReads: [],
   recitations: [],
+  terms: [],
 };
 
 /* ================== المخزن المحلي (نسخة سريعة للعرض) ================== */
@@ -502,6 +516,7 @@ function load(): AppState {
         books: Array.isArray(parsed.books) ? parsed.books : [],
         notifReads: Array.isArray(parsed.notifReads) ? parsed.notifReads : [],
         recitations: Array.isArray(parsed.recitations) ? parsed.recitations : [],
+        terms: Array.isArray(parsed.terms) ? parsed.terms : [],
       };
     } else {
       cache = SEED;
@@ -599,7 +614,7 @@ function run(op: () => PromiseLike<{ error: unknown }>) {
 
 /** جلب كل البيانات من قاعدة البيانات وتحديث العرض */
 export async function pullRemote(): Promise<void> {
-  const [h, t, s, a, b, r, sess] = await Promise.all([
+  const [h, t, s, a, b, r, sess, trm] = await Promise.all([
     supabase
       .from("almaher_halaqas")
       .select("id,mosque,day,term_start,term_sessions")
@@ -624,6 +639,10 @@ export async function pullRemote(): Promise<void> {
       .from("almaher_sessions")
       .select("id,student_id,log_date,attended,parts,note,created_at")
       .order("log_date", { ascending: false }),
+    supabase
+      .from("almaher_terms")
+      .select("id,halaqa_id,day,term_start,term_sessions,students,closed_at")
+      .order("closed_at", { ascending: false }),
   ]);
   if (h.error || t.error || s.error || a.error || b.error) {
     throw h.error ?? t.error ?? s.error ?? a.error ?? b.error;
@@ -698,6 +717,17 @@ export async function pullRemote(): Promise<void> {
         createdAt: (row.created_at as string) ?? undefined,
       };
     }),
+    terms: (trm.data ?? []).map((row) => ({
+      id: row.id as string,
+      halaqaId: row.halaqa_id as string,
+      day: (row.day as string) ?? "",
+      termStart: row.term_start as string,
+      termSessions: (row.term_sessions as number) ?? 0,
+      students: Array.isArray(row.students)
+        ? (row.students as TermArchive["students"])
+        : [],
+      closedAt: (row.closed_at as string) ?? "",
+    })),
   });
 }
 
@@ -1106,6 +1136,25 @@ export const actions = {
     }));
     run(() => supabase.from("almaher_sessions").delete().eq("id", id));
   },
+  /** أرشفة الفصل المنتهي (جدوله + خطط طالباته) قبل بدء فصل جديد */
+  archiveTerm(t: Omit<TermArchive, "id" | "closedAt">) {
+    const arch: TermArchive = {
+      ...t,
+      id: uid(),
+      closedAt: new Date().toISOString(),
+    };
+    setState((s) => ({ ...s, terms: [arch, ...s.terms] }));
+    run(() =>
+      supabase.from("almaher_terms").insert({
+        id: arch.id,
+        halaqa_id: arch.halaqaId,
+        day: arch.day,
+        term_start: arch.termStart,
+        term_sessions: arch.termSessions,
+        students: arch.students,
+      })
+    );
+  },
   /** تحديث «آخر ظهور» للطالبة عند فتح التطبيق (صامت) */
   touchSeen(studentId: string) {
     if (!studentId) return;
@@ -1168,6 +1217,7 @@ export const actions = {
         recitations: Array.isArray(parsed.recitations)
           ? parsed.recitations
           : getState().recitations,
+        terms: Array.isArray(parsed.terms) ? parsed.terms : getState().terms,
       };
       persist(state);
       pushAll(state).catch(() => syncAlert());
