@@ -298,6 +298,26 @@ export function StudentHome() {
           {/* لوحة التحفيز — رحلتي مع القرآن */}
           <MotivationPanel student={me} halaqa={halaqa} />
 
+          {/* مسمّعي — تحفيظ الورد بالاستماع والتكرار */}
+          <Link
+            href="/memorize"
+            className="mb-4 flex items-center gap-3 rounded-2xl p-4 text-white shadow transition active:scale-[0.99]"
+            style={{ background: "linear-gradient(135deg,#5d3f4e,#8a5d75)" }}
+          >
+            <span className="text-3xl">🎧</span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-kufi text-base font-bold">
+                مسمّعي — احفظي وردك بالتكرار
+              </span>
+              <span className="mt-0.5 block truncate text-xs text-white/85">
+                {prog.nextHifzLabel
+                  ? `وردك القادم: ${prog.nextHifzLabel}`
+                  : "استمعي آيةً آية وردّدي حتى يثبت الحفظ"}
+              </span>
+            </span>
+            <span className="text-xl text-white/70">‹</span>
+          </Link>
+
           {/* الطالبة تُدخل بداية الحفظ/المراجعة وأوجه اللقاء بنفسها */}
           <MyPlanEditor student={me} />
 
