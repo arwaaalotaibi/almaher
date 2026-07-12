@@ -34,6 +34,7 @@ import Link from "next/link";
 import { Field, inputCls, PrimaryBtn, Ribbon, Sheet } from "./ui";
 import { TajweedQuiz } from "./tajweed-quiz";
 import { ReadingWards } from "./reading-wards";
+import { RaceBoard } from "./race-board";
 import { NotificationsCenter, PinnedNotice } from "./notifications-card";
 import { PushToggle } from "./push-toggle";
 import { ReciteLogger, SessionVerdictChip, VerdictChip } from "./recite-log";
@@ -51,11 +52,12 @@ const STUDENT_TABS = [
 ] as const;
 type StudentTab = (typeof STUDENT_TABS)[number]["key"];
 
-// أقسام تبويب القرآن الثلاثة — كل شاشة خفيفة ومريحة
+// أقسام تبويب القرآن — كل شاشة خفيفة ومريحة
 const QURAN_SECTIONS = [
   { key: "today", icon: "📌", label: "وِردي" },
   { key: "journey", icon: "🧭", label: "رحلتي" },
   { key: "plan", icon: "📅", label: "خطتي" },
+  { key: "race", icon: "🏆", label: "السباق" },
 ] as const;
 type QuranSec = (typeof QURAN_SECTIONS)[number]["key"];
 
@@ -410,28 +412,11 @@ export function StudentHome() {
 
           {/* رحلتي — الخريطة والتحفيز كاملاً */}
           {quranSec === "journey" && (
-            <>
-              <MotivationPanel student={me} halaqa={halaqa} />
-
-              {/* سباق الحلقات — منافسة بين الطالبات */}
-              <Link
-                href="/race"
-                className="mb-4 flex items-center gap-3 rounded-2xl p-4 text-white shadow transition active:scale-[0.99]"
-                style={{ background: "linear-gradient(135deg,#8a6d3b,#b7973f)" }}
-              >
-                <span className="text-3xl">🏆</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block font-kufi text-base font-bold">
-                    سباق الحلقات
-                  </span>
-                  <span className="mt-0.5 block text-xs text-white/85">
-                    نافسي طالبات كل المساجد — أين ترتيبك هذا الأسبوع؟
-                  </span>
-                </span>
-                <span className="text-xl text-white/70">‹</span>
-              </Link>
-            </>
+            <MotivationPanel student={me} halaqa={halaqa} />
           )}
+
+          {/* السباق — منافسة الحلقات داخل التبويب */}
+          {quranSec === "race" && <RaceBoard myId={me.id} />}
 
           {quranSec === "plan" && (
             <>
