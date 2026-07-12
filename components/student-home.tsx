@@ -415,8 +415,10 @@ export function StudentHome() {
             <MotivationPanel student={me} halaqa={halaqa} />
           )}
 
-          {/* السباق — منافسة الحلقات داخل التبويب */}
-          {quranSec === "race" && <RaceBoard myId={me.id} />}
+          {/* السباق — على مستوى مسجد الطالبة */}
+          {quranSec === "race" && (
+            <RaceBoard myId={me.id} fixedMosque={halaqa?.mosque} />
+          )}
 
           {quranSec === "plan" && (
             <>

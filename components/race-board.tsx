@@ -16,11 +16,19 @@ type PeriodKey = (typeof PERIODS)[number]["key"];
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
-/** 🏆 لوحة سباق الحلقات — تُعرض في صفحة /race وتبويب «السباق» عند الطالبة */
-export function RaceBoard({ myId }: { myId?: string | null }) {
+/** 🏆 لوحة سباق الحلقات — تُعرض في صفحة /race وتبويب «السباق» عند الطالبة.
+    السباق على مستوى المسجد: fixedMosque يقفل النطاق على مسجد الطالبة */
+export function RaceBoard({
+  myId,
+  fixedMosque,
+}: {
+  myId?: string | null;
+  fixedMosque?: string;
+}) {
   const { students, halaqas, recitations, readingProgress, tajweedResults } =
     useApp();
-  const [mosque, setMosque] = useState(""); // "" = كل المساجد
+  const [mosqueState, setMosqueState] = useState(""); // "" = كل المساجد
+  const mosque = fixedMosque ?? mosqueState;
   const [period, setPeriod] = useState<PeriodKey>("week");
   const [rulesOpen, setRulesOpen] = useState(false);
 
@@ -51,23 +59,29 @@ export function RaceBoard({ myId }: { myId?: string | null }) {
 
   return (
     <div>
-      {/* النطاق: كل المساجد أو مسجد معين */}
-      <div className="mb-2 flex flex-wrap gap-1.5">
-        {["", ...mosques].map((m) => (
-          <button
-            key={m || "all"}
-            type="button"
-            onClick={() => setMosque(m)}
-            className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
-              mosque === m
-                ? "bg-plum-600 text-white"
-                : "bg-cream text-silver-600"
-            }`}
-          >
-            {m || "🕌 كل المساجد"}
-          </button>
-        ))}
-      </div>
+      {/* النطاق: السباق على مستوى المسجد — الطالبة مقفولة على مسجدها */}
+      {fixedMosque ? (
+        <p className="mb-2 rounded-xl bg-plum-50 px-3 py-2 text-center text-sm font-bold text-plum-800">
+          🕌 سباق طالبات {fixedMosque}
+        </p>
+      ) : (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {["", ...mosques].map((m) => (
+            <button
+              key={m || "all"}
+              type="button"
+              onClick={() => setMosqueState(m)}
+              className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
+                mosque === m
+                  ? "bg-plum-600 text-white"
+                  : "bg-cream text-silver-600"
+              }`}
+            >
+              {m || "🕌 كل المساجد"}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* الفترة */}
       <div className="mb-5 flex gap-1 rounded-2xl bg-cream p-1">
