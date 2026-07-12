@@ -49,9 +49,9 @@ const STUDENT_TABS = [
   { key: "quran", icon: "🕋", label: "القرآن" },
   { key: "tajweed", icon: "📿", label: "التجويد" },
   { key: "race", icon: "🏆", label: "السباق" },
-  { key: "notifications", icon: "🔔", label: "الإشعارات" },
 ] as const;
-type StudentTab = (typeof STUDENT_TABS)[number]["key"];
+// الإشعارات شاشة يفتحها جرس أعلى الصفحة (ليست في الشريط)
+type StudentTab = (typeof STUDENT_TABS)[number]["key"] | "notifications";
 
 // أقسام تبويب القرآن — كل شاشة خفيفة ومريحة
 const QURAN_SECTIONS = [
@@ -162,8 +162,28 @@ export function StudentHome() {
     : null;
 
   return (
-    <main className="mx-auto max-w-2xl px-4 pb-16 pt-10">
+    <main className="relative mx-auto max-w-2xl px-4 pb-16 pt-10">
       <WelcomeSplash name={me.name} />
+
+      {/* 🔔 الإشعارات — جرس في الطرف العلوي */}
+      <button
+        type="button"
+        onClick={() => setTab("notifications")}
+        aria-label="الإشعارات"
+        className={`absolute left-4 top-6 flex h-11 w-11 items-center justify-center rounded-full text-xl shadow ring-1 transition active:scale-95 ${
+          tab === "notifications"
+            ? "bg-plum-600 ring-plum-600"
+            : "bg-white ring-cream-dark"
+        }`}
+      >
+        🔔
+        {unreadNotifs > 0 && (
+          <span className="absolute -end-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+            {ar(unreadNotifs)}
+          </span>
+        )}
+      </button>
+
       <div className="mb-4 text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.png" alt="الماهر" className="mx-auto mb-3 h-16 w-auto" />
@@ -202,11 +222,6 @@ export function StudentHome() {
           >
             <span className="text-lg leading-none">{t.icon}</span>
             {t.label}
-            {t.key === "notifications" && unreadNotifs > 0 && (
-              <span className="absolute end-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
-                {ar(unreadNotifs)}
-              </span>
-            )}
           </button>
         ))}
       </div>
@@ -688,6 +703,18 @@ export function StudentHome() {
       {/* شاشة الإشعارات — الأرشيف كاملاً */}
       {tab === "notifications" && (
         <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-kufi text-lg font-bold text-plum-800">
+              🔔 الإشعارات
+            </h2>
+            <button
+              type="button"
+              onClick={() => setTab("quran")}
+              className="rounded-full bg-cream px-3 py-1.5 text-xs font-bold text-plum-700"
+            >
+              → رجوع
+            </button>
+          </div>
           <PushToggle studentId={me.id} halaqaId={me.halaqaId} />
           <NotificationsCenter
             halaqaIds={myHalaqaIds}
