@@ -135,6 +135,38 @@ input, textarea, select {
 .jm-draw {
   transition: stroke-dashoffset 1.6s ease-out;
 }
+/* تمايل الزهور المزهرة مع النسيم */
+@keyframes jm-sway {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+.jm-sway {
+  animation: jm-sway 3.2s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+/* نبض نموّ الزهرة المتفتحة */
+@keyframes jm-grow {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+.jm-grow {
+  animation: jm-grow 2.4s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+/* رفرفة الفراشة حول الزهرة الحالية */
+@keyframes jm-fly {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-9px, -7px); }
+  50% { transform: translate(3px, -13px); }
+  75% { transform: translate(9px, -5px); }
+}
+.jm-fly {
+  animation: jm-fly 5s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
 /* قصاصات الاحتفال بمحطة جديدة */
 @keyframes jm-confetti {
   0% { transform: translateY(-16px) rotate(0deg); opacity: 1; }
