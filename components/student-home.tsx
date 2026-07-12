@@ -48,6 +48,7 @@ const STUDENT_TABS = [
   { key: "reading", icon: "📖", label: "القراءة" },
   { key: "quran", icon: "🕋", label: "القرآن" },
   { key: "tajweed", icon: "📿", label: "التجويد" },
+  { key: "race", icon: "🏆", label: "السباق" },
   { key: "notifications", icon: "🔔", label: "الإشعارات" },
 ] as const;
 type StudentTab = (typeof STUDENT_TABS)[number]["key"];
@@ -57,7 +58,6 @@ const QURAN_SECTIONS = [
   { key: "today", icon: "📌", label: "وِردي" },
   { key: "journey", icon: "🧭", label: "رحلتي" },
   { key: "plan", icon: "📅", label: "خطتي" },
-  { key: "race", icon: "🏆", label: "السباق" },
 ] as const;
 type QuranSec = (typeof QURAN_SECTIONS)[number]["key"];
 
@@ -194,16 +194,16 @@ export function StudentHome() {
             key={t.key}
             type="button"
             onClick={() => setTab(t.key)}
-            className={`relative flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 font-kufi text-base font-bold transition ${
+            className={`relative flex flex-1 flex-col items-center gap-0.5 rounded-xl px-0.5 py-2 font-kufi text-[11px] font-bold transition ${
               tab === t.key
                 ? "bg-plum-600 text-white shadow"
                 : "text-silver-600"
             }`}
           >
-            <span>{t.icon}</span>
+            <span className="text-lg leading-none">{t.icon}</span>
             {t.label}
             {t.key === "notifications" && unreadNotifs > 0 && (
-              <span className="absolute end-1.5 top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+              <span className="absolute end-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
                 {ar(unreadNotifs)}
               </span>
             )}
@@ -415,10 +415,6 @@ export function StudentHome() {
             <MotivationPanel student={me} halaqa={halaqa} />
           )}
 
-          {/* السباق — على مستوى مسجد الطالبة */}
-          {quranSec === "race" && (
-            <RaceBoard myId={me.id} fixedMosque={halaqa?.mosque} />
-          )}
 
           {quranSec === "plan" && (
             <>
@@ -679,6 +675,13 @@ export function StudentHome() {
               return l ? <TajweedQuiz lesson={l} studentId={me.id} /> : null;
             })()}
           </Sheet>
+        </section>
+      )}
+
+      {/* شاشة السباق — منافسة على مستوى مسجد الطالبة */}
+      {tab === "race" && (
+        <section>
+          <RaceBoard myId={me.id} fixedMosque={halaqa?.mosque} />
         </section>
       )}
 
