@@ -213,6 +213,40 @@ export function recitePartLabel(part?: RecitePart): string {
   return a === b ? a : `${a} ← ${b}`;
 }
 
+/* ================== التجويد ================== */
+
+export interface TajweedQuestion {
+  q: string;
+  options: string[]; // ٢–٤ خيارات
+  answer: number; // فهرس الإجابة الصحيحة
+}
+
+export interface TajweedLesson {
+  id: string;
+  title: string;
+  kind: "video" | "pdf";
+  url: string;
+  questions: TajweedQuestion[];
+  createdAt: string;
+}
+
+/** نتيجة الطالبة في أسئلة درس (الأحدث تحلّ محل الأقدم) */
+export interface TajweedResult {
+  lessonId: string;
+  studentId: string;
+  score: number;
+  total: number;
+  answeredAt: string;
+}
+
+/** رابط تضمين للفيديو: يوتيوب → nocookie embed، وغيره يُعاد كما هو */
+export function videoEmbedUrl(url: string): string {
+  const m = url.match(
+    /(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([\w-]{6,})/
+  );
+  return m ? `https://www.youtube-nocookie.com/embed/${m[1]}` : "";
+}
+
 /** أرشيف فصل منتهٍ: جدوله + لقطة خطة كل طالبة عند الإغلاق —
     تكفي لإعادة بناء جدول الفصل القديم وأحكام سجلّاته */
 export interface TermArchive {
@@ -234,6 +268,8 @@ export interface AppState {
   notifReads: NotifRead[];
   recitations: RecitationLog[];
   terms: TermArchive[];
+  tajweed: TajweedLesson[];
+  tajweedResults: TajweedResult[];
 }
 
 export const EMPTY_GOALS: Goals = {};
@@ -491,6 +527,8 @@ const SEED: AppState = {
   notifReads: [],
   recitations: [],
   terms: [],
+  tajweed: [],
+  tajweedResults: [],
 };
 
 /* ================== المخزن المحلي (نسخة سريعة للعرض) ================== */
@@ -517,6 +555,10 @@ function load(): AppState {
         notifReads: Array.isArray(parsed.notifReads) ? parsed.notifReads : [],
         recitations: Array.isArray(parsed.recitations) ? parsed.recitations : [],
         terms: Array.isArray(parsed.terms) ? parsed.terms : [],
+        tajweed: Array.isArray(parsed.tajweed) ? parsed.tajweed : [],
+        tajweedResults: Array.isArray(parsed.tajweedResults)
+          ? parsed.tajweedResults
+          : [],
       };
     } else {
       cache = SEED;
@@ -614,7 +656,7 @@ function run(op: () => PromiseLike<{ error: unknown }>) {
 
 /** جلب كل البيانات من قاعدة البيانات وتحديث العرض */
 export async function pullRemote(): Promise<void> {
-  const [h, t, s, a, b, r, sess, trm] = await Promise.all([
+  const [h, t, s, a, b, r, sess, trm, tj, tjr] = await Promise.all([
     supabase
       .from("almaher_halaqas")
       .select("id,mosque,day,term_start,term_sessions")
@@ -643,6 +685,13 @@ export async function pullRemote(): Promise<void> {
       .from("almaher_terms")
       .select("id,halaqa_id,day,term_start,term_sessions,students,closed_at")
       .order("closed_at", { ascending: false }),
+    supabase
+      .from("almaher_tajweed")
+      .select("id,title,kind,url,questions,created_at")
+      .order("created_at"),
+    supabase
+      .from("almaher_tajweed_results")
+      .select("lesson_id,student_id,score,total,answered_at"),
   ]);
   if (h.error || t.error || s.error || a.error || b.error) {
     throw h.error ?? t.error ?? s.error ?? a.error ?? b.error;
@@ -727,6 +776,23 @@ export async function pullRemote(): Promise<void> {
         ? (row.students as TermArchive["students"])
         : [],
       closedAt: (row.closed_at as string) ?? "",
+    })),
+    tajweed: (tj.data ?? []).map((row) => ({
+      id: row.id as string,
+      title: row.title as string,
+      kind: (row.kind as TajweedLesson["kind"]) ?? "video",
+      url: (row.url as string) ?? "",
+      questions: Array.isArray(row.questions)
+        ? (row.questions as TajweedQuestion[])
+        : [],
+      createdAt: (row.created_at as string) ?? "",
+    })),
+    tajweedResults: (tjr.data ?? []).map((row) => ({
+      lessonId: row.lesson_id as string,
+      studentId: row.student_id as string,
+      score: (row.score as number) ?? 0,
+      total: (row.total as number) ?? 0,
+      answeredAt: (row.answered_at as string) ?? "",
     })),
   });
 }
@@ -1136,6 +1202,82 @@ export const actions = {
     }));
     run(() => supabase.from("almaher_sessions").delete().eq("id", id));
   },
+  /* ===== التجويد ===== */
+  addTajweed(data: Omit<TajweedLesson, "id" | "createdAt">) {
+    const lesson: TajweedLesson = {
+      ...data,
+      id: uid(),
+      createdAt: new Date().toISOString(),
+    };
+    setState((s) => ({ ...s, tajweed: [...s.tajweed, lesson] }));
+    run(() =>
+      supabase.from("almaher_tajweed").insert({
+        id: lesson.id,
+        title: lesson.title,
+        kind: lesson.kind,
+        url: lesson.url,
+        questions: lesson.questions,
+      })
+    );
+    return lesson.id;
+  },
+  updateTajweed(id: string, patch: Partial<Omit<TajweedLesson, "id" | "createdAt">>) {
+    setState((s) => ({
+      ...s,
+      tajweed: s.tajweed.map((l) => (l.id === id ? { ...l, ...patch } : l)),
+    }));
+    run(() =>
+      supabase
+        .from("almaher_tajweed")
+        .update({
+          ...(patch.title !== undefined && { title: patch.title }),
+          ...(patch.kind !== undefined && { kind: patch.kind }),
+          ...(patch.url !== undefined && { url: patch.url }),
+          ...(patch.questions !== undefined && { questions: patch.questions }),
+        })
+        .eq("id", id)
+    );
+  },
+  removeTajweed(id: string) {
+    setState((s) => ({
+      ...s,
+      tajweed: s.tajweed.filter((l) => l.id !== id),
+      tajweedResults: s.tajweedResults.filter((r) => r.lessonId !== id),
+    }));
+    run(async () => {
+      await supabase.from("almaher_tajweed_results").delete().eq("lesson_id", id);
+      return supabase.from("almaher_tajweed").delete().eq("id", id);
+    });
+  },
+  /** حفظ نتيجة الطالبة في أسئلة درس — الأحدث تحلّ محل الأقدم */
+  saveTajweedResult(lessonId: string, studentId: string, score: number, total: number) {
+    const res: TajweedResult = {
+      lessonId,
+      studentId,
+      score,
+      total,
+      answeredAt: new Date().toISOString(),
+    };
+    setState((s) => ({
+      ...s,
+      tajweedResults: [
+        ...s.tajweedResults.filter(
+          (r) => !(r.lessonId === lessonId && r.studentId === studentId)
+        ),
+        res,
+      ],
+    }));
+    run(() =>
+      supabase.from("almaher_tajweed_results").upsert({
+        lesson_id: lessonId,
+        student_id: studentId,
+        score,
+        total,
+        answered_at: res.answeredAt,
+      })
+    );
+  },
+
   /** أرشفة الفصل المنتهي (جدوله + خطط طالباته) قبل بدء فصل جديد */
   archiveTerm(t: Omit<TermArchive, "id" | "closedAt">) {
     const arch: TermArchive = {
@@ -1218,6 +1360,12 @@ export const actions = {
           ? parsed.recitations
           : getState().recitations,
         terms: Array.isArray(parsed.terms) ? parsed.terms : getState().terms,
+        tajweed: Array.isArray(parsed.tajweed)
+          ? parsed.tajweed
+          : getState().tajweed,
+        tajweedResults: Array.isArray(parsed.tajweedResults)
+          ? parsed.tajweedResults
+          : getState().tajweedResults,
       };
       persist(state);
       pushAll(state).catch(() => syncAlert());

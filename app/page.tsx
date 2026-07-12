@@ -87,6 +87,14 @@ export default function Home() {
           <span className="font-kufi text-sm font-bold text-plum-800">كتب القراءة</span>
           <span className="text-[11px] text-silver-600">رفع PDF</span>
         </Link>
+        <Link
+          href="/tajweed"
+          className="card flex flex-col items-center gap-1.5 rounded-2xl py-4 transition active:scale-[0.97]"
+        >
+          <span className="text-2xl">📿</span>
+          <span className="font-kufi text-sm font-bold text-plum-800">التجويد</span>
+          <span className="text-[11px] text-silver-600">دروس وأسئلة</span>
+        </Link>
       </div>
 
       <button

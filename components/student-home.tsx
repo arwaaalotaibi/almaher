@@ -31,7 +31,8 @@ import { printHifzSchedule } from "@/lib/print-schedule";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 import Link from "next/link";
-import { Field, inputCls, PrimaryBtn, Ribbon } from "./ui";
+import { Field, inputCls, PrimaryBtn, Ribbon, Sheet } from "./ui";
+import { TajweedQuiz } from "./tajweed-quiz";
 import { NotificationsCenter, PinnedNotice } from "./notifications-card";
 import { PushToggle } from "./push-toggle";
 import { ReciteLogger, SessionVerdictChip, VerdictChip } from "./recite-log";
@@ -40,21 +41,32 @@ import { computeProgress, partVerdict, sessionVerdict } from "@/lib/progress";
 import { facesLabel } from "@/lib/arabic";
 
 /** شاشة الطالبة: تدخل برمزها فتُعرض أهدافها مباشرة (قراءة فقط) */
-// تبويبات صفحة الطالبة (التجويد لاحقاً)
+// تبويبات صفحة الطالبة
 const STUDENT_TABS = [
   { key: "reading", icon: "📖", label: "القراءة" },
   { key: "quran", icon: "🕋", label: "القرآن" },
+  { key: "tajweed", icon: "📿", label: "التجويد" },
   { key: "notifications", icon: "🔔", label: "الإشعارات" },
 ] as const;
 type StudentTab = (typeof STUDENT_TABS)[number]["key"];
 
 export function StudentHome() {
-  const { halaqas, teachers, students, books, announcements, recitations, terms } =
-    useApp();
+  const {
+    halaqas,
+    teachers,
+    students,
+    books,
+    announcements,
+    recitations,
+    terms,
+    tajweed,
+    tajweedResults,
+  } = useApp();
   const [myId, setMyId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState<StudentTab>("reading");
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const [quizFor, setQuizFor] = useState<string | null>(null); // درس الأسئلة المفتوح
 
   useEffect(() => {
     setMyId(window.localStorage.getItem(STUDENT_PICK_KEY));
@@ -519,6 +531,84 @@ export function StudentHome() {
               آخر تحديث: {updatedLabel}
             </p>
           )}
+        </section>
+      )}
+
+      {/* شاشة التجويد — دروس فيديو/PDF مع أسئلة */}
+      {tab === "tajweed" && (
+        <section>
+          {tajweed.length === 0 ? (
+            <div className="card rounded-2xl p-8 text-center">
+              <p className="text-3xl">📿</p>
+              <p className="mt-2 font-kufi font-bold text-plum-800">
+                لا دروس تجويد بعد
+              </p>
+              <p className="mt-1 text-sm text-silver-600">
+                ستظهر هنا الدروس التي تضيفها الإدارة
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-3">
+              {tajweed.map((l) => {
+                const res = tajweedResults.find(
+                  (r) => r.lessonId === l.id && r.studentId === me.id
+                );
+                return (
+                  <div key={l.id} className="overflow-hidden rounded-xl">
+                    <Link
+                      href={`/tajweed/${l.id}`}
+                      className="name-box flex items-center gap-3 rounded-xl px-5 py-4 text-start transition active:scale-[0.99]"
+                    >
+                      <span className="text-2xl">
+                        {l.kind === "video" ? "🎬" : "📄"}
+                      </span>
+                      <span className="min-w-0 flex-1 font-kufi text-lg font-semibold text-white">
+                        {l.title}
+                      </span>
+                      {res && (
+                        <span
+                          className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                            res.score === res.total
+                              ? "bg-emerald-500 text-white"
+                              : "bg-white/20 text-white"
+                          }`}
+                        >
+                          {res.score === res.total ? "🌟 " : "📝 "}
+                          {ar(res.score)}/{ar(res.total)}
+                        </span>
+                      )}
+                    </Link>
+                    {l.questions.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setQuizFor(l.id)}
+                        className={`mt-1.5 w-full rounded-xl px-4 py-2.5 text-start text-sm font-bold ${
+                          res
+                            ? "bg-plum-50 text-plum-800"
+                            : "bg-plum-600 text-white"
+                        }`}
+                      >
+                        📝 {res ? "أعيدي حلّ الأسئلة" : "حُلّي أسئلة الدرس"} (
+                        {ar(l.questions.length)})
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* أسئلة الدرس في نافذة */}
+          <Sheet
+            open={quizFor !== null}
+            onClose={() => setQuizFor(null)}
+            title="📝 أسئلة الدرس"
+          >
+            {(() => {
+              const l = tajweed.find((x) => x.id === quizFor);
+              return l ? <TajweedQuiz lesson={l} studentId={me.id} /> : null;
+            })()}
+          </Sheet>
         </section>
       )}
 
