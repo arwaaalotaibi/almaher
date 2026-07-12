@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { juzLabel } from "@/lib/progress";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
@@ -43,17 +43,25 @@ function pathD(to: number): string {
   return d;
 }
 
+/** لوح ألوان قصاصات الاحتفال — من هوية التطبيق */
+const CONFETTI = ["#a8894f", "#5d3f4e", "#e7c873", "#8a5d75", "#ffffff"];
+
 /** 🗺️ درب الحفظ: خريطة رحلة متحركة عبر أجزاء المصحف الثلاثين */
 export function JourneyMap({
   juz,
   juzPct,
+  goalJuz = 0,
+  studentId = "",
 }: {
   juz: number; // الجزء الحالي (1..30)
   juzPct: number; // نسبة إنجازه
+  goalJuz?: number; // جزء هدف الفصل (يظهر عليه 🚩)
+  studentId?: string; // لتذكّر آخر محطة احتُفل بها
 }) {
   const cur = Math.min(Math.max(1, juz), 30) - 1; // فهرس المحطة الحالية
   const doneRef = useRef<SVGPathElement>(null);
   const [drawn, setDrawn] = useState(false);
+  const [celebrate, setCelebrate] = useState(false);
 
   // رسم الدرب المقطوع تدريجياً عند الظهور
   useEffect(() => {
@@ -68,13 +76,42 @@ export function JourneyMap({
     );
   }, [cur]);
 
+  // 🎊 احتفال عند تذهيب محطة جديدة (مرة واحدة لكل محطة، لكل جهاز)
+  useEffect(() => {
+    if (!studentId) return;
+    const key = `almaher-jm:${studentId}`;
+    const stored = window.localStorage.getItem(key);
+    if (stored !== null && cur > Number(stored)) {
+      setCelebrate(true);
+      const t = setTimeout(() => setCelebrate(false), 4000);
+      window.localStorage.setItem(key, String(cur));
+      return () => clearTimeout(t);
+    }
+    window.localStorage.setItem(key, String(cur));
+  }, [studentId, cur]);
+
+  // قصاصات عشوائية — تُولَّد فقط عند الاحتفال (على الجهاز، فلا مشكلة SSR)
+  const pieces = useMemo(
+    () =>
+      celebrate
+        ? Array.from({ length: 26 }, (_, i) => ({
+            left: Math.random() * 100,
+            delay: Math.random() * 0.7,
+            dur: 1.8 + Math.random() * 1.1,
+            color: CONFETTI[i % CONFETTI.length],
+            size: 6 + Math.random() * 5,
+          }))
+        : [],
+    [celebrate]
+  );
+
   const end = pt(29);
   // حلقة تقدّم الجزء الحالي حول محطته
   const R = 21;
   const ringLen = 2 * Math.PI * R;
 
   return (
-    <div className="card mb-2.5 overflow-hidden rounded-2xl">
+    <div className="card relative mb-2.5 overflow-hidden rounded-2xl">
       <div className="flex items-center justify-between bg-gradient-to-l from-plum-500 to-plum-700 px-4 py-2.5">
         <span className="font-kufi text-sm font-bold text-white">
           🗺️ درب حفظي
@@ -83,6 +120,30 @@ export function JourneyMap({
           {juzLabel(juz)} · {ar(juzPct)}٪
         </span>
       </div>
+
+      {/* 🎊 قصاصات الاحتفال بمحطة جديدة */}
+      {celebrate && (
+        <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
+          {pieces.map((p, i) => (
+            <span
+              key={i}
+              className="jm-confetti absolute rounded-[2px]"
+              style={{
+                left: `${p.left}%`,
+                top: -12,
+                width: p.size,
+                height: p.size * 0.6,
+                backgroundColor: p.color,
+                animationDuration: `${p.dur}s`,
+                animationDelay: `${p.delay}s`,
+              }}
+            />
+          ))}
+          <p className="absolute inset-x-4 top-1/3 rounded-2xl bg-plum-800/90 px-4 py-3 text-center font-kufi text-sm font-bold text-white shadow-lg">
+            🎉 ما شاء الله! ذهّبتِ محطة {juzLabel(cur)} — واصلي!
+          </p>
+        </div>
+      )}
 
       <svg
         viewBox={`0 0 ${W} ${H}`}
@@ -117,9 +178,16 @@ export function JourneyMap({
           const { x, y } = pt(i);
           const done = i < cur;
           const isCur = i === cur;
+          const isGoal = goalJuz > 0 && i === goalJuz - 1;
           return (
             <g key={i}>
-              <title>{juzLabel(i + 1)}</title>
+              <title>{`${juzLabel(i + 1)}${isGoal ? " — هدف الفصل 🚩" : ""}`}</title>
+              {/* 🚩 هدف الفصل */}
+              {isGoal && (
+                <text x={x + 14} y={y - 14} fontSize="13" className="jm-float">
+                  🚩
+                </text>
+              )}
               {/* نبض المحطة الحالية */}
               {isCur && (
                 <circle cx={x} cy={y} r={16} fill="#5d3f4e" className="jm-pulse" />

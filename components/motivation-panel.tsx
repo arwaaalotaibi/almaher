@@ -272,7 +272,12 @@ export function MotivationPanel({
       )}
 
       {/* درب الحفظ — خريطة الرحلة المتحركة عبر الأجزاء */}
-      <JourneyMap juz={p.juz} juzPct={p.juzPct} />
+      <JourneyMap
+        juz={p.juz}
+        juzPct={p.juzPct}
+        goalJuz={p.termGoalJuz}
+        studentId={student.id}
+      />
 
       {/* تقدّم الجزء */}
       <div className="card mb-2.5 rounded-2xl p-4">

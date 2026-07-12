@@ -135,3 +135,13 @@ input, textarea, select {
 .jm-draw {
   transition: stroke-dashoffset 1.6s ease-out;
 }
+/* قصاصات الاحتفال بمحطة جديدة */
+@keyframes jm-confetti {
+  0% { transform: translateY(-16px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(460px) rotate(680deg); opacity: 0; }
+}
+.jm-confetti {
+  animation-name: jm-confetti;
+  animation-timing-function: ease-in;
+  animation-fill-mode: both;
+}
