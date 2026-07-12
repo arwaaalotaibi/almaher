@@ -259,6 +259,27 @@ export function videoEmbedUrl(url: string): string {
   return m ? `https://www.youtube-nocookie.com/embed/${m[1]}` : "";
 }
 
+/* ================== الدعم والاقتراحات ================== */
+
+export type SupportKind = "issue" | "idea" | "question";
+
+export const SUPPORT_KINDS: { key: SupportKind; icon: string; label: string }[] = [
+  { key: "issue", icon: "🛠️", label: "مشكلة تقنية" },
+  { key: "idea", icon: "💡", label: "اقتراح" },
+  { key: "question", icon: "💬", label: "استفسار" },
+];
+
+export interface SupportMsg {
+  id: string;
+  studentId: string;
+  kind: SupportKind;
+  body: string;
+  reply: string;
+  status: "new" | "done";
+  createdAt: string;
+  repliedAt?: string;
+}
+
 /** أرشيف فصل منتهٍ: جدوله + لقطة خطة كل طالبة عند الإغلاق —
     تكفي لإعادة بناء جدول الفصل القديم وأحكام سجلّاته */
 export interface TermArchive {
@@ -283,6 +304,7 @@ export interface AppState {
   tajweed: TajweedLesson[];
   tajweedResults: TajweedResult[];
   readingProgress: ReadingProgress[];
+  support: SupportMsg[];
 }
 
 export const EMPTY_GOALS: Goals = {};
@@ -543,6 +565,7 @@ const SEED: AppState = {
   tajweed: [],
   tajweedResults: [],
   readingProgress: [],
+  support: [],
 };
 
 /* ================== المخزن المحلي (نسخة سريعة للعرض) ================== */
@@ -576,6 +599,7 @@ function load(): AppState {
         readingProgress: Array.isArray(parsed.readingProgress)
           ? parsed.readingProgress
           : [],
+        support: Array.isArray(parsed.support) ? parsed.support : [],
       };
     } else {
       cache = SEED;
@@ -673,7 +697,7 @@ function run(op: () => PromiseLike<{ error: unknown }>) {
 
 /** جلب كل البيانات من قاعدة البيانات وتحديث العرض */
 export async function pullRemote(): Promise<void> {
-  const [h, t, s, a, b, r, sess, trm, tj, tjr, rdp] = await Promise.all([
+  const [h, t, s, a, b, r, sess, trm, tj, tjr, rdp, sup] = await Promise.all([
     supabase
       .from("almaher_halaqas")
       .select("id,mosque,day,term_start,term_sessions")
@@ -712,6 +736,10 @@ export async function pullRemote(): Promise<void> {
     supabase
       .from("almaher_reading_progress")
       .select("book_id,segment_id,student_id,done,score,total,updated_at"),
+    supabase
+      .from("almaher_support")
+      .select("id,student_id,kind,body,reply,status,created_at,replied_at")
+      .order("created_at", { ascending: false }),
   ]);
   if (h.error || t.error || s.error || a.error || b.error) {
     throw h.error ?? t.error ?? s.error ?? a.error ?? b.error;
@@ -822,6 +850,16 @@ export async function pullRemote(): Promise<void> {
       score: (row.score as number) ?? undefined,
       total: (row.total as number) ?? undefined,
       updatedAt: (row.updated_at as string) ?? "",
+    })),
+    support: (sup.data ?? []).map((row) => ({
+      id: row.id as string,
+      studentId: row.student_id as string,
+      kind: (row.kind as SupportKind) ?? "issue",
+      body: (row.body as string) ?? "",
+      reply: (row.reply as string) ?? "",
+      status: (row.status as SupportMsg["status"]) ?? "new",
+      createdAt: (row.created_at as string) ?? "",
+      repliedAt: (row.replied_at as string) ?? undefined,
     })),
   });
 }
@@ -1355,6 +1393,53 @@ export const actions = {
     );
   },
 
+  /* ===== الدعم والاقتراحات ===== */
+  addSupport(studentId: string, kind: SupportKind, body: string) {
+    const msg: SupportMsg = {
+      id: uid(),
+      studentId,
+      kind,
+      body: body.trim(),
+      reply: "",
+      status: "new",
+      createdAt: new Date().toISOString(),
+    };
+    setState((s) => ({ ...s, support: [msg, ...s.support] }));
+    run(() =>
+      supabase.from("almaher_support").insert({
+        id: msg.id,
+        student_id: msg.studentId,
+        kind: msg.kind,
+        body: msg.body,
+      })
+    );
+  },
+  /** ردّ الإدارة — يُغلق الرسالة */
+  replySupport(id: string, reply: string) {
+    const repliedAt = new Date().toISOString();
+    setState((s) => ({
+      ...s,
+      support: s.support.map((m) =>
+        m.id === id
+          ? { ...m, reply: reply.trim(), status: "done" as const, repliedAt }
+          : m
+      ),
+    }));
+    run(() =>
+      supabase
+        .from("almaher_support")
+        .update({ reply: reply.trim(), status: "done", replied_at: repliedAt })
+        .eq("id", id)
+    );
+  },
+  removeSupport(id: string) {
+    setState((s) => ({
+      ...s,
+      support: s.support.filter((m) => m.id !== id),
+    }));
+    run(() => supabase.from("almaher_support").delete().eq("id", id));
+  },
+
   /** أرشفة الفصل المنتهي (جدوله + خطط طالباته) قبل بدء فصل جديد */
   archiveTerm(t: Omit<TermArchive, "id" | "closedAt">) {
     const arch: TermArchive = {
@@ -1446,6 +1531,9 @@ export const actions = {
         readingProgress: Array.isArray(parsed.readingProgress)
           ? parsed.readingProgress
           : getState().readingProgress,
+        support: Array.isArray(parsed.support)
+          ? parsed.support
+          : getState().support,
       };
       persist(state);
       pushAll(state).catch(() => syncAlert());

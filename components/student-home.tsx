@@ -35,6 +35,7 @@ import { Field, inputCls, PrimaryBtn, Ribbon, Sheet } from "./ui";
 import { TajweedQuiz } from "./tajweed-quiz";
 import { ReadingWards } from "./reading-wards";
 import { RaceBoard } from "./race-board";
+import { SupportBox } from "./support-box";
 import { NotificationsCenter, PinnedNotice } from "./notifications-card";
 import { PushToggle } from "./push-toggle";
 import { ReciteLogger, SessionVerdictChip, VerdictChip } from "./recite-log";
@@ -725,10 +726,13 @@ export function StudentHome() {
         </section>
       )}
 
+      {/* الدعم الفني والاقتراحات */}
+      <SupportBox studentId={me.id} />
+
       <button
         type="button"
         onClick={logout}
-        className="mx-auto mt-10 block text-sm font-bold text-silver-600 underline"
+        className="mx-auto mt-4 block text-sm font-bold text-silver-600 underline"
       >
         🚪 تسجيل الخروج
       </button>

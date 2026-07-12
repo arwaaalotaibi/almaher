@@ -10,8 +10,9 @@ import { StudentHome } from "@/components/student-home";
 
 export default function Home() {
   const role = useRole();
-  const { halaqas, students } = useApp();
+  const { halaqas, students, support } = useApp();
   const hydrated = useHydrated();
+  const newSupport = support.filter((m) => m.status === "new").length;
 
   if (role === "teacher") return <TeacherHome />;
   if (role === "student") return <StudentHome />;
@@ -102,6 +103,21 @@ export default function Home() {
           <span className="text-2xl">🏆</span>
           <span className="font-kufi text-sm font-bold text-plum-800">سباق الحلقات</span>
           <span className="text-[11px] text-silver-600">منافسة تلقائية</span>
+        </Link>
+        <Link
+          href="/support"
+          className="card relative flex flex-col items-center gap-1.5 rounded-2xl py-4 transition active:scale-[0.97]"
+        >
+          <span className="text-2xl">🛟</span>
+          <span className="font-kufi text-sm font-bold text-plum-800">
+            الدعم والاقتراحات
+          </span>
+          <span className="text-[11px] text-silver-600">رسائل الطالبات</span>
+          {newSupport > 0 && (
+            <span className="absolute end-3 top-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+              {newSupport.toLocaleString("ar-EG")}
+            </span>
+          )}
         </Link>
       </div>
 
