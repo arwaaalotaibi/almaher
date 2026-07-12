@@ -410,7 +410,27 @@ export function StudentHome() {
 
           {/* رحلتي — الخريطة والتحفيز كاملاً */}
           {quranSec === "journey" && (
-            <MotivationPanel student={me} halaqa={halaqa} />
+            <>
+              <MotivationPanel student={me} halaqa={halaqa} />
+
+              {/* سباق الحلقات — منافسة بين الطالبات */}
+              <Link
+                href="/race"
+                className="mb-4 flex items-center gap-3 rounded-2xl p-4 text-white shadow transition active:scale-[0.99]"
+                style={{ background: "linear-gradient(135deg,#8a6d3b,#b7973f)" }}
+              >
+                <span className="text-3xl">🏆</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-kufi text-base font-bold">
+                    سباق الحلقات
+                  </span>
+                  <span className="mt-0.5 block text-xs text-white/85">
+                    نافسي طالبات كل المساجد — أين ترتيبك هذا الأسبوع؟
+                  </span>
+                </span>
+                <span className="text-xl text-white/70">‹</span>
+              </Link>
+            </>
           )}
 
           {quranSec === "plan" && (

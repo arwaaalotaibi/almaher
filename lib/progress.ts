@@ -123,6 +123,11 @@ function faces(part?: RecitePart): number {
   return facesInfo(part).done;
 }
 
+/** أوجه مكتملة لقسم تسميع — للاستخدام خارج المحرّك (نقاط المنافسة) */
+export function partFaces(part?: RecitePart): number {
+  return facesInfo(part).done;
+}
+
 /* ================== مقارنة المُنجَز بالمطلوب ================== */
 
 /** حكم قسم واحد في لقاء: ما سُمّع فعلاً مقابل المطلوب (بالأوجه) */

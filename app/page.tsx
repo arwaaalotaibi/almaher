@@ -95,6 +95,14 @@ export default function Home() {
           <span className="font-kufi text-sm font-bold text-plum-800">التجويد</span>
           <span className="text-[11px] text-silver-600">دروس وأسئلة</span>
         </Link>
+        <Link
+          href="/race"
+          className="card flex flex-col items-center gap-1.5 rounded-2xl py-4 transition active:scale-[0.97]"
+        >
+          <span className="text-2xl">🏆</span>
+          <span className="font-kufi text-sm font-bold text-plum-800">سباق الحلقات</span>
+          <span className="text-[11px] text-silver-600">منافسة تلقائية</span>
+        </Link>
       </div>
 
       <button
