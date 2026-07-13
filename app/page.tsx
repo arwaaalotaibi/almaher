@@ -65,6 +65,16 @@ export default function Home() {
       {/* أقسام إضافية (البقية في الشريط السفلي) */}
       <div className="mt-6 grid grid-cols-2 gap-3">
         <Link
+          href="/dashboard"
+          className="card flex flex-col items-center gap-1.5 rounded-2xl py-4 transition active:scale-[0.97]"
+        >
+          <span className="text-2xl">📊</span>
+          <span className="font-kufi text-sm font-bold text-plum-800">
+            لوحة المتابعة
+          </span>
+          <span className="text-[11px] text-silver-600">نبض الحلقات + تصدير</span>
+        </Link>
+        <Link
           href="/announcements"
           className="card flex flex-col items-center gap-1.5 rounded-2xl py-4 transition active:scale-[0.97]"
         >
