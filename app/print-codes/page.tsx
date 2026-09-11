@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
+import { toPng } from "html-to-image";
 import { codeLink } from "@/lib/store";
 import { PRINT_CODES_KEY, type PrintCodesPayload } from "@/lib/print-codes";
 
@@ -12,6 +13,42 @@ const ar = (n: number) => n.toLocaleString("ar-EG");
 export default function PrintCodesPage() {
   const [data, setData] = useState<PrintCodesPayload | null | undefined>(undefined);
   const [qrs, setQrs] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false); // جاري توليد PDF
+  const pagesRef = useRef<HTMLDivElement>(null);
+
+  /** توليد PDF بصفحات A4 دقيقة: كل صفحة تُصوَّر كما هي على الشاشة (٢١٠×٢٩٧ ملم)
+      وتوضع صورةً على صفحة PDF — لا يتدخّل المتصفح بهوامش أو فواصل، فلا ورقة فارغة */
+  const downloadPdf = async () => {
+    if (busy || !pagesRef.current) return;
+    setBusy(true);
+    try {
+      const { jsPDF } = await import("jspdf");
+      const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+      const pageEls = Array.from(pagesRef.current.querySelectorAll<HTMLElement>(".page"));
+      for (let i = 0; i < pageEls.length; i++) {
+        const png = await toPng(pageEls[i], { pixelRatio: 2, cacheBust: true, backgroundColor: "#ffffff" });
+        if (i > 0) pdf.addPage("a4", "portrait");
+        pdf.addImage(png, "PNG", 0, 0, 210, 297, undefined, "FAST");
+      }
+      const fileName = `رموز-${data?.halaqaLabel ?? "الحلقة"}.pdf`;
+      const blob = pdf.output("blob");
+      const file = new File([blob], fileName, { type: "application/pdf" });
+      // على الجوال: ورقة المشاركة (حفظ في الملفات / طباعة / إرسال)
+      if (typeof navigator.share === "function" && navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: fileName });
+          return;
+        } catch {
+          /* ألغت المشاركة — نكمل بالتنزيل */
+        }
+      }
+      pdf.save(fileName);
+    } catch {
+      window.alert("تعذّر توليد الملف — حاولي من جديد");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   useEffect(() => {
     try {
@@ -88,6 +125,9 @@ export default function PrintCodesPage() {
         .print-codes .back{background:#e8dfe4;color:#5d3f4e}
         .print-codes .print{background:#5d3f4e;color:#fff}
         .print-codes .bar .meta{font-size:14px;color:#5d3f4e;font-weight:700}
+        .print-codes .bar .actions{display:flex;gap:8px}
+        .print-codes .bar button:disabled{opacity:.6;cursor:wait}
+        .print-codes .note{max-width:210mm;margin:12px auto 0;padding:0 12px;text-align:center;font-size:13px;color:#6f5f68}
         /* صفحة A4 صريحة: ٢١٠×٢٩٧ ملم، هوامش داخلية، وشبكة ٢×٢ ثابتة */
         .print-codes .pages{display:flex;flex-direction:column;gap:16px;align-items:center;padding:16px 0}
         .print-codes .page{width:210mm;height:297mm;box-sizing:border-box;padding:8mm;background:#fff;box-shadow:0 2px 12px rgba(77,51,64,.12);display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
@@ -102,7 +142,7 @@ export default function PrintCodesPage() {
         .print-codes .brand{font-size:11px;color:#a8894f;font-weight:700;margin-top:0.5mm}
         .print-codes .rule{width:60%;height:2px;background:linear-gradient(90deg,transparent,#c9a96a,transparent);margin:2mm 0}
         .print-codes .name{font-size:20px;font-weight:800;color:#3a2a32;line-height:1.3;max-height:2.6em;overflow:hidden}
-        .print-codes .halaqa{font-size:12px;color:#8b7a84;margin-top:1mm}
+        .print-codes .halaqa{font-size:12px;color:#8b7a84;margin-top:1mm;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .print-codes .qr{width:40mm;height:40mm;margin-top:2mm;border:1px solid #e8dfe4;border-radius:6px;padding:1.5mm;background:#fff;box-sizing:content-box}
         .print-codes .lbl{font-size:12px;color:#8b7a84;font-weight:700;margin-top:2mm}
         .print-codes .code{font-size:30px;font-weight:800;letter-spacing:0.22em;color:#5d3f4e;direction:ltr;line-height:1.15;background:#faf6f8;border-radius:10px;padding:1mm 4mm 1mm 6mm;margin-top:1mm}
@@ -112,7 +152,7 @@ export default function PrintCodesPage() {
           @page{size:A4 portrait;margin:10mm}
           html,body{background:#fff !important;margin:0;padding:0;height:auto}
           .print-codes{background:#fff;padding:0;min-height:0}
-          .print-codes .bar{display:none}
+          .print-codes .bar,.print-codes .note{display:none}
           .print-codes .pages{display:block;padding:0;gap:0}
           /* الصفحة بعرض المساحة المتاحة (لا ٢١٠ ملم ثابتة) وارتفاع ٢٥٦ ملم:
              يتّسع لأي هوامش يفرضها المتصفح (كروم أو سفاري أو الجوال) فلا تفيض ورقة فارغة */
@@ -137,12 +177,20 @@ export default function PrintCodesPage() {
         <span className="meta">
           {data.halaqaLabel} · {ar(data.rows.length)} بطاقة · {ar(pages.length)} صفحات
         </span>
-        <button type="button" className="print" onClick={() => window.print()}>
-          🖨️ طباعة
-        </button>
+        <span className="actions">
+          <button type="button" className="print" onClick={downloadPdf} disabled={busy}>
+            {busy ? "⏳ جاري التجهيز…" : "⬇️ تنزيل PDF"}
+          </button>
+          <button type="button" className="back" onClick={() => window.print()}>
+            🖨️
+          </button>
+        </span>
       </div>
+      <p className="note">
+        «تنزيل PDF» يعطيكِ ملفاً بصفحات A4 مضبوطة — أربع بطاقات في كل صفحة — يُطبع من أي جهاز.
+      </p>
 
-      <div className="pages">
+      <div className="pages" ref={pagesRef}>
         {pages.map((group, pi) => (
           <div key={pi} className="page">
             {group.map((r) => (
@@ -154,7 +202,7 @@ export default function PrintCodesPage() {
                   <div className="brand">جمعية الماهر بالقرآن وعلومه</div>
                   <div className="rule" />
                   <div className="name">{r.name}</div>
-                  <div className="halaqa">🕌 {data.halaqaLabel}</div>
+                  <div className="halaqa">{data.halaqaLabel}</div>
                   {qrs[r.code] ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img className="qr" src={qrs[r.code]} alt="" />
