@@ -250,6 +250,36 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
             />
           </label>
         </div>
+
+        {/* المحطتان الذهبيتان بعد اللقاءات — تظهران على درب حفظ كل طالبة مع عدّ تنازلي */}
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold text-plum-700">
+              🎙️ يوم السرد القرآني
+            </span>
+            <input
+              type="date"
+              className={inputCls}
+              value={halaqa.sardDate ?? ""}
+              onChange={(e) =>
+                actions.updateHalaqa(id, { sardDate: e.target.value })
+              }
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold text-plum-700">
+              🏁 يوم الاختبار
+            </span>
+            <input
+              type="date"
+              className={inputCls}
+              value={halaqa.examDate ?? ""}
+              onChange={(e) =>
+                actions.updateHalaqa(id, { examDate: e.target.value })
+              }
+            />
+          </label>
+        </div>
         <p className="mt-2 text-[11px] text-silver-600">
           أوجه الحفظ/التثبيت/المراجعة لكل طالبة تُدخل من بيانات الطالبة، ويولّد
           النظام جدولها تلقائياً.

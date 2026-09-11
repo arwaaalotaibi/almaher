@@ -396,12 +396,14 @@ export function JourneyMap({
   goalJuz = 0,
   studentId = "",
   reverse = false,
+  children,
 }: {
   juz: number; // الجزء الحالي (1..30)
   juzPct: number; // نسبة إنجازه
   goalJuz?: number; // جزء هدف الفصل (يظهر عليه 🚩)
   studentId?: string; // لتذكّر آخر محطة احتُفل بها + المظهر المفضّل
   reverse?: boolean; // الحفظ من الناس: المحطات من جزء عمّ نزولاً إلى الجزء الأول
+  children?: React.ReactNode; // مسار الفصل (المحطات الذهبية) أسفل الدرب
 }) {
   const j = Math.min(Math.max(1, juz), 30);
   const cur = reverse ? 30 - j : j - 1; // فهرس المحطة الحالية
@@ -517,6 +519,8 @@ export function JourneyMap({
       ) : (
         <PathSvg cur={cur} juz={juz} juzPct={juzPct} goalJuz={goalJuz} reverse={reverse} />
       )}
+
+      {children}
 
       <p className="border-t border-cream-dark px-4 py-2.5 text-center text-[11px] font-bold text-silver-600">
         {view === "garden"

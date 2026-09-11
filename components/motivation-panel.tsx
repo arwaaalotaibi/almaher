@@ -10,7 +10,14 @@ import {
   facesPlain,
   meetingsLabel,
 } from "@/lib/arabic";
-import { useApp, type Halaqa, type Student } from "@/lib/store";
+import {
+  buildSchedule,
+  termMilestones,
+  useApp,
+  type Halaqa,
+  type Student,
+} from "@/lib/store";
+import { TermTrack } from "./term-track";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 
@@ -230,16 +237,30 @@ export function MotivationPanel({
   const { recitations } = useApp();
   const p = computeProgress(student, recitations, halaqa);
 
+  // مسار الفصل: نقاط اللقاءات + المحطتان الذهبيتان (السرد والاختبار)
+  const schedule = halaqa ? buildSchedule(halaqa, student.plan) : null;
+  const passed = schedule ? schedule.length - p.termSessionsLeft : 0;
+  const track = (
+    <TermTrack
+      schedule={schedule}
+      passed={passed}
+      milestones={termMilestones(halaqa)}
+    />
+  );
+
   if (!p.hasData) {
     return (
-      <div className="card mb-4 rounded-2xl p-5 text-center">
-        <p className="text-2xl">🌱</p>
-        <p className="mt-1 font-kufi text-sm font-bold text-plum-800">
-          ابدئي بتسجيل تسميعكِ
-        </p>
-        <p className="mt-1 text-xs text-silver-600">
-          فور أول تسجيل تظهر لكِ رحلتكِ وتقدّمكِ 🧭
-        </p>
+      <div className="card mb-4 overflow-hidden rounded-2xl">
+        <div className="p-5 text-center">
+          <p className="text-2xl">🌱</p>
+          <p className="mt-1 font-kufi text-sm font-bold text-plum-800">
+            ابدئي بتسجيل تسميعكِ
+          </p>
+          <p className="mt-1 text-xs text-silver-600">
+            فور أول تسجيل تظهر لكِ رحلتكِ وتقدّمكِ 🧭
+          </p>
+        </div>
+        {track}
       </div>
     );
   }
@@ -281,7 +302,9 @@ export function MotivationPanel({
         goalJuz={p.termGoalJuz}
         studentId={student.id}
         reverse={p.desc}
-      />
+      >
+        {track}
+      </JourneyMap>
 
       {/* تقدّم الجزء */}
       <div className="card mb-2.5 rounded-2xl p-4">

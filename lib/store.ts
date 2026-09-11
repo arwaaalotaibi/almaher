@@ -129,6 +129,35 @@ export interface Halaqa {
   day: string; // الاثنين — قد يكون فارغاً
   termStart: string; // تاريخ بداية الفصل (ISO yyyy-mm-dd) — قد يكون فارغاً
   termSessions: number; // عدد لقاءات الفصل
+  sardDate?: string; // يوم السرد القرآني (ISO yyyy-mm-dd) — محطة ذهبية بعد اللقاءات
+  examDate?: string; // يوم الاختبار (ISO yyyy-mm-dd)
+}
+
+/* ================== محطات الفصل الذهبية ================== */
+
+export interface Milestone {
+  key: "sard" | "exam";
+  icon: string;
+  label: string;
+  date: Date;
+}
+
+export const MILESTONE_META = [
+  { key: "sard", icon: "🎙️", label: "السرد القرآني", field: "sardDate" },
+  { key: "exam", icon: "🏁", label: "الاختبار", field: "examDate" },
+] as const;
+
+/** محطات الفصل المضبوطة لحلقةٍ ما (السرد ثم الاختبار) — بتواريخها */
+export function termMilestones(h?: Halaqa | null): Milestone[] {
+  if (!h) return [];
+  return MILESTONE_META.flatMap((m) => {
+    const v = h[m.field];
+    if (!v) return [];
+    const date = new Date(`${v}T00:00:00`);
+    return isNaN(date.getTime())
+      ? []
+      : [{ key: m.key, icon: m.icon, label: m.label, date }];
+  });
 }
 
 export interface Teacher {
@@ -763,7 +792,8 @@ export async function pullRemote(): Promise<void> {
   const [h, t, s, a, b, r, sess, trm, tj, tjr, rdp, sup] = await Promise.all([
     supabase
       .from("almaher_halaqas")
-      .select("id,mosque,day,term_start,term_sessions")
+      // «*» لا «أعمدة محدّدة»: يعمل قبل إضافة عمودَي السرد/الاختبار وبعدها
+      .select("*")
       .order("created_at"),
     supabase.from("almaher_teachers").select("id,name,halaqa_ids").order("created_at"),
     supabase
@@ -814,6 +844,8 @@ export async function pullRemote(): Promise<void> {
       day: (row.day as string) ?? "",
       termStart: (row.term_start as string) ?? "",
       termSessions: (row.term_sessions as number) ?? 0,
+      sardDate: (row.sard_date as string) ?? "",
+      examDate: (row.exam_date as string) ?? "",
     })),
     teachers: (t.data ?? []).map((row) => ({
       id: row.id as string,
@@ -978,6 +1010,8 @@ export async function pushAll(state: AppState): Promise<void> {
           day: h.day,
           term_start: h.termStart ?? "",
           term_sessions: h.termSessions ?? 0,
+          sard_date: h.sardDate ?? "",
+          exam_date: h.examDate ?? "",
         }))
       );
     if (error) throw error;
@@ -1079,6 +1113,8 @@ export const actions = {
           ...(patch.termSessions !== undefined && {
             term_sessions: patch.termSessions,
           }),
+          ...(patch.sardDate !== undefined && { sard_date: patch.sardDate }),
+          ...(patch.examDate !== undefined && { exam_date: patch.examDate }),
         })
         .eq("id", id)
     );

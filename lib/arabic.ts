@@ -56,3 +56,7 @@ export const byMeetings = (n: number) =>
       : n <= 10
         ? `بـ${ar(n)} لقاءات`
         : `بـ${ar(n)} لقاءً`;
+
+/** أيام بعد «باقي»: «باقي يوم واحد، يومان، ٣ أيام، ١١ يوماً» */
+export const daysLabel = (n: number) =>
+  countLabel(n, { one: "يوم واحد", two: "يومان", few: "أيام", many: "يوماً" });
