@@ -10,7 +10,6 @@ import {
 import {
   ROLE_EMAILS,
   roleFromEmail,
-  STUDENT_PASSWORD,
   supabase,
   type Role,
 } from "@/lib/supabase";
@@ -91,11 +90,25 @@ export function AuthGate({ children }: { children: ReactNode }) {
     ) {
       setRole("admin");
     }
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       if (!mounted) return;
-      const r = roleFromEmail(data.session?.user.email);
-      if (data.session && r) {
+      const user = data.session?.user;
+      if (!user) {
+        setStatus("login");
+        return;
+      }
+      // إدارة/معلّمة: حساب بريدي
+      const r = roleFromEmail(user.email);
+      if (r) {
         void init(r);
+        return;
+      }
+      // هوية مجهولة لجهاز طالبة: هل رُبطت برمز من قبل؟
+      const { data: sid } = await supabase.rpc("almaher_me");
+      if (!mounted) return;
+      if (typeof sid === "string" && sid) {
+        window.localStorage.setItem(STUDENT_PICK_KEY, sid);
+        void init("student");
       } else {
         setStatus("login");
       }
@@ -111,35 +124,41 @@ export function AuthGate({ children }: { children: ReactNode }) {
     setBusy(true);
     setError("");
 
-    // الطالبة: تدخل برمزها الخاص بدل كلمة مرور مشتركة
+    // الطالبة: رمزها الخاص فقط — بلا حساب مشترك.
+    // جهازها يحصل على هوية مجهولة من Supabase (مرة واحدة)، ثم تربطها
+    // الدالة الآمنة almaher_claim بالطالبة صاحبة الرمز، وقاعدة البيانات
+    // تحصر هذه الهوية في بياناتها هي.
     if (role === "student") {
-      const { error: err } = await supabase.auth.signInWithPassword({
-        email: ROLE_EMAILS.student,
-        password: STUDENT_PASSWORD,
-      });
-      if (err) {
-        setBusy(false);
-        setError("تعذّر الاتصال، حاولي لاحقاً");
-        return;
-      }
-      try {
-        await pullRemote();
-      } catch {
-        setBusy(false);
-        setError("تعذّر الاتصال بالإنترنت");
-        return;
-      }
-      const code = normalizeDigits(password);
-      const me = getState().students.find(
-        (s) => normalizeDigits(s.code) === code
-      );
-      if (!me) {
-        await supabase.auth.signOut();
+      const code = normalizeDigits(password).replace(/\D/g, "");
+      if (code.length < 4) {
         setBusy(false);
         setError("الرمز غير صحيح");
         return;
       }
-      window.localStorage.setItem(STUDENT_PICK_KEY, me.id);
+      const { data: cur } = await supabase.auth.getSession();
+      if (!cur.session || cur.session.user.email) {
+        if (cur.session) await supabase.auth.signOut();
+        const { error: anonErr } = await supabase.auth.signInAnonymously();
+        if (anonErr) {
+          setBusy(false);
+          setError("تعذّر الاتصال، حاولي لاحقاً");
+          return;
+        }
+      }
+      const { data: sid, error: claimErr } = await supabase.rpc("almaher_claim", {
+        p_code: code,
+      });
+      if (claimErr) {
+        setBusy(false);
+        setError("تعذّر الاتصال، حاولي لاحقاً");
+        return;
+      }
+      if (typeof sid !== "string" || !sid) {
+        setBusy(false);
+        setError("الرمز غير صحيح");
+        return;
+      }
+      window.localStorage.setItem(STUDENT_PICK_KEY, sid);
       setBusy(false);
       setStatus("loading");
       void init("student");

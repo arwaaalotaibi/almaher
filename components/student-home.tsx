@@ -100,6 +100,12 @@ export function StudentHome() {
 
   const logout = async () => {
     window.localStorage.removeItem(STUDENT_PICK_KEY);
+    // فكّ ربط هذا الجهاز بالطالبة قبل إنهاء الجلسة
+    try {
+      await supabase.rpc("almaher_unclaim");
+    } catch {
+      /* بدون إنترنت — الجلسة تنتهي محلياً على كل حال */
+    }
     await supabase.auth.signOut();
     window.location.reload();
   };

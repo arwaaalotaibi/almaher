@@ -752,7 +752,7 @@ interface StudentRow {
   name: string;
   halaqa_id: string;
   teacher_id: string;
-  code: string;
+  code?: string; // (قديم) — الرموز الآن في almaher_student_codes
   track: string;
   plan: CoursePlan;
   sessions: SessionLog[];
@@ -789,7 +789,7 @@ function run(op: () => PromiseLike<{ error: unknown }>) {
 
 /** جلب كل البيانات من قاعدة البيانات وتحديث العرض */
 export async function pullRemote(): Promise<void> {
-  const [h, t, s, a, b, r, sess, trm, tj, tjr, rdp, sup] = await Promise.all([
+  const [h, t, s, a, b, r, sess, trm, tj, tjr, rdp, sup, codes, peers] = await Promise.all([
     supabase
       .from("almaher_halaqas")
       // «*» لا «أعمدة محدّدة»: يعمل قبل إضافة عمودَي السرد/الاختبار وبعدها
@@ -798,7 +798,7 @@ export async function pullRemote(): Promise<void> {
     supabase.from("almaher_teachers").select("id,name,halaqa_ids").order("created_at"),
     supabase
       .from("almaher_students")
-      .select("id,name,halaqa_id,teacher_id,code,track,plan,sessions,goals,done,note,phone,updated_at,agreed_at,agreed_version,last_seen")
+      .select("id,name,halaqa_id,teacher_id,track,plan,sessions,goals,done,note,phone,updated_at,agreed_at,agreed_version,last_seen")
       .order("created_at"),
     supabase
       .from("almaher_announcements")
@@ -833,10 +833,51 @@ export async function pullRemote(): Promise<void> {
       .from("almaher_support")
       .select("id,student_id,kind,body,reply,status,created_at,replied_at")
       .order("created_at", { ascending: false }),
+    // رموز الدخول — لا تُرجع إلا للإدارة/المعلّمات (RLS)
+    supabase.from("almaher_student_codes").select("student_id,code"),
+    // زميلات المسجد (اسم وحلقة فقط) — لا تُرجع إلا للطالبة (للسباق)
+    supabase.from("almaher_peers").select("id,name,halaqa_id,teacher_id,track"),
   ]);
   if (h.error || t.error || s.error || a.error || b.error) {
     throw h.error ?? t.error ?? s.error ?? a.error ?? b.error;
   }
+  const codeMap = new Map(
+    (codes.data ?? []).map((row) => [row.student_id as string, row.code as string])
+  );
+  const ownStudents = ((s.data ?? []) as StudentRow[]).map((row) => ({
+    id: row.id,
+    name: row.name,
+    halaqaId: row.halaqa_id,
+    teacherId: row.teacher_id,
+    code: codeMap.get(row.id) ?? row.code ?? "",
+    track: (row.track as TrackKey) ?? "hifz",
+    plan: { ...EMPTY_PLAN, ...row.plan },
+    sessions: Array.isArray(row.sessions) ? row.sessions : [],
+    goals: { ...EMPTY_GOALS, ...row.goals },
+    done: { ...EMPTY_DONE, ...row.done },
+    note: row.note,
+    phone: row.phone ?? "",
+    updatedAt: row.updated_at,
+    agreedAt: row.agreed_at ?? undefined,
+    agreedVersion: row.agreed_version ?? "",
+    lastSeen: row.last_seen ?? undefined,
+  }));
+  const ownIds = new Set(ownStudents.map((x) => x.id));
+  // عند الطالبة: صفّها كاملاً + زميلات مسجدها بالاسم فقط (بلا خطة ولا هاتف)
+  const peerStudents: Student[] = (peers.data ?? [])
+    .filter((p) => !ownIds.has(p.id as string))
+    .map((p) => ({
+      id: p.id as string,
+      name: p.name as string,
+      halaqaId: (p.halaqa_id as string) ?? "",
+      teacherId: (p.teacher_id as string) ?? "",
+      code: "",
+      track: (p.track as TrackKey) ?? "hifz",
+      plan: { ...EMPTY_PLAN },
+      sessions: [],
+      goals: { ...EMPTY_GOALS },
+      done: { ...EMPTY_DONE },
+    }));
   persist({
     halaqas: (h.data ?? []).map((row) => ({
       id: row.id as string,
@@ -852,24 +893,7 @@ export async function pullRemote(): Promise<void> {
       name: row.name as string,
       halaqaIds: Array.isArray(row.halaqa_ids) ? (row.halaqa_ids as string[]) : [],
     })),
-    students: ((s.data ?? []) as StudentRow[]).map((row) => ({
-      id: row.id,
-      name: row.name,
-      halaqaId: row.halaqa_id,
-      teacherId: row.teacher_id,
-      code: row.code ?? "",
-      track: (row.track as TrackKey) ?? "hifz",
-      plan: { ...EMPTY_PLAN, ...row.plan },
-      sessions: Array.isArray(row.sessions) ? row.sessions : [],
-      goals: { ...EMPTY_GOALS, ...row.goals },
-      done: { ...EMPTY_DONE, ...row.done },
-      note: row.note,
-      phone: row.phone ?? "",
-      updatedAt: row.updated_at,
-      agreedAt: row.agreed_at ?? undefined,
-      agreedVersion: row.agreed_version ?? "",
-      lastSeen: row.last_seen ?? undefined,
-    })),
+    students: [...ownStudents, ...peerStudents],
     announcements: (a.data ?? []).map((row) => ({
       id: row.id as string,
       body: row.body as string,
@@ -966,7 +990,6 @@ function studentToRow(st: Student): StudentRow {
     name: st.name,
     halaqa_id: st.halaqaId,
     teacher_id: st.teacherId,
-    code: st.code,
     track: st.track ?? "hifz",
     plan: st.plan ?? EMPTY_PLAN,
     sessions: st.sessions ?? [],
@@ -1031,6 +1054,16 @@ export async function pushAll(state: AppState): Promise<void> {
       .from("almaher_students")
       .insert(state.students.map(studentToRow));
     if (error) throw error;
+    // الرموز في جدولها الخاص (لا تقرؤه إلا الإدارة)
+    const codes = state.students
+      .filter((st) => st.code)
+      .map((st) => ({ student_id: st.id, code: st.code }));
+    if (codes.length) {
+      const { error: cErr } = await supabase
+        .from("almaher_student_codes")
+        .upsert(codes);
+      if (cErr) throw cErr;
+    }
   }
   if (state.announcements?.length) {
     const { error } = await supabase.from("almaher_announcements").insert(
@@ -1198,7 +1231,13 @@ export const actions = {
       updatedAt: new Date().toISOString(),
     };
     setState((s) => ({ ...s, students: [...s.students, student] }));
-    run(() => supabase.from("almaher_students").insert(studentToRow(student)));
+    run(async () => {
+      const ins = await supabase.from("almaher_students").insert(studentToRow(student));
+      if (ins.error) return ins;
+      return supabase
+        .from("almaher_student_codes")
+        .upsert({ student_id: student.id, code: student.code });
+    });
   },
   updateStudent(id: string, patch: Partial<Student>) {
     const updatedAt = new Date().toISOString();
@@ -1213,6 +1252,12 @@ export const actions = {
       run(() =>
         supabase.from("almaher_students").update(studentToRow(st)).eq("id", id)
       );
+      if (patch.code !== undefined && st.code)
+        run(() =>
+          supabase
+            .from("almaher_student_codes")
+            .upsert({ student_id: id, code: st.code })
+        );
     }
   },
   removeStudent(id: string) {
