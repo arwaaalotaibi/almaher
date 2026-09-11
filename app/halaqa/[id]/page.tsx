@@ -1,6 +1,7 @@
 "use client";
 
 import { confirmDanger } from "@/lib/confirm";
+import { printCodeCards } from "@/lib/print-codes";
 import { use, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -478,6 +479,18 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
             className="rounded-xl bg-plum-600 py-2.5 text-xs font-bold text-white"
           >
             {copied === "all" ? "✓ نُسخت" : "📋 نسخ كل الرموز"}
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              printCodeCards(
+                `${halaqa.mosque}${halaqa.day ? " — " + halaqa.day : ""}`,
+                halaqaStudents.map((s) => ({ name: s.name, code: s.code ?? "" }))
+              )
+            }
+            className="col-span-2 rounded-xl border-2 border-plum-300 bg-white py-2.5 text-xs font-bold text-plum-700"
+          >
+            🖨️ طباعة بطاقات الرموز للتوزيع اليدوي
           </button>
         </div>
 
