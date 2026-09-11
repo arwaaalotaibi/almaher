@@ -42,6 +42,7 @@ import { RaceBoard } from "./race-board";
 import { SupportBox } from "./support-box";
 import { NotificationsCenter, PinnedNotice } from "./notifications-card";
 import { PushToggle } from "./push-toggle";
+import { AppTour, hasSeenTour } from "./app-tour";
 import { ReciteLogger, SessionVerdictChip, VerdictChip } from "./recite-log";
 import { MotivationPanel } from "./motivation-panel";
 import { computeProgress, partVerdict, sessionVerdict } from "@/lib/progress";
@@ -85,6 +86,8 @@ export function StudentHome() {
   const [quranSec, setQuranSec] = useState<QuranSec>("today");
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [quizFor, setQuizFor] = useState<string | null>(null); // درس الأسئلة المفتوح
+  const [settingsOpen, setSettingsOpen] = useState(false); // ورقة الإعدادات ⚙️
+  const [tourOpen, setTourOpen] = useState(false); // شرح البرنامج
 
   useEffect(() => {
     setMyId(window.localStorage.getItem(STUDENT_PICK_KEY));
@@ -96,6 +99,13 @@ export function StudentHome() {
   useEffect(() => {
     if (myId) actions.touchSeen(myId);
   }, [myId]);
+
+  // شرح البرنامج يظهر تلقائياً أول مرة على هذا الجهاز — بعد إقرار اللائحة
+  const agreed =
+    students.find((s) => s.id === myId)?.agreedVersion === TERMS_VERSION;
+  useEffect(() => {
+    if (ready && agreed && !hasSeenTour()) setTourOpen(true);
+  }, [ready, agreed]);
 
   if (!ready) return <main className="mx-auto max-w-2xl px-4 pt-10" />;
 
@@ -176,6 +186,70 @@ export function StudentHome() {
   return (
     <main className="relative mx-auto max-w-2xl px-4 pb-16 pt-10">
       <WelcomeSplash name={me.name} />
+
+      {/* 🎓 شرح البرنامج — أول مرة تلقائياً، ثم من الإعدادات */}
+      <AppTour open={tourOpen} onClose={() => setTourOpen(false)} />
+
+      {/* ⚙️ الإعدادات — في الطرف الآخر من الجرس */}
+      <button
+        type="button"
+        onClick={() => setSettingsOpen(true)}
+        aria-label="الإعدادات"
+        className="absolute right-4 top-6 flex h-11 w-11 items-center justify-center rounded-full bg-white text-xl shadow ring-1 ring-cream-dark transition active:scale-95"
+      >
+        ⚙️
+      </button>
+      <Sheet
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        title="⚙️ الإعدادات"
+      >
+        <div className="grid gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setSettingsOpen(false);
+              setTourOpen(true);
+            }}
+            className="card flex items-center gap-3 rounded-2xl px-4 py-3.5 text-start transition active:scale-[0.99]"
+          >
+            <span className="text-2xl">🎓</span>
+            <span>
+              <span className="block font-kufi font-bold text-plum-800">
+                شرح البرنامج
+              </span>
+              <span className="block text-xs text-silver-600">
+                جولة سريعة في شاشات التطبيق وما يقدّمه لكِ
+              </span>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSettingsOpen(false);
+              setTab("notifications");
+            }}
+            className="card flex items-center gap-3 rounded-2xl px-4 py-3.5 text-start transition active:scale-[0.99]"
+          >
+            <span className="text-2xl">🔔</span>
+            <span>
+              <span className="block font-kufi font-bold text-plum-800">
+                إشعارات الجهاز
+              </span>
+              <span className="block text-xs text-silver-600">
+                تفعيلها أو إيقافها من شاشة الإشعارات
+              </span>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={logout}
+            className="mt-2 w-full rounded-xl border border-red-200 bg-red-50 py-2.5 text-sm font-bold text-red-700 transition active:scale-[0.98]"
+          >
+            🚪 تسجيل الخروج من هذا الجهاز
+          </button>
+        </div>
+      </Sheet>
 
       {/* 🔔 الإشعارات — جرس في الطرف العلوي */}
       <button
