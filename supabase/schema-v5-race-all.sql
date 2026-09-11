@@ -7,9 +7,17 @@
 --  الكتابة تبقى محصورة في صفّها هي.
 -- ============================================================
 
--- زميلات السباق: كل الطالبات (الاسم والحلقة والمعلّمة والمسار فقط)
-drop view if exists public.almaher_peers;
-create view public.almaher_peers
+-- ١) حذف السياسات القديمة المعتمدة على العرض أولاً
+do $
+declare t text;
+begin
+  foreach t in array array['almaher_sessions','almaher_reading_progress','almaher_tajweed_results'] loop
+    execute format('drop policy if exists student_mosque_read on public.%I', t);
+  end loop;
+end $;
+
+-- ٢) زميلات السباق: كل الطالبات (الاسم والحلقة والمعلّمة والمسار فقط)
+create or replace view public.almaher_peers
 with (security_invoker = false)
 as
   select s.id, s.name, s.halaqa_id, s.teacher_id, s.track
@@ -17,7 +25,7 @@ as
   where public.almaher_role() = 'student';
 grant select on public.almaher_peers to authenticated;
 
--- قراءة سجلات النقاط للجميع (الكتابة للطالبة نفسها فقط — كما هي)
+-- ٣) قراءة سجلات النقاط للجميع (الكتابة للطالبة نفسها فقط — كما هي)
 do $$
 declare t text;
 begin
