@@ -17,7 +17,12 @@ import {
   type ScheduleRow,
   type Student,
 } from "@/lib/store";
-import { partVerdict, sessionVerdict, type PartVerdict } from "@/lib/progress";
+import {
+  logFaces,
+  partVerdict,
+  sessionVerdict,
+  type PartVerdict,
+} from "@/lib/progress";
 import { facesAcc, facesPlain } from "@/lib/arabic";
 import { ayahCount, SURAHS } from "@/lib/surahs";
 import { Field, inputCls, PrimaryBtn } from "./ui";
@@ -447,6 +452,8 @@ export function ReciteLogger({
         note: note.trim() || undefined,
       };
     }
+    // الأوجه رقماً مع السجلّ — منها تُحسب نقاط السباق دون كشف المقاطع لغيرها
+    data.faces = logFaces(data, student.plan);
     if (editingId) actions.updateRecitation(editingId, data);
     else actions.addRecitation(data);
     reset();

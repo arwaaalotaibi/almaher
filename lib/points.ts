@@ -65,10 +65,11 @@ export function computeRace(
         attends++;
         points += 10;
       }
+      // الأوجه المحفوظة رقماً مع السجلّ (سجلات الزميلات تصل بها فقط)، وإلا من المقاطع
       const d = isDesc(st.plan);
-      const fH = partFaces(r.tasmi, d);
-      const fT = partFaces(r.tathbit, d);
-      const fM = partFaces(r.muraja, isMurDesc(st.plan));
+      const fH = r.faces?.tasmi ?? partFaces(r.tasmi, d);
+      const fT = r.faces?.tathbit ?? partFaces(r.tathbit, d);
+      const fM = r.faces?.muraja ?? partFaces(r.muraja, isMurDesc(st.plan));
       faces += fH;
       points += fH * 5 + fT * 2 + fM * 1;
     }

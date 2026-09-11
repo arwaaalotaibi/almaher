@@ -227,6 +227,20 @@ export function partFaces(part?: RecitePart, desc = false): number {
   return facesInfo(part, desc).done;
 }
 
+/** أوجه السجلّ الثلاثة رقماً — تُحفظ مع السجلّ عند التسجيل ليُحسب السباق
+    منها دون كشف المقاطع لغيرها */
+export function logFaces(
+  log: Pick<RecitationLog, "tasmi" | "tathbit" | "muraja">,
+  plan?: Pick<CoursePlan, "direction" | "murDirection"> | null
+): NonNullable<RecitationLog["faces"]> {
+  const d = isDesc(plan);
+  return {
+    tasmi: partFaces(log.tasmi, d),
+    tathbit: partFaces(log.tathbit, d),
+    muraja: partFaces(log.muraja, isMurDesc(plan)),
+  };
+}
+
 /* ================== مقارنة المُنجَز بالمطلوب ================== */
 
 /** حكم قسم واحد في لقاء: ما سُمّع فعلاً مقابل المطلوب (بالأوجه) */

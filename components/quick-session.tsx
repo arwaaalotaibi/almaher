@@ -15,7 +15,7 @@ import {
   type RecitePart,
   type Student,
 } from "@/lib/store";
-import { computeProgress, type PosRange } from "@/lib/progress";
+import { computeProgress, logFaces, type PosRange } from "@/lib/progress";
 import { surahName } from "@/lib/mushaf";
 import { PrimaryBtn, inputCls } from "./ui";
 
@@ -143,6 +143,7 @@ export function QuickSession({
             st.attended && st.tathbit && i.tathbit ? { ...i.tathbit } : { status: "none" },
           note: i.existing?.note ?? "",
         };
+        data.faces = logFaces(data, s.plan);
         if (i.existing) actions.updateRecitation(i.existing.id, data);
         else actions.addRecitation(data);
         n++;

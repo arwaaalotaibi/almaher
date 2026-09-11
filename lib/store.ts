@@ -275,6 +275,9 @@ export interface RecitationLog {
   tathbit: RecitePart;
   note?: string;
   createdAt?: string;
+  /** أوجه مكتملة لكل قسم — تُحسب عند التسجيل وتُحفظ رقماً، فتُحسب نقاط السباق
+      دون كشف مقاطع الطالبة لغيرها (سجلات الزميلات تصل «خفيفة» بهذه الأرقام فقط) */
+  faces?: { tasmi: number; tathbit: number; muraja: number };
 }
 
 /** أقسام سجلّ التسميع الثلاثة */
@@ -813,7 +816,7 @@ function run(op: () => PromiseLike<{ error: unknown }>) {
 
 /** جلب كل البيانات من قاعدة البيانات وتحديث العرض */
 export async function pullRemote(): Promise<void> {
-  const [h, t, s, a, b, r, sess, trm, tj, tjr, rdp, sup, codes, peers, setg] = await Promise.all([
+  const [h, t, s, a, b, r, sess, trm, tj, tjr, rdp, sup, codes, peers, setg, race] = await Promise.all([
     supabase
       .from("almaher_halaqas")
       // «*» لا «أعمدة محدّدة»: يعمل قبل إضافة عمودَي السرد/الاختبار وبعدها
@@ -837,7 +840,7 @@ export async function pullRemote(): Promise<void> {
       .select("announcement_id,student_id,read_at"),
     supabase
       .from("almaher_sessions")
-      .select("id,student_id,log_date,attended,parts,note,created_at")
+      .select("id,student_id,log_date,attended,parts,note,created_at,faces")
       .order("log_date", { ascending: false }),
     supabase
       .from("almaher_terms")
@@ -863,7 +866,19 @@ export async function pullRemote(): Promise<void> {
     supabase.from("almaher_peers").select("id,name,halaqa_id,teacher_id,track"),
     // الإعدادات العامة (يقرؤها الجميع، تكتبها الإدارة)
     supabase.from("almaher_settings").select("key,value"),
+    // سجلات السباق «الخفيفة» لكل الطالبات (حضور وأرقام أوجه فقط) — للطالبة فقط
+    supabase.from("almaher_race_sessions").select("id,student_id,log_date,attended,faces"),
   ]);
+  const normFaces = (v: unknown): RecitationLog["faces"] => {
+    const f = (v ?? {}) as Record<string, unknown>;
+    return typeof f.tasmi === "number" || typeof f.tathbit === "number" || typeof f.muraja === "number"
+      ? {
+          tasmi: Number(f.tasmi) || 0,
+          tathbit: Number(f.tathbit) || 0,
+          muraja: Number(f.muraja) || 0,
+        }
+      : undefined;
+  };
   const settingsRows = (setg.data ?? []) as { key: string; value: Record<string, unknown> }[];
   const reciteRow = settingsRows.find((x) => x.key === "student_recite");
   const settings: AppSettings = {
@@ -912,6 +927,20 @@ export async function pullRemote(): Promise<void> {
       goals: { ...EMPTY_GOALS },
       done: { ...EMPTY_DONE },
     }));
+  // سجلات الزميلات «الخفيفة» (عند الطالبة فقط): حضور وأرقام أوجه بلا أي مقطع
+  const ownSessionIds = new Set((sess.data ?? []).map((row) => row.id as string));
+  const raceLite: RecitationLog[] = (race.data ?? [])
+    .filter((row) => !ownSessionIds.has(row.id as string))
+    .map((row) => ({
+      id: row.id as string,
+      studentId: row.student_id as string,
+      date: row.log_date as string,
+      attended: (row.attended as boolean) ?? true,
+      tasmi: { status: "none" },
+      muraja: { status: "none" },
+      tathbit: { status: "none" },
+      faces: normFaces(row.faces) ?? { tasmi: 0, tathbit: 0, muraja: 0 },
+    }));
   persist({
     halaqas: (h.data ?? []).map((row) => ({
       id: row.id as string,
@@ -954,7 +983,7 @@ export async function pullRemote(): Promise<void> {
       studentId: row.student_id as string,
       readAt: (row.read_at as string) ?? undefined,
     })),
-    recitations: (sess.data ?? []).map((row) => {
+    recitations: [...(sess.data ?? []).map((row) => {
       const parts = (row.parts ?? {}) as Record<string, unknown>;
       return {
         id: row.id as string,
@@ -966,8 +995,9 @@ export async function pullRemote(): Promise<void> {
         tathbit: normPart(parts.tathbit),
         note: (row.note as string) || undefined,
         createdAt: (row.created_at as string) ?? undefined,
+        faces: normFaces(row.faces),
       };
-    }),
+    }), ...raceLite],
     terms: (trm.data ?? []).map((row) => ({
       id: row.id as string,
       halaqaId: row.halaqa_id as string,
@@ -1432,6 +1462,7 @@ export const actions = {
         attended: rec.attended,
         parts: { tasmi: rec.tasmi, muraja: rec.muraja, tathbit: rec.tathbit },
         note: rec.note ?? "",
+        faces: rec.faces ?? {},
       })
     );
   },
@@ -1451,6 +1482,7 @@ export const actions = {
           attended: data.attended,
           parts: { tasmi: data.tasmi, muraja: data.muraja, tathbit: data.tathbit },
           note: data.note ?? "",
+          faces: data.faces ?? {},
         })
         .eq("id", id)
     );
