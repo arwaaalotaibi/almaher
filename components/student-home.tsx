@@ -6,11 +6,9 @@ import {
   actions,
   autoNotifsFor,
   buildSchedule,
-  CoursePlan,
   countUnread,
   currentSessionIndex,
   dateKey,
-  EMPTY_PLAN,
   formatSchedDate,
   getReadIds,
   isDesc,
@@ -18,7 +16,6 @@ import {
   recitePartLabel,
   halaqaTitle,
   hifzStartLabel,
-  normalizeDigits,
   PLAN_FIELDS,
   segDateLabel,
   STUDENT_PICK_KEY,
@@ -27,7 +24,6 @@ import {
   visibleAnnouncements,
   type Student,
 } from "@/lib/store";
-import { ayahCount, SURAHS } from "@/lib/surahs";
 import {
   APP_NOTICE,
   TERMS,
@@ -39,8 +35,7 @@ import { printHifzSchedule } from "@/lib/print-schedule";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 import Link from "next/link";
-import { DirectionPicker } from "./direction-picker";
-import { Field, inputCls, PrimaryBtn, Ribbon, Sheet } from "./ui";
+import { PrimaryBtn, Ribbon, Sheet } from "./ui";
 import { TajweedQuiz } from "./tajweed-quiz";
 import { ReadingWards } from "./reading-wards";
 import { RaceBoard } from "./race-board";
@@ -450,7 +445,7 @@ export function StudentHome() {
           {quranSec === "plan" && (
             <>
           {/* الطالبة تُدخل بداية الحفظ/المراجعة وأوجه اللقاء بنفسها */}
-          <MyPlanEditor student={me} />
+          {/* الخطة تُدخلها الإدارة — الطالبة تراها فقط (بلا تعديل) */}
 
           {/* خطة الفصل — جدول مولّد تلقائياً */}
           {schedule ? (
@@ -964,204 +959,3 @@ function TermsGate({
   );
 }
 
-/** نموذج تُدخل فيه الطالبة بداية الحفظ/المراجعة وأوجه كل لقاء بنفسها */
-function MyPlanEditor({ student }: { student: Student }) {
-  const [plan, setPlan] = useState<CoursePlan>({ ...EMPTY_PLAN, ...student.plan });
-  const [saved, setSaved] = useState(false);
-  const [open, setOpen] = useState(false);
-
-  // مزامنة إن عدّلت الإدارة البيانات من جهاز آخر
-  useEffect(() => {
-    setPlan({ ...EMPTY_PLAN, ...student.plan });
-  }, [student.plan]);
-
-  const planNum = (v: string) => Math.max(0, Number(normalizeDigits(v)) || 0);
-
-  const save = () => {
-    actions.updateStudent(student.id, { plan });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
-
-  return (
-    <div className="card mb-4 rounded-2xl p-4">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between text-start"
-        aria-expanded={open}
-      >
-        <span className="font-kufi text-base font-bold text-plum-800">
-          📝 بيانات حفظي
-        </span>
-        <span
-          className={`text-plum-600 transition-transform duration-200 ${
-            open ? "rotate-180" : ""
-          }`}
-        >
-          ▾
-        </span>
-      </button>
-
-      {!open ? null : (
-      <div className="mt-3">
-      {/* اتجاه الحفظ والمراجعة — كلٌّ على حدة (كثيرات يحفظن صاعداً ويراجعن من الناس) */}
-      <DirectionPicker
-        label="🧭 اتجاه حفظي"
-        value={plan.direction ?? "asc"}
-        onChange={(dir) => {
-          const desc = dir === "desc";
-          // المراجعة تتبع الحفظ ما لم يكن لها اتجاه خاص
-          const murFollows = !plan.murDirection;
-          setPlan({
-            ...plan,
-            direction: dir,
-            startAyah: plan.startSurah
-              ? desc
-                ? ayahCount(plan.startSurah)
-                : 1
-              : plan.startAyah,
-            murStartAyah:
-              murFollows && plan.murStartSurah
-                ? desc
-                  ? ayahCount(plan.murStartSurah)
-                  : 1
-                : plan.murStartAyah,
-          });
-        }}
-      />
-      <DirectionPicker
-        label="🔁 اتجاه مراجعتي"
-        value={plan.murDirection ?? plan.direction ?? "asc"}
-        onChange={(dir) =>
-          setPlan({
-            ...plan,
-            murDirection: dir,
-            murStartAyah: plan.murStartSurah
-              ? dir === "desc"
-                ? ayahCount(plan.murStartSurah)
-                : 1
-              : plan.murStartAyah,
-          })
-        }
-      />
-
-      {/* بداية الحفظ */}
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="بداية الحفظ — السورة" icon="📖">
-          <select
-            className={inputCls}
-            value={plan.startSurah ?? ""}
-            onChange={(e) =>
-              setPlan({
-                ...plan,
-                startSurah: e.target.value,
-                startAyah: isDesc(plan) ? ayahCount(e.target.value) : 1,
-              })
-            }
-          >
-            <option value="">اختاري السورة…</option>
-            {SURAHS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="رقم الآية" icon="🔢">
-          <select
-            className={inputCls}
-            value={plan.startAyah ?? 1}
-            onChange={(e) => setPlan({ ...plan, startAyah: Number(e.target.value) })}
-            disabled={!plan.startSurah}
-          >
-            {Array.from(
-              { length: Math.max(1, ayahCount(plan.startSurah ?? "")) },
-              (_, i) => i + 1
-            ).map((n) => (
-              <option key={n} value={n}>
-                {ar(n)}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
-
-      {/* بداية المراجعة */}
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="بداية المراجعة — السورة" icon="🔁">
-          <select
-            className={inputCls}
-            value={plan.murStartSurah ?? ""}
-            onChange={(e) =>
-              setPlan({
-                ...plan,
-                murStartSurah: e.target.value,
-                murStartAyah: isMurDesc(plan) ? ayahCount(e.target.value) : 1,
-              })
-            }
-          >
-            <option value="">اختاري السورة…</option>
-            {SURAHS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="رقم الآية" icon="🔢">
-          <select
-            className={inputCls}
-            value={plan.murStartAyah ?? 1}
-            onChange={(e) =>
-              setPlan({ ...plan, murStartAyah: Number(e.target.value) })
-            }
-            disabled={!plan.murStartSurah}
-          >
-            {Array.from(
-              { length: Math.max(1, ayahCount(plan.murStartSurah ?? "")) },
-              (_, i) => i + 1
-            ).map((n) => (
-              <option key={n} value={n}>
-                {ar(n)}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
-
-      {/* أوجه كل لقاء */}
-      <div className="mt-1 rounded-2xl border border-cream-dark p-3">
-        <p className="mb-2 font-kufi text-sm font-bold text-plum-800">
-          📋 أوجه كل لقاء
-        </p>
-        <div className="grid grid-cols-2 gap-2">
-          {PLAN_FIELDS.map(({ key, label, icon }) => (
-            <label key={key} className="block">
-              <span className="mb-1 block text-xs font-bold text-plum-700">
-                {icon} {label.replace("أوجه ", "")}
-              </span>
-              <input
-                className={`${inputCls} text-center`}
-                inputMode="numeric"
-                placeholder="٠"
-                value={plan[key] || ""}
-                onChange={(e) =>
-                  setPlan({ ...plan, [key]: planNum(e.target.value) })
-                }
-              />
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-3">
-        <PrimaryBtn onClick={save}>
-          {saved ? "تم الحفظ ✓" : "حفظ بياناتي"}
-        </PrimaryBtn>
-      </div>
-      </div>
-      )}
-    </div>
-  );
-}
