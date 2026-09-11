@@ -811,16 +811,64 @@ function TermsGate({
   onLogout: () => void;
 }) {
   const [checked, setChecked] = useState<Record<string, boolean>>({});
+  // بعد الإقرار بكل البنود تظهر صفحة «تنبيه بخصوص التطبيق» ثم يُحفظ الإقرار
+  const [step, setStep] = useState<"terms" | "notice">("terms");
   const doneCount = Object.values(checked).filter(Boolean).length;
   const allDone = doneCount >= TERMS.length;
 
   const agree = () => {
     if (!allDone) return;
+    setStep("notice");
+    window.scrollTo({ top: 0 });
+  };
+
+  const confirmNotice = () => {
     actions.updateStudent(student.id, {
       agreedAt: new Date().toISOString(),
       agreedVersion: TERMS_VERSION,
     });
   };
+
+  if (step === "notice") {
+    return (
+      <main className="mx-auto flex min-h-dvh max-w-2xl flex-col justify-center px-4 py-10">
+        <div className="mb-5 text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="الماهر" className="mx-auto mb-3 h-16 w-auto" />
+          <p className="text-sm font-bold text-plum-600">
+            ✓ تم الإقرار بجميع بنود اللائحة
+          </p>
+        </div>
+
+        <div className="rounded-2xl border-2 border-amber-400 bg-amber-50 p-5">
+          <p className="mb-3 text-center font-kufi text-lg font-bold text-amber-900">
+            {APP_NOTICE.icon} {APP_NOTICE.title}
+          </p>
+          <ul className="grid list-disc gap-2 pe-5 ps-1">
+            {APP_NOTICE.items.map((item, i) => (
+              <li
+                key={i}
+                className="text-sm font-medium leading-relaxed text-amber-950 marker:text-amber-600"
+              >
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="mt-6">
+          <PrimaryBtn onClick={confirmNotice}>فهمت، الدخول إلى التطبيق</PrimaryBtn>
+        </div>
+        <button
+          type="button"
+          onClick={() => setStep("terms")}
+          className="mx-auto mt-4 block text-sm font-bold text-silver-600 underline"
+        >
+          → الرجوع إلى اللائحة
+        </button>
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto max-w-2xl px-4 pb-32 pt-10">
@@ -886,23 +934,6 @@ function TermsGate({
             </div>
           );
         })}
-      </div>
-
-      {/* تنبيه بخصوص التطبيق — بعد اللائحة، للعلم */}
-      <div className="mt-4 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4">
-        <p className="mb-2 font-kufi text-base font-bold text-amber-900">
-          {APP_NOTICE.icon} {APP_NOTICE.title}
-        </p>
-        <ul className="grid list-disc gap-1.5 pe-5 ps-1">
-          {APP_NOTICE.items.map((item, i) => (
-            <li
-              key={i}
-              className="text-sm font-medium leading-relaxed text-amber-950 marker:text-amber-600"
-            >
-              {item}
-            </li>
-          ))}
-        </ul>
       </div>
 
       <button
