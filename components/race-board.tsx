@@ -17,18 +17,17 @@ type PeriodKey = (typeof PERIODS)[number]["key"];
 const MEDALS = ["🥇", "🥈", "🥉"];
 
 /** 🏆 لوحة سباق الحلقات — تُعرض في صفحة /race وتبويب «السباق» عند الطالبة.
-    السباق على مستوى المسجد: fixedMosque يقفل النطاق على مسجد الطالبة */
+    السباق على مستويين: مسجد الطالبة (الافتراضي عندها) أو كل المساجد */
 export function RaceBoard({
   myId,
-  fixedMosque,
+  defaultMosque,
 }: {
   myId?: string | null;
-  fixedMosque?: string;
+  defaultMosque?: string; // النطاق الابتدائي (مسجد الطالبة) — ويمكن التبديل لكل المساجد
 }) {
   const { students, halaqas, recitations, readingProgress, tajweedResults } =
     useApp();
-  const [mosqueState, setMosqueState] = useState(""); // "" = كل المساجد
-  const mosque = fixedMosque ?? mosqueState;
+  const [mosque, setMosqueState] = useState(defaultMosque ?? ""); // "" = كل المساجد
   const [period, setPeriod] = useState<PeriodKey>("week");
   const [rulesOpen, setRulesOpen] = useState(false);
 
@@ -59,29 +58,21 @@ export function RaceBoard({
 
   return (
     <div>
-      {/* النطاق: السباق على مستوى المسجد — الطالبة مقفولة على مسجدها */}
-      {fixedMosque ? (
-        <p className="mb-2 rounded-xl bg-plum-50 px-3 py-2 text-center text-sm font-bold text-plum-800">
-          🕌 سباق طالبات {fixedMosque}
-        </p>
-      ) : (
-        <div className="mb-2 flex flex-wrap gap-1.5">
-          {["", ...mosques].map((m) => (
-            <button
-              key={m || "all"}
-              type="button"
-              onClick={() => setMosqueState(m)}
-              className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
-                mosque === m
-                  ? "bg-plum-600 text-white"
-                  : "bg-cream text-silver-600"
-              }`}
-            >
-              {m || "🕌 كل المساجد"}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* النطاق: مسجد الطالبة أو كل المساجد — عند الطالبة يظهر مسجدها وخيار الكل */}
+      <div className="mb-2 flex flex-wrap gap-1.5">
+        {(defaultMosque ? [defaultMosque, ""] : ["", ...mosques]).map((m) => (
+          <button
+            key={m || "all"}
+            type="button"
+            onClick={() => setMosqueState(m)}
+            className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
+              mosque === m ? "bg-plum-600 text-white" : "bg-cream text-silver-600"
+            }`}
+          >
+            {m ? `🕌 ${defaultMosque ? "مسجدي — " : ""}${m}` : "🌍 كل المساجد"}
+          </button>
+        ))}
+      </div>
 
       {/* الفترة */}
       <div className="mb-5 flex gap-1 rounded-2xl bg-cream p-1">

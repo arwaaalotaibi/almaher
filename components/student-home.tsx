@@ -710,7 +710,7 @@ const md = isMurDesc(me.plan);
       {/* شاشة السباق — منافسة على مستوى مسجد الطالبة */}
       {tab === "race" && (
         <section>
-          <RaceBoard myId={me.id} fixedMosque={halaqa?.mosque} />
+          <RaceBoard myId={me.id} defaultMosque={halaqa?.mosque} />
         </section>
       )}
 
