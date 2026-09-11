@@ -46,3 +46,5 @@ next-env.d.ts
 # بيانات الطالبات ورموزهن — لا تُرفع
 /supabase/seed-*.sql
 /supabase/plans-*.sql
+/supabase/roster-*.sql
+/supabase/fix-*.sql
