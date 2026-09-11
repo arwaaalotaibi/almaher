@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# بيانات الطالبات (خاصة — لا تُرفع)
+/data-import

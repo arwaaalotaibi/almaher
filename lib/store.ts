@@ -577,10 +577,10 @@ export const WEEK_DAYS = [
 
 const SEED: AppState = {
   halaqas: [
+    { id: "yaqout-sat", mosque: "مسجد الياقوت", day: "السبت", termStart: "", termSessions: 0 },
     { id: "bahar-mon", mosque: "مسجد البحر", day: "الاثنين", termStart: "", termSessions: 0 },
-    { id: "yaqout", mosque: "مسجد الياقوت", day: "", termStart: "", termSessions: 0 },
+    { id: "saad-tue", mosque: "مسجد سعد بن أبي وقاص", day: "الثلاثاء", termStart: "", termSessions: 0 },
     { id: "bahar-wed", mosque: "مسجد البحر", day: "الأربعاء", termStart: "", termSessions: 0 },
-    { id: "ibn-taymiyyah", mosque: "مسجد ابن تيمية", day: "", termStart: "", termSessions: 0 },
   ],
   teachers: [],
   students: [],
@@ -1833,7 +1833,8 @@ export function arabicCount(n: number, single: string, dual: string, plural: str
   if (n === 1) return single;
   if (n === 2) return dual;
   if (n <= 10) return `${n.toLocaleString("ar-EG")} ${plural}`;
-  return `${n.toLocaleString("ar-EG")} ${single}`;
+  // فوق العشرة: تمييز مفرد بلا «واحدة» — «١٠٣ طالبة» لا «١٠٣ طالبة واحدة»
+  return `${n.toLocaleString("ar-EG")} ${single.replace(/\s+واحدة?$/, "")}`;
 }
 
 export function studentCountLabel(n: number): string {
