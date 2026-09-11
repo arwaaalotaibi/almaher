@@ -10,6 +10,8 @@ import {
   type Stroke,
 } from "@/lib/store";
 import { inputCls, Sheet } from "./ui";
+import { BookQuotes } from "./book-quotes";
+import { useApp } from "@/lib/store";
 
 const COLORS = ["#c0392b", "#d68910", "#1e8449", "#2471a3", "#7d3c98", "#2c3e50"];
 const ZOOMS = [1, 1.5, 2];
@@ -59,6 +61,8 @@ export function PdfReader({
   const [sizeIdx, setSizeIdx] = useState(1);
   const [chrome, setChrome] = useState(true);
   const [gridOpen, setGridOpen] = useState(false);
+  const [quotesOpen, setQuotesOpen] = useState(false); // 💬 اقتباسات هذا الكتاب
+  const { books } = useApp();
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
@@ -525,6 +529,14 @@ export function PdfReader({
           </button>
           <button
             type="button"
+            onClick={() => setQuotesOpen(true)}
+            className="shrink-0 rounded-full bg-cream px-2.5 py-1 text-sm font-bold text-plum-700"
+            aria-label="اقتباسات الكتاب"
+          >
+            💬
+          </button>
+          <button
+            type="button"
             onClick={() => setZoomIdx((zoomIdx + 1) % ZOOMS.length)}
             className="shrink-0 rounded-full bg-cream px-2.5 py-1 text-xs font-bold text-plum-700"
             aria-label="تكبير"
@@ -791,6 +803,16 @@ export function PdfReader({
       </div>
 
       {/* خريطة الصفحات */}
+      {/* 💬 اقتباسات هذا الكتاب — الصفحة المفتوحة تُقترح عند الكتابة */}
+      <Sheet open={quotesOpen} onClose={() => setQuotesOpen(false)}>
+        <BookQuotes
+          studentId={studentId}
+          books={books}
+          bookId={bookId}
+          defaultPage={pageNum}
+        />
+      </Sheet>
+
       <Sheet open={gridOpen} onClose={() => setGridOpen(false)} title="⊞ الصفحات">
         {/* بحث برقم الصفحة */}
         <form

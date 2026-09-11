@@ -13,6 +13,7 @@ import {
   useHydrated,
 } from "@/components/ui";
 import { RoleOnly } from "@/components/admin-only";
+import { BookQuotes } from "@/components/book-quotes";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 
@@ -238,6 +239,13 @@ function BooksInner() {
           يظهر الاسم الجديد لجميع الطالبات فوراً
         </p>
       </Sheet>
+
+      {/* 💬 اقتباسات الطالبات — للمراجعة وحذف غير المناسب */}
+      {books.length > 0 && (
+        <div className="mt-8">
+          <BookQuotes studentId={null} books={books} />
+        </div>
+      )}
     </main>
   );
 }

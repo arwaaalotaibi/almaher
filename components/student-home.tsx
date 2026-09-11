@@ -43,6 +43,7 @@ import { SupportBox } from "./support-box";
 import { NotificationsCenter, PinnedNotice } from "./notifications-card";
 import { PushToggle } from "./push-toggle";
 import { AppTour, hasSeenTour } from "./app-tour";
+import { BookQuotes } from "./book-quotes";
 import { ReciteLogger, SessionVerdictChip, VerdictChip } from "./recite-log";
 import { MotivationPanel } from "./motivation-panel";
 import { computeProgress, partVerdict, sessionVerdict } from "@/lib/progress";
@@ -372,6 +373,13 @@ export function StudentHome() {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* 💬 اقتباسات الطالبات من الكتب — خلاصة مشتركة مع إعجابات */}
+          {books.length > 0 && (
+            <div className="mt-8">
+              <BookQuotes studentId={me.id} books={books} />
             </div>
           )}
         </section>
