@@ -121,14 +121,34 @@ export function whatsappLink(phone: string | undefined, text: string): string {
 
 /** نص رسالة رمز الدخول */
 export function codeMessage(name: string, code: string): string {
-  const origin =
-    typeof window !== "undefined" ? window.location.origin : "";
+  const link = codeLink(code);
   return (
     `السلام عليكم ورحمة الله 🌸\n` +
     `حياكِ الله «${name}» في تطبيق الماهر لحلقات التحفيظ\n\n` +
     `🔑 رمز دخولك: ${code}\n` +
-    (origin ? `🔗 رابط التطبيق: ${origin}\n\n` : "\n") +
-    `افتحي الرابط ثم أدخلي رمزك، وستجدين وردك وخطتك بإذن الله 🌙`
+    (link ? `🔗 اضغطي الرابط ويدخلك مباشرة:\n${link}\n\n` : "\n") +
+    `وستجدين وردك وخطتك بإذن الله 🌙`
+  );
+}
+
+/** رابط دخول مباشر: يفتح التطبيق ويُدخل الرمز تلقائياً */
+export function codeLink(code: string): string {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  return origin ? `${origin}/?code=${code}` : "";
+}
+
+/** قائمة رموز حلقة كاملة — تُنسخ وتُرسل للمعلّمة لتوزّعها */
+export function codesListMessage(
+  halaqaLabel: string,
+  rows: { name: string; code: string }[]
+): string {
+  const lines = rows
+    .filter((r) => r.code)
+    .map((r) => `• ${r.name}: ${r.code}\n  ${codeLink(r.code)}`);
+  return (
+    `🔑 رموز دخول طالبات ${halaqaLabel} — تطبيق الماهر\n` +
+    `كل طالبة تضغط رابطها فيدخلها مباشرة، أو تكتب رمزها في التطبيق.\n\n` +
+    lines.join("\n")
   );
 }
 

@@ -7,6 +7,7 @@ import {
   actions,
   buildSchedule,
   codeMessage,
+  codesListMessage,
   currentSessionIndex,
   dateKey,
   EMPTY_PLAN,
@@ -67,6 +68,16 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
   const [newName, setNewName] = useState("");
   const [newTeacher, setNewTeacher] = useState("");
   const [showCodes, setShowCodes] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null); // آخر ما نُسخ من الرموز
+  const copyText = async (text: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(key);
+      setTimeout(() => setCopied((c) => (c === key ? null : c)), 2000);
+    } catch {
+      window.prompt("انسخي النص:", text);
+    }
+  };
   const [newTermOpen, setNewTermOpen] = useState(false);
   const [newTermStart, setNewTermStart] = useState("");
   const [newTermCount, setNewTermCount] = useState(0);
@@ -433,34 +444,83 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
         title="🔑 أرقام دخول الطالبات"
       >
         <p className="mb-3 text-sm text-silver-600">
-          كل طالبة تدخل التطبيق باختيار «الطالبات» ثم كتابة رمزها.
+          رسالة كل طالبة فيها رمزها ورابط يُدخلها مباشرة بضغطة واحدة.
+          📲 يفتح واتساب برسالة جاهزة، و📋 ينسخها.
         </p>
+
+        {/* الحلقة كاملة دفعة واحدة — للمعلّمة أو لمجموعة الحلقة */}
+        <div className="mb-3 grid grid-cols-2 gap-2">
+          <a
+            href={whatsappLink(
+              "",
+              codesListMessage(
+                `${halaqa.mosque}${halaqa.day ? " — " + halaqa.day : ""}`,
+                halaqaStudents.map((s) => ({ name: s.name, code: s.code ?? "" }))
+              )
+            )}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-xl bg-emerald-500 py-2.5 text-center text-xs font-bold text-white"
+          >
+            📲 كل الرموز للمعلّمة
+          </a>
+          <button
+            type="button"
+            onClick={() =>
+              copyText(
+                codesListMessage(
+                  `${halaqa.mosque}${halaqa.day ? " — " + halaqa.day : ""}`,
+                  halaqaStudents.map((s) => ({ name: s.name, code: s.code ?? "" }))
+                ),
+                "all"
+              )
+            }
+            className="rounded-xl bg-plum-600 py-2.5 text-xs font-bold text-white"
+          >
+            {copied === "all" ? "✓ نُسخت" : "📋 نسخ كل الرموز"}
+          </button>
+        </div>
+
         <div className="grid gap-2">
           {halaqaStudents.map((s) => (
             <div
               key={s.id}
-              className="flex items-center justify-between gap-2 rounded-xl bg-cream px-4 py-2.5"
+              className="flex items-center justify-between gap-2 rounded-xl bg-cream px-3 py-2.5"
             >
               <span className="min-w-0 truncate text-sm font-bold text-plum-800">
                 {s.name}
               </span>
-              <span className="flex shrink-0 items-center gap-2">
+              <span className="flex shrink-0 items-center gap-1.5">
                 <span
-                  className="font-kufi text-lg font-bold tracking-[0.15em] text-plum-700"
+                  className="font-kufi text-base font-bold tracking-[0.15em] text-plum-700"
                   dir="ltr"
                 >
                   {s.code || "—"}
                 </span>
                 {s.code && (
-                  <a
-                    href={whatsappLink(s.phone, codeMessage(s.name, s.code))}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-bold text-white"
-                    aria-label={`إرسال رمز ${s.name} عبر واتساب`}
-                  >
-                    📲
-                  </a>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => copyText(codeMessage(s.name, s.code!), s.id)}
+                      className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+                        copied === s.id
+                          ? "bg-plum-600 text-white"
+                          : "bg-white text-plum-700 ring-1 ring-cream-dark"
+                      }`}
+                      aria-label={`نسخ رسالة رمز ${s.name}`}
+                    >
+                      {copied === s.id ? "✓" : "📋"}
+                    </button>
+                    <a
+                      href={whatsappLink(s.phone, codeMessage(s.name, s.code))}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-bold text-white"
+                      aria-label={`إرسال رمز ${s.name} عبر واتساب`}
+                    >
+                      📲
+                    </a>
+                  </>
                 )}
               </span>
             </div>
