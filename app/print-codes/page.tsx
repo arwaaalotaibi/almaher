@@ -114,8 +114,10 @@ export default function PrintCodesPage() {
           .print-codes{background:#fff;padding:0;min-height:0}
           .print-codes .bar{display:none}
           .print-codes .pages{display:block;padding:0;gap:0}
-          .print-codes .page{height:296.5mm;box-shadow:none;margin:0;break-after:page;page-break-after:always;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-          .print-codes .page:last-child{break-after:auto;page-break-after:auto}
+          /* ارتفاع أقل من الورقة (٢٩٠ ملم من ٢٩٧) حتى لا يفيض أي بكسل ويولّد ورقة فارغة */
+          .print-codes .page{height:auto;grid-template-rows:137mm 137mm;box-shadow:none;margin:0;overflow:hidden;break-inside:avoid;page-break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+          .print-codes .page + .page{break-before:page;page-break-before:always}
+          .print-codes .cell{padding:2mm}
         }
       `}</style>
 
