@@ -28,7 +28,13 @@ import {
   type Student,
 } from "@/lib/store";
 import { ayahCount, SURAHS } from "@/lib/surahs";
-import { TERMS, TERMS_SUBTITLE, TERMS_TITLE, TERMS_VERSION } from "@/lib/terms";
+import {
+  APP_NOTICE,
+  TERMS,
+  TERMS_SUBTITLE,
+  TERMS_TITLE,
+  TERMS_VERSION,
+} from "@/lib/terms";
 import { printHifzSchedule } from "@/lib/print-schedule";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
@@ -880,6 +886,23 @@ function TermsGate({
             </div>
           );
         })}
+      </div>
+
+      {/* تنبيه بخصوص التطبيق — بعد اللائحة، للعلم */}
+      <div className="mt-4 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4">
+        <p className="mb-2 font-kufi text-base font-bold text-amber-900">
+          {APP_NOTICE.icon} {APP_NOTICE.title}
+        </p>
+        <ul className="grid list-disc gap-1.5 pe-5 ps-1">
+          {APP_NOTICE.items.map((item, i) => (
+            <li
+              key={i}
+              className="text-sm font-medium leading-relaxed text-amber-950 marker:text-amber-600"
+            >
+              {item}
+            </li>
+          ))}
+        </ul>
       </div>
 
       <button
