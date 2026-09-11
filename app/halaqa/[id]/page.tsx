@@ -32,6 +32,7 @@ import {
   useHydrated,
 } from "@/components/ui";
 import { GoalDots, StudentSheet } from "@/components/student-sheet";
+import { QuickSession } from "@/components/quick-session";
 
 import { RoleOnly } from "@/components/admin-only";
 
@@ -285,6 +286,9 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
           النظام جدولها تلقائياً.
         </p>
       </div>
+
+      {/* 📋 التسجيل السريع للقاء كامل */}
+      <QuickSession halaqa={halaqa} groups={groups} />
 
       {/* انتهى الفصل — بدء فصل جديد */}
       {termEnded && (
