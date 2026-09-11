@@ -349,12 +349,10 @@ export function ReciteLogger({
   student,
   halaqa,
   voice = "student",
-  readOnly = false,
 }: {
   student: Student;
   halaqa?: Halaqa;
   voice?: ChipVoice;
-  readOnly?: boolean; // الإدارة هي من تسجّل: تُعرض السجلّات فقط بلا إدخال أو تعديل
 }) {
   const schedule = halaqa ? buildSchedule(halaqa, student.plan) : null;
   const [open, setOpen] = useState(false);
@@ -455,20 +453,6 @@ export function ReciteLogger({
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
-
-  if (readOnly) {
-    return (
-      <div className="card mb-3 rounded-2xl p-4">
-        <p className="mb-1 font-kufi text-base font-bold text-plum-800">
-          📖 سجلّ تسميعي
-        </p>
-        <p className="mb-3 text-xs text-silver-600">
-          تسجيل التسميع يكون من المعلّمة/الإدارة بعد كل لقاء — وهنا تتابعين ما سُجّل لكِ
-        </p>
-        <ReciteHistory studentId={student.id} schedule={schedule} voice={voice} />
-      </div>
-    );
-  }
 
   return (
     <div className="card mb-4 rounded-2xl p-4">

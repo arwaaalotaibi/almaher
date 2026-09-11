@@ -432,12 +432,8 @@ export function StudentHome() {
             <span className="text-xl text-white/70">‹</span>
           </Link>
 
-          {/* سجلّ التسميع بعد كل لقاء — أو قراءة فقط إن كانت الإدارة هي من تسجّل */}
-          <ReciteLogger
-            student={me}
-            halaqa={halaqa}
-            readOnly={!settings.studentRecite}
-          />
+          {/* سجلّ التسميع بعد كل لقاء — يظهر فقط إن كانت الطالبة هي من تسجّل */}
+          {settings.studentRecite && <ReciteLogger student={me} halaqa={halaqa} />}
             </>
           )}
 
