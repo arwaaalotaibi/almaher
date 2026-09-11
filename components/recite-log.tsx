@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDanger } from "@/lib/confirm";
 import { useMemo, useRef, useState } from "react";
 import {
   actions,
@@ -314,7 +315,7 @@ export function ReciteHistory({
                   <button
                     type="button"
                     onClick={() => {
-                      if (window.confirm("حذف هذا السجلّ؟"))
+                      if (confirmDanger("حذف هذا السجلّ"))
                         actions.removeRecitation(r.id);
                     }}
                     className="text-[11px] font-bold text-red-600"

@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDanger } from "@/lib/confirm";
 import { use, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -139,8 +140,9 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
   const startNewTerm = () => {
     if (!newTermStart || newTermCount < 1) return;
     if (
-      !window.confirm(
-        `أرشفة الفصل الحالي وبدء فصل جديد (${newTermCount.toLocaleString("ar-EG")} لقاء)؟\nستنطلق كل طالبة من آخر ما وصلت له.`
+      !confirmDanger(
+        `أرشفة الفصل الحالي وبدء فصل جديد (${newTermCount.toLocaleString("ar-EG")} لقاء) — ستنطلق كل طالبة من آخر ما وصلت له`,
+        "فصل جديد"
       )
     )
       return;
@@ -410,8 +412,8 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
           <DangerBtn
             onClick={() => {
               if (
-                window.confirm(
-                  `حذف «${halaqa.mosque}${halaqa.day ? " — " + halaqa.day : ""}» وكل طالباتها؟`
+                confirmDanger(
+                  `حذف حلقة «${halaqa.mosque}${halaqa.day ? " — " + halaqa.day : ""}» وكل طالباتها`
                 )
               ) {
                 actions.removeHalaqa(id);

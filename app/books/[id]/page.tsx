@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDanger } from "@/lib/confirm";
 import { use, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -181,7 +182,7 @@ function Inner({ params }: { params: Promise<{ id: string }> }) {
             <button
               type="button"
               onClick={() => {
-                if (window.confirm("مسح كل الخطة؟")) setPlan([]);
+                if (confirmDanger("مسح كل خطة القراءة لهذا الكتاب", "مسح")) setPlan([]);
               }}
               className="text-xs font-bold text-red-600"
             >

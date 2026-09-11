@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDanger } from "@/lib/confirm";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { actions, convertAndUploadBook, useApp, type Book } from "@/lib/store";
@@ -170,7 +171,7 @@ function BooksInner() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (window.confirm(`حذف كتاب «${b.title}»؟`)) {
+                      if (confirmDanger(`حذف كتاب «${b.title}» وكل ما يتعلق به`)) {
                         actions.removeBook(b.id);
                       }
                     }}

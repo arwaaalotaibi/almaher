@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDanger } from "@/lib/confirm";
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -212,8 +213,8 @@ export function TeacherView({
             <DangerBtn
               onClick={() => {
                 if (
-                  window.confirm(
-                    `حذف المعلّمة «${teacher.name}»؟ (طالباتها ستبقى بدون معلّمة)`
+                  confirmDanger(
+                    `حذف المعلّمة «${teacher.name}» (طالباتها ستبقى بدون معلّمة)`
                   )
                 ) {
                   actions.removeTeacher(teacherId);

@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDanger } from "@/lib/confirm";
 import { useState } from "react";
 import {
   actions,
@@ -237,7 +238,7 @@ function AnnouncementsInner() {
                     <button
                       type="button"
                       onClick={() => {
-                        if (window.confirm("حذف هذا الإشعار؟")) {
+                        if (confirmDanger("حذف هذا الإشعار")) {
                           actions.removeAnnouncement(n.id);
                         }
                       }}

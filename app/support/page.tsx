@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDanger } from "@/lib/confirm";
 import { useState } from "react";
 import {
   actions,
@@ -103,7 +104,7 @@ function SupportInner() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (window.confirm("حذف هذه الرسالة؟"))
+                      if (confirmDanger("حذف هذه الرسالة"))
                         actions.removeSupport(m.id);
                     }}
                     className="shrink-0 text-xs font-bold text-red-600"

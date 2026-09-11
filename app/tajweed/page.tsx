@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDanger } from "@/lib/confirm";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import {
@@ -187,7 +188,7 @@ function TajweedInner() {
                     <button
                       type="button"
                       onClick={() => {
-                        if (window.confirm(`حذف درس «${l.title}»؟`))
+                        if (confirmDanger(`حذف درس «${l.title}» ونتائج الطالبات فيه`))
                           actions.removeTajweed(l.id);
                       }}
                       className="text-sm font-bold text-red-600"

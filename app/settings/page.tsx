@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDanger } from "@/lib/confirm";
 import { useRef, useState } from "react";
 import { actions, halaqaTitle, useApp, WEEK_DAYS } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
@@ -43,6 +44,13 @@ function SettingsInner() {
   };
 
   const importBackup = async (file: File) => {
+    if (
+      !confirmDanger(
+        "استيراد نسخة: سيستبدل كل الحلقات والمعلّمات والطالبات والإشعارات الحالية لكل الأجهزة بمحتوى الملف",
+        "استيراد"
+      )
+    )
+      return;
     const text = await file.text();
     if (actions.importJSON(text)) {
       window.alert("تم استيراد النسخة بنجاح ✅");
@@ -203,7 +211,7 @@ function SettingsInner() {
 
       <DangerBtn
         onClick={() => {
-          if (window.confirm("مسح كل البيانات من قاعدة البيانات لكل الأجهزة والبدء من جديد؟ لا يمكن التراجع!")) {
+          if (confirmDanger("مسح كل البيانات من قاعدة البيانات لكل الأجهزة والبدء من جديد", "مسح الكل")) {
             actions.resetAll();
           }
         }}

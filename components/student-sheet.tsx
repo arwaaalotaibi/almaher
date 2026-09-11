@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDanger } from "@/lib/confirm";
 import { useEffect, useState } from "react";
 import {
   actions,
@@ -77,7 +78,7 @@ export function StudentSheet({
   };
 
   const remove = () => {
-    if (window.confirm(`حذف الطالبة «${student.name}»؟`)) {
+    if (confirmDanger(`حذف الطالبة «${student.name}» وكل سجلاتها`)) {
       actions.removeStudent(student.id);
       onClose();
     }
