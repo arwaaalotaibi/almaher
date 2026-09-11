@@ -376,10 +376,10 @@ export interface TermArchive {
 
 /** إعدادات عامة تضبطها الإدارة (جدول almaher_settings) */
 export interface AppSettings {
-  studentRecite: boolean; // هل تسجّل الطالبة تسميعها بنفسها؟ (وإلا الإدارة/المعلّمات فقط)
+  studentRecite: boolean; // هل تسجّل الطالبة تسميعها بنفسها؟ الافتراضي: لا — الإدارة/المعلّمات فقط
 }
 
-export const DEFAULT_SETTINGS: AppSettings = { studentRecite: true };
+export const DEFAULT_SETTINGS: AppSettings = { studentRecite: false };
 
 export interface AppState {
   halaqas: Halaqa[];

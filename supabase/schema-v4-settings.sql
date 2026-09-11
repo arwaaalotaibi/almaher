@@ -14,7 +14,7 @@ create table if not exists public.almaher_settings (
   updated_at timestamptz not null default now()
 );
 insert into public.almaher_settings (key, value)
-  values ('student_recite', '{"enabled": true}'::jsonb)
+  values ('student_recite', '{"enabled": false}'::jsonb)
   on conflict (key) do nothing;
 
 alter table public.almaher_settings enable row level security;
@@ -26,7 +26,7 @@ drop policy if exists student_read on public.almaher_settings;
 create policy student_read on public.almaher_settings for select to authenticated
   using (public.almaher_role() = 'student');
 
--- هل يُسمح للطالبة بتسجيل التسميع؟ (الافتراضي نعم)
+-- هل يُسمح للطالبة بتسجيل التسميع؟ (الافتراضي لا — الإدارة فقط)
 create or replace function public.almaher_student_recite_enabled()
 returns boolean
 language sql
@@ -36,7 +36,7 @@ set search_path = public
 as $$
   select coalesce(
     (select (value ->> 'enabled')::boolean from public.almaher_settings where key = 'student_recite'),
-    true
+    false
   )
 $$;
 revoke all on function public.almaher_student_recite_enabled() from public;
