@@ -50,8 +50,8 @@ import { facesLabel } from "@/lib/arabic";
 /** شاشة الطالبة: تدخل برمزها فتُعرض أهدافها مباشرة (قراءة فقط) */
 // تبويبات صفحة الطالبة
 const STUDENT_TABS = [
-  { key: "reading", icon: "📖", label: "القراءة" },
-  { key: "quran", icon: "🕋", label: "القرآن" },
+  { key: "reading", icon: "📚", label: "القراءة" },
+  { key: "quran", icon: "📖", label: "القرآن" },
   { key: "tajweed", icon: "📿", label: "التجويد" },
   { key: "race", icon: "🏆", label: "السباق" },
 ] as const;
