@@ -1,10 +1,11 @@
 import { partFaces } from "./progress";
-import type {
-  Halaqa,
-  ReadingProgress,
-  RecitationLog,
-  Student,
-  TajweedResult,
+import {
+  isDesc,
+  type Halaqa,
+  type ReadingProgress,
+  type RecitationLog,
+  type Student,
+  type TajweedResult,
 } from "./store";
 
 /* ============ نقاط سباق الحلقات ============
@@ -63,9 +64,10 @@ export function computeRace(
         attends++;
         points += 10;
       }
-      const fH = partFaces(r.tasmi);
-      const fT = partFaces(r.tathbit);
-      const fM = partFaces(r.muraja);
+      const d = isDesc(st.plan);
+      const fH = partFaces(r.tasmi, d);
+      const fT = partFaces(r.tathbit, d);
+      const fM = partFaces(r.muraja, d);
       faces += fH;
       points += fH * 5 + fT * 2 + fM * 1;
     }

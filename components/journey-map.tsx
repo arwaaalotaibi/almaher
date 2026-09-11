@@ -54,12 +54,15 @@ function PathSvg({
   juz,
   juzPct,
   goalJuz,
+  reverse = false,
 }: {
   cur: number;
   juz: number;
   juzPct: number;
   goalJuz: number;
+  reverse?: boolean; // الدرب من جزء عمّ نزولاً (الحفظ من الناس)
 }) {
+  const stationJuz = (i: number) => (reverse ? 30 - i : i + 1);
   const doneRef = useRef<SVGPathElement>(null);
   const [drawn, setDrawn] = useState(false);
 
@@ -113,10 +116,10 @@ function PathSvg({
         const { x, y } = pt(i);
         const done = i < cur;
         const isCur = i === cur;
-        const isGoal = goalJuz > 0 && i === goalJuz - 1;
+        const isGoal = goalJuz > 0 && stationJuz(i) === goalJuz;
         return (
           <g key={i}>
-            <title>{`${juzLabel(i + 1)}${isGoal ? " — هدف الفصل 🚩" : ""}`}</title>
+            <title>{`${juzLabel(stationJuz(i))}${isGoal ? " — هدف الفصل 🚩" : ""}`}</title>
             {/* 🚩 هدف الفصل */}
             {isGoal && (
               <text x={x + 14} y={y - 14} fontSize="13" className="jm-float">
@@ -157,7 +160,7 @@ function PathSvg({
               fontWeight="700"
               fill={done || isCur ? "#ffffff" : "#a9a09a"}
             >
-              {ar(i + 1)}
+              {ar(stationJuz(i))}
             </text>
             {/* تلألؤ المحطات المقطوعة */}
             {done && (
@@ -252,12 +255,15 @@ function GardenSvg({
   juz,
   juzPct,
   goalJuz,
+  reverse = false,
 }: {
   cur: number;
   juz: number;
   juzPct: number;
   goalJuz: number;
+  reverse?: boolean;
 }) {
+  const stationJuz = (i: number) => (reverse ? 30 - i : i + 1);
   // الزهرة الحالية تتفتّح بتدرّج مع نسبة الجزء
   const bloom = 0.35 + 0.65 * (Math.min(100, Math.max(0, juzPct)) / 100);
   return (
@@ -291,10 +297,10 @@ function GardenSvg({
         const ground = y + 36;
         const done = i < cur;
         const isCur = i === cur;
-        const isGoal = goalJuz > 0 && i === goalJuz - 1;
+        const isGoal = goalJuz > 0 && stationJuz(i) === goalJuz;
         return (
           <g key={i}>
-            <title>{`${juzLabel(i + 1)}${isGoal ? " — هدف الفصل 🚩" : ""}`}</title>
+            <title>{`${juzLabel(stationJuz(i))}${isGoal ? " — هدف الفصل 🚩" : ""}`}</title>
             {/* الساق والورقة */}
             <path
               d={`M ${x} ${ground} C ${x + 2} ${y + 22}, ${x - 2} ${y + 15}, ${x} ${st}`}
@@ -361,7 +367,7 @@ function GardenSvg({
               fontSize="8.5"
               fill="#b3a893"
             >
-              {ar(i + 1)}
+              {ar(stationJuz(i))}
             </text>
           </g>
         );
@@ -389,13 +395,16 @@ export function JourneyMap({
   juzPct,
   goalJuz = 0,
   studentId = "",
+  reverse = false,
 }: {
   juz: number; // الجزء الحالي (1..30)
   juzPct: number; // نسبة إنجازه
   goalJuz?: number; // جزء هدف الفصل (يظهر عليه 🚩)
   studentId?: string; // لتذكّر آخر محطة احتُفل بها + المظهر المفضّل
+  reverse?: boolean; // الحفظ من الناس: المحطات من جزء عمّ نزولاً إلى الجزء الأول
 }) {
-  const cur = Math.min(Math.max(1, juz), 30) - 1; // فهرس المحطة الحالية
+  const j = Math.min(Math.max(1, juz), 30);
+  const cur = reverse ? 30 - j : j - 1; // فهرس المحطة الحالية
   const [celebrate, setCelebrate] = useState(false);
   const [view, setView] = useState<MapView>("path");
 
@@ -504,9 +513,9 @@ export function JourneyMap({
       )}
 
       {view === "garden" ? (
-        <GardenSvg cur={cur} juz={juz} juzPct={juzPct} goalJuz={goalJuz} />
+        <GardenSvg cur={cur} juz={juz} juzPct={juzPct} goalJuz={goalJuz} reverse={reverse} />
       ) : (
-        <PathSvg cur={cur} juz={juz} juzPct={juzPct} goalJuz={goalJuz} />
+        <PathSvg cur={cur} juz={juz} juzPct={juzPct} goalJuz={goalJuz} reverse={reverse} />
       )}
 
       <p className="border-t border-cream-dark px-4 py-2.5 text-center text-[11px] font-bold text-silver-600">

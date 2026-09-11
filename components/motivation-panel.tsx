@@ -51,7 +51,10 @@ export function ProgressSummary({
           />
         </div>
         <p className="mt-1.5 text-[11px] font-bold text-silver-600">
-          صفحة {ar(p.currentPage)} من {ar(604)} · المصحف {ar(p.mushafPct)}٪
+          {p.desc
+            ? `⬇️ من الناس نزولاً · قطعت ${ar(p.pagesReached)} من ${ar(604)} صفحة`
+            : `صفحة ${ar(p.currentPage)} من ${ar(604)}`}{" "}
+          · المصحف {ar(p.mushafPct)}٪
         </p>
       </div>
 
@@ -277,6 +280,7 @@ export function MotivationPanel({
         juzPct={p.juzPct}
         goalJuz={p.termGoalJuz}
         studentId={student.id}
+        reverse={p.desc}
       />
 
       {/* تقدّم الجزء */}
@@ -296,7 +300,10 @@ export function MotivationPanel({
           />
         </div>
         <p className="mt-2 text-[11px] font-bold text-silver-600">
-          وصلتِ صفحة {ar(p.currentPage)} من {ar(604)} · المصحف {ar(p.mushafPct)}٪
+          {p.desc
+            ? `⬇️ تحفظين من الناس نزولاً · قطعتِ ${ar(p.pagesReached)} من ${ar(604)} صفحة`
+            : `وصلتِ صفحة ${ar(p.currentPage)} من ${ar(604)}`}{" "}
+          · المصحف {ar(p.mushafPct)}٪
         </p>
       </div>
 

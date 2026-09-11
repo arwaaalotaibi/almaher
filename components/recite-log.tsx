@@ -7,6 +7,7 @@ import {
   dateKey,
   formatSchedDate,
   RECITE_PARTS,
+  isDesc,
   recitePartLabel,
   useApp,
   type Halaqa,
@@ -204,7 +205,9 @@ export function ReciteHistory({
   editingId?: string | null;
   voice?: ChipVoice;
 }) {
-  const { recitations, terms } = useApp();
+  const { recitations, terms, students } = useApp();
+  // اتجاه حفظ الطالبة — يغيّر قاعدة عدّ الأوجه المكتملة
+  const desc = isDesc(students.find((s) => s.id === studentId)?.plan);
   const mine = useMemo(
     () =>
       recitations
@@ -261,10 +264,10 @@ export function ReciteHistory({
           label: recitePartLabel(r[p.key] as RecitePart),
           verdict:
             row && r.attended
-              ? partVerdict(r[p.key] as RecitePart, row[ROW_REQ[p.key]])
+              ? partVerdict(r[p.key] as RecitePart, row[ROW_REQ[p.key]], desc)
               : null,
         })).filter((x) => x.label);
-        const overall = row && r.attended ? sessionVerdict(r, row) : null;
+        const overall = row && r.attended ? sessionVerdict(r, row, desc) : null;
         return (
           <div
             key={r.id}

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { STUDENT_PICK_KEY, useApp } from "@/lib/store";
 import { computeProgress } from "@/lib/progress";
-import { pageEnd, pageOf, MUSHAF_PAGES, refLabel } from "@/lib/mushaf";
+import { refLabel } from "@/lib/mushaf";
 import { ayahCount, SURAHS } from "@/lib/surahs";
 import { PageHeader, useHydrated } from "@/components/ui";
 import { Memorizer } from "@/components/memorizer";
@@ -33,20 +33,10 @@ export default function MemorizePage() {
     [me, recitations, halaqa]
   );
 
-  // ورد الحفظ القادم (بدقة الآية) وورد المراجعة القادمة
-  const hifzRange = useMemo(() => {
-    if (!prog?.nextHifzFrom || !prog.nextToPage) return null;
-    return { from: prog.nextHifzFrom, to: pageEnd(prog.nextToPage) };
-  }, [prog]);
-
-  const murRange = useMemo(() => {
-    if (!prog?.nextMurFrom || !me) return null;
-    const perM = Math.max(0, Math.round(me.plan.murajaah || 0));
-    if (!perM) return null;
-    const fromPage = pageOf(prog.nextMurFrom.surah, prog.nextMurFrom.ayah);
-    const toPage = Math.min(MUSHAF_PAGES, fromPage + perM - 1);
-    return { from: prog.nextMurFrom, to: pageEnd(toPage) };
-  }, [prog, me]);
+  // ورد الحفظ القادم (بدقة الآية) وورد المراجعة القادمة — يحسبهما محرّك
+  // التقدّم في اتجاه حفظ الطالبة (صاعداً أو نازلاً)، وكلاهما بترتيب المصحف
+  const hifzRange = prog?.nextHifzRange ?? null;
+  const murRange = prog?.nextMurRange ?? null;
 
   if (!hydrated) return <main className="mx-auto max-w-2xl px-4 pt-10" />;
 

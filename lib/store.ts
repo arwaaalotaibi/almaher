@@ -14,6 +14,19 @@ import {
 export type Goals = Record<string, string>;
 export type GoalsDone = Record<string, boolean>;
 
+/** اتجاه الحفظ: صاعد من البقرة نحو الناس، أو نازل من الناس نحو البقرة */
+export type HifzDirection = "asc" | "desc";
+
+export const DIRECTIONS: { key: HifzDirection; icon: string; label: string; hint: string }[] = [
+  { key: "asc", icon: "⬆️", label: "من البقرة", hint: "صاعداً نحو الناس" },
+  { key: "desc", icon: "⬇️", label: "من الناس", hint: "نازلاً نحو البقرة — سورةً سورة" },
+];
+
+/** هل خطة الطالبة نازلة (من الناس)؟ */
+export function isDesc(plan?: Pick<CoursePlan, "direction"> | null): boolean {
+  return plan?.direction === "desc";
+}
+
 /** خطة الفصل الخاصة بالطالبة */
 export interface CoursePlan {
   meetings: number; // (قديم — غير مستخدم)
@@ -21,8 +34,9 @@ export interface CoursePlan {
   tathbit: number; // أوجه التثبيت
   murajaah: number; // أوجه المراجعة لكل لقاء
   start?: string; // (قديم — نص حر)
+  direction?: HifzDirection; // اتجاه الحفظ والمراجعة (الافتراضي: صاعد)
   startSurah?: string; // بداية الحفظ: السورة
-  startAyah?: number; // بداية الحفظ: رقم الآية
+  startAyah?: number; // بداية الحفظ: رقم الآية (في النازل: آخر آية تُحفظ أولاً — حافة الحفظ)
   murStartSurah?: string; // بداية المراجعة: السورة
   murStartAyah?: number; // بداية المراجعة: رقم الآية
 }
@@ -33,6 +47,7 @@ export const EMPTY_PLAN: CoursePlan = {
   tathbit: 0,
   murajaah: 0,
   start: "",
+  direction: "asc",
   startSurah: "",
   startAyah: 1,
   murStartSurah: "",
@@ -42,8 +57,10 @@ export const EMPTY_PLAN: CoursePlan = {
 /** نص بداية الحفظ للعرض */
 export function hifzStartLabel(plan?: CoursePlan): string {
   if (!plan) return "";
-  if (plan.startSurah)
-    return `سورة ${plan.startSurah} — آية ${(plan.startAyah ?? 1).toLocaleString("ar-EG")}`;
+  if (plan.startSurah) {
+    const base = `سورة ${plan.startSurah} — آية ${(plan.startAyah ?? 1).toLocaleString("ar-EG")}`;
+    return isDesc(plan) ? `${base} ⬇️ نزولاً` : base;
+  }
   return plan.start?.trim() ?? "";
 }
 
@@ -461,6 +478,22 @@ export function buildSchedule(
 
   type Rng = { from: number; to: number };
   const empty: Rng = { from: 0, to: 0 };
+  const desc = isDesc(plan);
+
+  /** المقطع التالي بمقدار k صفحة من المؤشّر — صاعداً أو نازلاً.
+      يعيد المقطع (من الأدنى إلى الأعلى دائماً — يُقرأ بترتيب المصحف)
+      والمؤشّر الجديد، أو null إن انتهى المصحف. */
+  const step = (cur: number, k: number): { rng: Rng; next: number } | null => {
+    if (k <= 0) return null;
+    if (desc) {
+      if (cur < 1) return null;
+      const from = Math.max(1, cur - k + 1);
+      return { rng: { from, to: cur }, next: from - 1 };
+    }
+    if (cur > MUSHAF_PAGES) return null;
+    const to = Math.min(MUSHAF_PAGES, cur + k - 1);
+    return { rng: { from: cur, to }, next: to + 1 };
+  };
 
   const rows: ScheduleRow[] = [];
   let hCur = hPage0; // مؤشّر صفحة الحفظ التالية
@@ -478,10 +511,11 @@ export function buildSchedule(
     let hRange: Rng = empty;
     let hCount = perH;
     if (hPage0) {
-      if (perH > 0 && hCur <= MUSHAF_PAGES) {
-        hRange = { from: hCur, to: Math.min(MUSHAF_PAGES, hCur + perH - 1) };
+      const s = step(hCur, perH);
+      if (s) {
+        hRange = s.rng;
         hCount = hRange.to - hRange.from + 1;
-        hCur = hRange.to + 1;
+        hCur = s.next;
       } else {
         hCount = 0; // انتهى المصحف
       }
@@ -495,10 +529,11 @@ export function buildSchedule(
     let mRange: Rng = empty;
     let mCount = perM;
     if (mPage0) {
-      if (perM > 0 && mCur <= MUSHAF_PAGES) {
-        mRange = { from: mCur, to: Math.min(MUSHAF_PAGES, mCur + perM - 1) };
+      const s = step(mCur, perM);
+      if (s) {
+        mRange = s.rng;
         mCount = mRange.to - mRange.from + 1;
-        mCur = mRange.to + 1;
+        mCur = s.next;
       } else {
         mCount = 0;
       }

@@ -10,9 +10,11 @@ import {
   countUnread,
   currentSessionIndex,
   dateKey,
+  DIRECTIONS,
   EMPTY_PLAN,
   formatSchedDate,
   getReadIds,
+  isDesc,
   recitePartLabel,
   halaqaTitle,
   hifzStartLabel,
@@ -503,10 +505,11 @@ export function StudentHome() {
                   const tathbitPlan = pj?.tathbitLabel || s.tathbitLabel;
                   const murPlan = pj?.murajaahLabel || s.murajaahLabel;
                   // حكم كل قسم: أنجزت المطلوب / زادت / ناقص
-                  const vH = att && log ? partVerdict(log.tasmi, s.hifz) : null;
-                  const vT = att && log ? partVerdict(log.tathbit, s.tathbit) : null;
-                  const vM = att && log ? partVerdict(log.muraja, s.murajaah) : null;
-                  const overall = att && log ? sessionVerdict(log, s) : null;
+                  const d = isDesc(me.plan);
+                  const vH = att && log ? partVerdict(log.tasmi, s.hifz, d) : null;
+                  const vT = att && log ? partVerdict(log.tathbit, s.tathbit, d) : null;
+                  const vM = att && log ? partVerdict(log.muraja, s.murajaah, d) : null;
+                  const overall = att && log ? sessionVerdict(log, s, d) : null;
                   return (
                     <div
                       key={s.n}
@@ -940,6 +943,55 @@ function MyPlanEditor({ student }: { student: Student }) {
 
       {!open ? null : (
       <div className="mt-3">
+      {/* اتجاه الحفظ */}
+      <div className="mb-3">
+        <span className="mb-1 block text-xs font-bold text-plum-700">
+          🧭 اتجاه حفظي
+        </span>
+        <div className="grid grid-cols-2 gap-2">
+          {DIRECTIONS.map((d) => {
+            const on = (plan.direction ?? "asc") === d.key;
+            return (
+              <button
+                key={d.key}
+                type="button"
+                onClick={() => {
+                  const desc = d.key === "desc";
+                  setPlan({
+                    ...plan,
+                    direction: d.key,
+                    startAyah: plan.startSurah
+                      ? desc
+                        ? ayahCount(plan.startSurah)
+                        : 1
+                      : plan.startAyah,
+                    murStartAyah: plan.murStartSurah
+                      ? desc
+                        ? ayahCount(plan.murStartSurah)
+                        : 1
+                      : plan.murStartAyah,
+                  });
+                }}
+                className={`rounded-xl border px-3 py-2 text-start transition ${
+                  on
+                    ? "border-plum-600 bg-plum-600 text-white"
+                    : "border-cream-dark bg-white text-plum-800"
+                }`}
+              >
+                <span className="block text-sm font-bold">
+                  {d.icon} {d.label}
+                </span>
+                <span
+                  className={`block text-[11px] ${on ? "text-white/80" : "text-silver-600"}`}
+                >
+                  {d.hint}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* بداية الحفظ */}
       <div className="grid grid-cols-2 gap-3">
         <Field label="بداية الحفظ — السورة" icon="📖">
@@ -947,7 +999,11 @@ function MyPlanEditor({ student }: { student: Student }) {
             className={inputCls}
             value={plan.startSurah ?? ""}
             onChange={(e) =>
-              setPlan({ ...plan, startSurah: e.target.value, startAyah: 1 })
+              setPlan({
+                ...plan,
+                startSurah: e.target.value,
+                startAyah: isDesc(plan) ? ayahCount(e.target.value) : 1,
+              })
             }
           >
             <option value="">اختاري السورة…</option>
@@ -984,7 +1040,11 @@ function MyPlanEditor({ student }: { student: Student }) {
             className={inputCls}
             value={plan.murStartSurah ?? ""}
             onChange={(e) =>
-              setPlan({ ...plan, murStartSurah: e.target.value, murStartAyah: 1 })
+              setPlan({
+                ...plan,
+                murStartSurah: e.target.value,
+                murStartAyah: isDesc(plan) ? ayahCount(e.target.value) : 1,
+              })
             }
           >
             <option value="">اختاري السورة…</option>
