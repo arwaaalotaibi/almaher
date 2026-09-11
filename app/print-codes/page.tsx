@@ -75,6 +75,9 @@ export default function PrintCodesPage() {
 
   const host =
     typeof window !== "undefined" ? window.location.host : "almaher-one.vercel.app";
+  // أربع بطاقات في كل صفحة A4
+  const pages: PrintCodesPayload["rows"][] = [];
+  for (let i = 0; i < data.rows.length; i += 4) pages.push(data.rows.slice(i, i + 4));
 
   return (
     <main className="print-codes">
@@ -85,9 +88,10 @@ export default function PrintCodesPage() {
         .print-codes .back{background:#e8dfe4;color:#5d3f4e}
         .print-codes .print{background:#5d3f4e;color:#fff}
         .print-codes .bar .meta{font-size:14px;color:#5d3f4e;font-weight:700}
-        .print-codes .grid{display:grid;grid-template-columns:repeat(2,1fr);max-width:194mm;margin:16px auto;background:#fff}
-        /* خلية القصّ: خط متقطع، وبداخلها البطاقة المزخرفة */
-        .print-codes .cell{border:1px dashed #c9b6c0;padding:3mm;height:140mm;box-sizing:border-box;break-inside:avoid;page-break-inside:avoid}
+        /* صفحة A4 صريحة: ٢١٠×٢٩٧ ملم، هوامش داخلية، وشبكة ٢×٢ ثابتة */
+        .print-codes .pages{display:flex;flex-direction:column;gap:16px;align-items:center;padding:16px 0}
+        .print-codes .page{width:210mm;height:297mm;box-sizing:border-box;padding:8mm;background:#fff;box-shadow:0 2px 12px rgba(77,51,64,.12);display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+        .print-codes .cell{border:1px dashed #c9b6c0;padding:3mm;box-sizing:border-box;min-height:0;min-width:0}
         .print-codes .card{height:100%;box-sizing:border-box;border:3px double #7d5a6c;border-radius:14px;padding:4mm 5mm;display:flex;flex-direction:column;align-items:center;text-align:center;background:#fff;position:relative;overflow:hidden}
         .print-codes .card>*{flex-shrink:0}
         .print-codes .card::before,.print-codes .card::after{content:"❁";position:absolute;color:#c9a96a;font-size:14px}
@@ -105,13 +109,13 @@ export default function PrintCodesPage() {
         .print-codes .hint{font-size:10.5px;color:#6f5f68;margin-top:auto;padding-top:2mm;line-height:1.55}
         .print-codes .hint b{color:#5d3f4e;direction:ltr;unicode-bidi:embed}
         @media print{
-          @page{size:A4;margin:8mm}
-          body{background:#fff !important}
-          .print-codes{background:#fff;padding:0}
+          @page{size:A4;margin:0}
+          html,body{background:#fff !important;margin:0;padding:0}
+          .print-codes{background:#fff;padding:0;min-height:0}
           .print-codes .bar{display:none}
-          .print-codes .grid{margin:0;max-width:none}
-          .print-codes .cell{height:139mm}
-          .print-codes .cell:nth-child(4n){page-break-after:always}
+          .print-codes .pages{display:block;padding:0;gap:0}
+          .print-codes .page{height:296.5mm;box-shadow:none;margin:0;break-after:page;page-break-after:always;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+          .print-codes .page:last-child{break-after:auto;page-break-after:auto}
         }
       `}</style>
 
@@ -120,38 +124,42 @@ export default function PrintCodesPage() {
           → رجوع
         </button>
         <span className="meta">
-          {data.halaqaLabel} · {ar(data.rows.length)} بطاقة
+          {data.halaqaLabel} · {ar(data.rows.length)} بطاقة · {ar(pages.length)} صفحات
         </span>
         <button type="button" className="print" onClick={() => window.print()}>
           🖨️ طباعة
         </button>
       </div>
 
-      <div className="grid">
-        {data.rows.map((r) => (
-          <div key={r.code} className="cell">
-            <div className="card">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="logo" src="/logo.png" alt="" />
-              <div className="app">تطبيق الماهر</div>
-              <div className="brand">جمعية الماهر بالقرآن وعلومه</div>
-              <div className="rule" />
-              <div className="name">{r.name}</div>
-              <div className="halaqa">🕌 {data.halaqaLabel}</div>
-              {qrs[r.code] ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img className="qr" src={qrs[r.code]} alt="" />
-              ) : (
-                <span className="qr" />
-              )}
-              <div className="lbl">رمز الدخول</div>
-              <div className="code">{r.code}</div>
-              <div className="hint">
-                امسحي الرمز بكاميرا الجوال فيدخلكِ التطبيق مباشرة
-                <br />
-                أو افتحي <b>{host}</b> وأدخلي رمزك
+      <div className="pages">
+        {pages.map((group, pi) => (
+          <div key={pi} className="page">
+            {group.map((r) => (
+              <div key={r.code} className="cell">
+                <div className="card">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img className="logo" src="/logo.png" alt="" />
+                  <div className="app">تطبيق الماهر</div>
+                  <div className="brand">جمعية الماهر بالقرآن وعلومه</div>
+                  <div className="rule" />
+                  <div className="name">{r.name}</div>
+                  <div className="halaqa">🕌 {data.halaqaLabel}</div>
+                  {qrs[r.code] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className="qr" src={qrs[r.code]} alt="" />
+                  ) : (
+                    <span className="qr" />
+                  )}
+                  <div className="lbl">رمز الدخول</div>
+                  <div className="code">{r.code}</div>
+                  <div className="hint">
+                    امسحي الرمز بكاميرا الجوال فيدخلكِ التطبيق مباشرة
+                    <br />
+                    أو افتحي <b>{host}</b> وأدخلي رمزك
+                  </div>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
         ))}
       </div>
