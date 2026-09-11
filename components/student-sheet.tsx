@@ -95,7 +95,8 @@ export function StudentSheet({
   const halaqa = halaqas.find((h) => h.id === halaqaId);
   const schedule = halaqa ? buildSchedule(halaqa, plan) : null;
   // الإسقاط التكيّفي للّقاءات القادمة (من الموضع الفعلي للطالبة)
-  const prog = computeProgress(student, recitations, halaqa);
+  // بالخطة المعدَّلة في النموذج (لا المحفوظة) — فيتحدّث الجدول فور تغيير الاتجاه أو البداية
+  const prog = computeProgress({ ...student, plan }, recitations, halaqa);
 
   const printSchedule = () => {
     if (!schedule || !halaqa) return;

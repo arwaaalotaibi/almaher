@@ -536,7 +536,11 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
         </PrimaryBtn>
       </Sheet>
 
-      <StudentSheet student={selected} onClose={() => setSelected(null)} />
+      {/* النسخة الحيّة من الطالبة (بعد الحفظ) لا اللقطة وقت الضغط */}
+      <StudentSheet
+        student={selected ? (students.find((s) => s.id === selected.id) ?? selected) : null}
+        onClose={() => setSelected(null)}
+      />
     </main>
   );
 }

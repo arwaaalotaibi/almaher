@@ -228,7 +228,10 @@ export function TeacherView({
         </Sheet>
       )}
 
-      <StudentSheet student={selected} onClose={() => setSelected(null)} />
+      <StudentSheet
+        student={selected ? (students.find((s) => s.id === selected.id) ?? selected) : null}
+        onClose={() => setSelected(null)}
+      />
     </main>
   );
 }
