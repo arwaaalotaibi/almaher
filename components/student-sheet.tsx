@@ -7,8 +7,8 @@ import {
   codeMessage,
   CoursePlan,
   dateKey,
-  DIRECTIONS,
   isDesc,
+  isMurDesc,
   whatsappLink,
   EMPTY_PLAN,
   formatSchedDate,
@@ -26,6 +26,7 @@ import { ayahCount, SURAHS } from "@/lib/surahs";
 import { computeProgress, partVerdict, sessionVerdict } from "@/lib/progress";
 import { facesLabel } from "@/lib/arabic";
 import { printHifzSchedule } from "@/lib/print-schedule";
+import { DirectionPicker } from "./direction-picker";
 import { DangerBtn, Field, inputCls, PrimaryBtn, Sheet } from "./ui";
 import { ReciteLogger, SessionVerdictChip, VerdictChip } from "./recite-log";
 import { ProgressSummary } from "./motivation-panel";
@@ -194,55 +195,46 @@ export function StudentSheet({
         </Field>
       </div>
 
-      {/* اتجاه الحفظ */}
-      <div className="mb-3">
-        <span className="mb-1 block text-xs font-bold text-plum-700">
-          🧭 اتجاه الحفظ
-        </span>
-        <div className="grid grid-cols-2 gap-2">
-          {DIRECTIONS.map((d) => {
-            const on = (plan.direction ?? "asc") === d.key;
-            return (
-              <button
-                key={d.key}
-                type="button"
-                onClick={() => {
-                  const desc = d.key === "desc";
-                  // عند تبديل الاتجاه تُضبط آية البداية على طرف السورة المناسب
-                  setPlan({
-                    ...plan,
-                    direction: d.key,
-                    startAyah: plan.startSurah
-                      ? desc
-                        ? ayahCount(plan.startSurah)
-                        : 1
-                      : plan.startAyah,
-                    murStartAyah: plan.murStartSurah
-                      ? desc
-                        ? ayahCount(plan.murStartSurah)
-                        : 1
-                      : plan.murStartAyah,
-                  });
-                }}
-                className={`rounded-xl border px-3 py-2 text-start transition ${
-                  on
-                    ? "border-plum-600 bg-plum-600 text-white"
-                    : "border-cream-dark bg-white text-plum-800"
-                }`}
-              >
-                <span className="block text-sm font-bold">
-                  {d.icon} {d.label}
-                </span>
-                <span
-                  className={`block text-[11px] ${on ? "text-white/80" : "text-silver-600"}`}
-                >
-                  {d.hint}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {/* اتجاه الحفظ والمراجعة — كلٌّ على حدة (كثيرات يحفظن صاعداً ويراجعن من الناس) */}
+      <DirectionPicker
+        label="🧭 اتجاه الحفظ"
+        value={plan.direction ?? "asc"}
+        onChange={(dir) => {
+          const desc = dir === "desc";
+          // المراجعة تتبع الحفظ ما لم يكن لها اتجاه خاص
+          const murFollows = !plan.murDirection;
+          setPlan({
+            ...plan,
+            direction: dir,
+            startAyah: plan.startSurah
+              ? desc
+                ? ayahCount(plan.startSurah)
+                : 1
+              : plan.startAyah,
+            murStartAyah:
+              murFollows && plan.murStartSurah
+                ? desc
+                  ? ayahCount(plan.murStartSurah)
+                  : 1
+                : plan.murStartAyah,
+          });
+        }}
+      />
+      <DirectionPicker
+        label="🔁 اتجاه المراجعة"
+        value={plan.murDirection ?? plan.direction ?? "asc"}
+        onChange={(dir) =>
+          setPlan({
+            ...plan,
+            murDirection: dir,
+            murStartAyah: plan.murStartSurah
+              ? dir === "desc"
+                ? ayahCount(plan.murStartSurah)
+                : 1
+              : plan.murStartAyah,
+          })
+        }
+      />
 
       {/* بداية الحفظ */}
       <div className="mb-1 grid grid-cols-2 gap-3">
@@ -297,7 +289,7 @@ export function StudentSheet({
               setPlan({
                 ...plan,
                 murStartSurah: e.target.value,
-                murStartAyah: isDesc(plan) ? ayahCount(e.target.value) : 1,
+                murStartAyah: isMurDesc(plan) ? ayahCount(e.target.value) : 1,
               })
             }
           >
@@ -385,10 +377,11 @@ export function StudentSheet({
               const murLabel = log ? recitePartLabel(log.muraja) : "";
               // حكم كل قسم: أنجزت / زادت / ناقص — مقارنةً بمطلوب اللقاء
               const d = isDesc(plan);
+const md = isMurDesc(plan);
               const vH = att && log ? partVerdict(log.tasmi, s.hifz, d) : null;
               const vT = att && log ? partVerdict(log.tathbit, s.tathbit, d) : null;
-              const vM = att && log ? partVerdict(log.muraja, s.murajaah, d) : null;
-              const overall = att && log ? sessionVerdict(log, s, d) : null;
+              const vM = att && log ? partVerdict(log.muraja, s.murajaah, md) : null;
+              const overall = att && log ? sessionVerdict(log, s, d, md) : null;
               // اللقاءات القادمة: المقطع مُسقَط من الموضع الفعلي
               const pj = !log ? prog.projected[s.n] : undefined;
               const hifzPlan = pj?.hifzLabel || s.hifzLabel;

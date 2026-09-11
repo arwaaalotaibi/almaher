@@ -1,6 +1,7 @@
 import { partFaces } from "./progress";
 import {
   isDesc,
+  isMurDesc,
   type Halaqa,
   type ReadingProgress,
   type RecitationLog,
@@ -67,7 +68,7 @@ export function computeRace(
       const d = isDesc(st.plan);
       const fH = partFaces(r.tasmi, d);
       const fT = partFaces(r.tathbit, d);
-      const fM = partFaces(r.muraja, d);
+      const fM = partFaces(r.muraja, isMurDesc(st.plan));
       faces += fH;
       points += fH * 5 + fT * 2 + fM * 1;
     }

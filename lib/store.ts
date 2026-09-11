@@ -22,9 +22,17 @@ export const DIRECTIONS: { key: HifzDirection; icon: string; label: string; hint
   { key: "desc", icon: "⬇️", label: "من الناس", hint: "نازلاً نحو البقرة — سورةً سورة" },
 ];
 
-/** هل خطة الطالبة نازلة (من الناس)؟ */
+/** هل حفظ الطالبة نازل (من الناس)؟ */
 export function isDesc(plan?: Pick<CoursePlan, "direction"> | null): boolean {
   return plan?.direction === "desc";
+}
+
+/** هل مراجعة الطالبة نازلة؟ — تتبع اتجاه الحفظ ما لم يُحدَّد لها اتجاه خاص
+    (كثيرات يحفظن صاعداً من البقرة ويراجعن نازلاً من الناس) */
+export function isMurDesc(
+  plan?: Pick<CoursePlan, "direction" | "murDirection"> | null
+): boolean {
+  return (plan?.murDirection ?? plan?.direction) === "desc";
 }
 
 /** خطة الفصل الخاصة بالطالبة */
@@ -34,7 +42,8 @@ export interface CoursePlan {
   tathbit: number; // أوجه التثبيت
   murajaah: number; // أوجه المراجعة لكل لقاء
   start?: string; // (قديم — نص حر)
-  direction?: HifzDirection; // اتجاه الحفظ والمراجعة (الافتراضي: صاعد)
+  direction?: HifzDirection; // اتجاه الحفظ (الافتراضي: صاعد)
+  murDirection?: HifzDirection; // اتجاه المراجعة (الافتراضي: كاتجاه الحفظ)
   startSurah?: string; // بداية الحفظ: السورة
   startAyah?: number; // بداية الحفظ: رقم الآية (في النازل: آخر آية تُحفظ أولاً — حافة الحفظ)
   murStartSurah?: string; // بداية المراجعة: السورة
@@ -507,12 +516,17 @@ export function buildSchedule(
 
   type Rng = { from: number; to: number };
   const empty: Rng = { from: 0, to: 0 };
-  const desc = isDesc(plan);
+  const hDesc = isDesc(plan);
+  const mDesc = isMurDesc(plan);
 
   /** المقطع التالي بمقدار k صفحة من المؤشّر — صاعداً أو نازلاً.
       يعيد المقطع (من الأدنى إلى الأعلى دائماً — يُقرأ بترتيب المصحف)
       والمؤشّر الجديد، أو null إن انتهى المصحف. */
-  const step = (cur: number, k: number): { rng: Rng; next: number } | null => {
+  const step = (
+    cur: number,
+    k: number,
+    desc: boolean
+  ): { rng: Rng; next: number } | null => {
     if (k <= 0) return null;
     if (desc) {
       if (cur < 1) return null;
@@ -540,7 +554,7 @@ export function buildSchedule(
     let hRange: Rng = empty;
     let hCount = perH;
     if (hPage0) {
-      const s = step(hCur, perH);
+      const s = step(hCur, perH, hDesc);
       if (s) {
         hRange = s.rng;
         hCount = hRange.to - hRange.from + 1;
@@ -558,7 +572,7 @@ export function buildSchedule(
     let mRange: Rng = empty;
     let mCount = perM;
     if (mPage0) {
-      const s = step(mCur, perM);
+      const s = step(mCur, perM, mDesc);
       if (s) {
         mRange = s.rng;
         mCount = mRange.to - mRange.from + 1;

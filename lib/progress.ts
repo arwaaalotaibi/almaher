@@ -11,6 +11,7 @@ import {
   buildSchedule,
   currentSessionIndex,
   isDesc,
+  isMurDesc,
   recitePartLabel,
   type CoursePlan,
   type Halaqa,
@@ -260,18 +261,19 @@ export function partVerdict(
 export function sessionVerdict(
   log: RecitationLog,
   row: Pick<ScheduleRow, "hifz" | "tathbit" | "murajaah">,
-  desc = false
+  desc = false,
+  murDesc = desc
 ): PartVerdict["status"] | null {
-  const pairs: [RecitePart | undefined, number][] = [
-    [log.tasmi, row.hifz],
-    [log.tathbit, row.tathbit],
-    [log.muraja, row.murajaah],
+  const pairs: [RecitePart | undefined, number, boolean][] = [
+    [log.tasmi, row.hifz, desc],
+    [log.tathbit, row.tathbit, desc],
+    [log.muraja, row.murajaah, murDesc],
   ];
   let any = false;
   let exceeded = false;
   let short = false;
-  for (const [part, req] of pairs) {
-    const v = partVerdict(part, req, desc);
+  for (const [part, req, d] of pairs) {
+    const v = partVerdict(part, req, d);
     if (v) any = true;
     if (v?.status === "exceeded") exceeded = true;
     // قسم مطلوب لم يُسمَّع، أو سُمّع أقل من مطلوبه ⇒ لم يكتمل
@@ -287,6 +289,7 @@ export function sessionVerdict(
 export interface Progress {
   hasData: boolean;
   desc: boolean; // الحفظ نازل (من الناس)
+  murDesc: boolean; // المراجعة نازلة
   currentPage: number; // صفحة حافة الحفظ (أبعد صفحة بلغتها في اتجاهها)
   pagesReached: number; // صفحات قُطعت من بداية المصحف في اتجاهها (١..٦٠٤)
   juz: number;
@@ -350,6 +353,7 @@ export function computeProgress(
 ): Progress {
   const plan: CoursePlan = student.plan;
   const desc = isDesc(plan);
+  const mdesc = isMurDesc(plan);
   const mine = recitations
     .filter((r) => r.studentId === student.id)
     .sort((a, b) => b.date.localeCompare(a.date));
@@ -378,11 +382,9 @@ export function computeProgress(
     ? Math.max(0, desc ? currentPage - jStart : jEnd - currentPage)
     : 0;
 
-  // صفحة الوصول بعد قطع cum صفحة من صفحة البداية في اتجاهها
-  const advance = (from: number, cum: number) =>
-    desc
-      ? Math.max(1, from - cum + 1)
-      : Math.min(MUSHAF_PAGES, from + cum - 1);
+  // صفحة الوصول بعد قطع cum صفحة من صفحة البداية في الاتجاه المعطى
+  const advance = (from: number, cum: number, d = desc) =>
+    d ? Math.max(1, from - cum + 1) : Math.min(MUSHAF_PAGES, from + cum - 1);
 
   // المتوقّع حسب الخطة + الحصص المتبقية
   const schedule = halaqa ? buildSchedule(halaqa, plan) : null;
@@ -408,10 +410,8 @@ export function computeProgress(
   }
   // المقارنة بالخطة تكون بالصفحات «المكتملة» (كقاعدة عدّ الأوجه).
   // + متقدّمة: صاعداً بلغت صفحة أعلى من المتوقّع، ونازلاً صفحة أدنى منه
-  const ahead = (edge: Pos, expected: number) =>
-    desc
-      ? expected - completedPageOf(edge, true)
-      : completedPageOf(edge) - expected;
+  const ahead = (edge: Pos, expected: number, d = desc) =>
+    d ? expected - completedPageOf(edge, true) : completedPageOf(edge) - expected;
   const aheadPages =
     lastTasmi && expectedPage ? ahead(lastTasmi, expectedPage) : 0;
 
@@ -427,25 +427,29 @@ export function computeProgress(
   const nextToPage = nh.toPage;
 
   // المطلوب القادم للمراجعة = من الآية التي تلي (أو تسبق) حافة المراجعة
-  const lastMuraja = furthestEnd(mine.map((r) => ({ part: r.muraja })), desc);
+  const lastMuraja = furthestEnd(mine.map((r) => ({ part: r.muraja })), mdesc);
   const perMplan = Math.max(0, Math.round(plan.murajaah || 0));
   const murStartPos: Pos | null = plan.murStartSurah
     ? { surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 }
     : null;
-  const nextMurFrom = lastMuraja ? stepPos(lastMuraja, desc) : murStartPos;
-  const nm = nextLabel(nextMurFrom, perMplan, desc);
+  const nextMurFrom = lastMuraja ? stepPos(lastMuraja, mdesc) : murStartPos;
+  const nm = nextLabel(nextMurFrom, perMplan, mdesc);
   const nextMurLabel = nm.label;
 
-  // موقع المراجعة مقابل خطتها (تراكمياً) — كمؤشر الحفظ
+  // موقع المراجعة مقابل خطتها (تراكمياً) — كمؤشر الحفظ، في اتجاه المراجعة
   let expectedMurPage = 0;
   if (schedule && schedule.length && murStartPos) {
     const passed = nextIdx > 0 ? nextIdx - 1 : schedule.length;
     const cumM = passed > 0 ? schedule[passed - 1].cumMurajaah : 0;
     if (cumM > 0)
-      expectedMurPage = advance(pageOf(murStartPos.surah, murStartPos.ayah), cumM);
+      expectedMurPage = advance(
+        pageOf(murStartPos.surah, murStartPos.ayah),
+        cumM,
+        mdesc
+      );
   }
   const aheadMurPages =
-    lastMuraja && expectedMurPage ? ahead(lastMuraja, expectedMurPage) : 0;
+    lastMuraja && expectedMurPage ? ahead(lastMuraja, expectedMurPage, mdesc) : 0;
   const hasMurPlan = Boolean(lastMuraja && expectedMurPage > 0);
 
   // «سباق خطة الفصل»: كم أُنجز من خطة الفصل كاملة، وما وصفة كل لقاء
@@ -457,20 +461,25 @@ export function computeProgress(
     const totalM = lastRow.cumMurajaah;
     if (totalH + totalM > 0) {
       // صفحات مكتملة من بداية الخطة حتى الحافة، في اتجاهها
-      const doneFrom = (startPage: number, edge: Pos | null, total: number) => {
+      const doneFrom = (
+        startPage: number,
+        edge: Pos | null,
+        total: number,
+        d: boolean
+      ) => {
         if (!edge || !startPage) return 0;
-        const cp = completedPageOf(edge, desc);
-        const n = desc ? startPage - cp + 1 : cp - startPage + 1;
+        const cp = completedPageOf(edge, d);
+        const n = d ? startPage - cp + 1 : cp - startPage + 1;
         return Math.max(0, Math.min(total, n));
       };
       const hStart = hifzStartPos
         ? pageOf(hifzStartPos.surah, hifzStartPos.ayah)
         : 0;
-      const doneH = doneFrom(hStart, lastTasmi, totalH);
+      const doneH = doneFrom(hStart, lastTasmi, totalH, desc);
       const mStart = murStartPos
         ? pageOf(murStartPos.surah, murStartPos.ayah)
         : 0;
-      const doneM = doneFrom(mStart, lastMuraja, totalM);
+      const doneM = doneFrom(mStart, lastMuraja, totalM, mdesc);
       const remHifz = totalH - doneH;
       const remMur = totalM - doneM;
       const left = termSessionsLeft;
@@ -508,14 +517,14 @@ export function computeProgress(
     let prevHifz = recitePartLabel(lastTasmiLog?.tasmi);
     for (let n = nextIdx; n <= schedule.length; n++) {
       const nh2 = nextLabel(hFrom, perHplan, desc);
-      const nm2 = nextLabel(mFrom, perMplan, desc);
+      const nm2 = nextLabel(mFrom, perMplan, mdesc);
       projected[n] = {
         hifzLabel: nh2.label,
         tathbitLabel: prevHifz,
         murajaahLabel: nm2.label,
       };
       hFrom = nh2.fromPage ? edgeAfter(nh2, desc) : null;
-      mFrom = nm2.fromPage ? edgeAfter(nm2, desc) : null;
+      mFrom = nm2.fromPage ? edgeAfter(nm2, mdesc) : null;
       prevHifz = nh2.label || prevHifz;
     }
   }
@@ -574,6 +583,7 @@ export function computeProgress(
   return {
     hasData: currentPage > 0,
     desc,
+    murDesc: mdesc,
     currentPage,
     pagesReached,
     juz,

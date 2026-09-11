@@ -10,11 +10,11 @@ import {
   countUnread,
   currentSessionIndex,
   dateKey,
-  DIRECTIONS,
   EMPTY_PLAN,
   formatSchedDate,
   getReadIds,
   isDesc,
+  isMurDesc,
   recitePartLabel,
   halaqaTitle,
   hifzStartLabel,
@@ -39,6 +39,7 @@ import { printHifzSchedule } from "@/lib/print-schedule";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 import Link from "next/link";
+import { DirectionPicker } from "./direction-picker";
 import { Field, inputCls, PrimaryBtn, Ribbon, Sheet } from "./ui";
 import { TajweedQuiz } from "./tajweed-quiz";
 import { ReadingWards } from "./reading-wards";
@@ -518,10 +519,11 @@ export function StudentHome() {
                   const murPlan = pj?.murajaahLabel || s.murajaahLabel;
                   // حكم كل قسم: أنجزت المطلوب / زادت / ناقص
                   const d = isDesc(me.plan);
+const md = isMurDesc(me.plan);
                   const vH = att && log ? partVerdict(log.tasmi, s.hifz, d) : null;
                   const vT = att && log ? partVerdict(log.tathbit, s.tathbit, d) : null;
-                  const vM = att && log ? partVerdict(log.muraja, s.murajaah, d) : null;
-                  const overall = att && log ? sessionVerdict(log, s, d) : null;
+                  const vM = att && log ? partVerdict(log.muraja, s.murajaah, md) : null;
+                  const overall = att && log ? sessionVerdict(log, s, d, md) : null;
                   return (
                     <div
                       key={s.n}
@@ -1003,54 +1005,46 @@ function MyPlanEditor({ student }: { student: Student }) {
 
       {!open ? null : (
       <div className="mt-3">
-      {/* اتجاه الحفظ */}
-      <div className="mb-3">
-        <span className="mb-1 block text-xs font-bold text-plum-700">
-          🧭 اتجاه حفظي
-        </span>
-        <div className="grid grid-cols-2 gap-2">
-          {DIRECTIONS.map((d) => {
-            const on = (plan.direction ?? "asc") === d.key;
-            return (
-              <button
-                key={d.key}
-                type="button"
-                onClick={() => {
-                  const desc = d.key === "desc";
-                  setPlan({
-                    ...plan,
-                    direction: d.key,
-                    startAyah: plan.startSurah
-                      ? desc
-                        ? ayahCount(plan.startSurah)
-                        : 1
-                      : plan.startAyah,
-                    murStartAyah: plan.murStartSurah
-                      ? desc
-                        ? ayahCount(plan.murStartSurah)
-                        : 1
-                      : plan.murStartAyah,
-                  });
-                }}
-                className={`rounded-xl border px-3 py-2 text-start transition ${
-                  on
-                    ? "border-plum-600 bg-plum-600 text-white"
-                    : "border-cream-dark bg-white text-plum-800"
-                }`}
-              >
-                <span className="block text-sm font-bold">
-                  {d.icon} {d.label}
-                </span>
-                <span
-                  className={`block text-[11px] ${on ? "text-white/80" : "text-silver-600"}`}
-                >
-                  {d.hint}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {/* اتجاه الحفظ والمراجعة — كلٌّ على حدة (كثيرات يحفظن صاعداً ويراجعن من الناس) */}
+      <DirectionPicker
+        label="🧭 اتجاه حفظي"
+        value={plan.direction ?? "asc"}
+        onChange={(dir) => {
+          const desc = dir === "desc";
+          // المراجعة تتبع الحفظ ما لم يكن لها اتجاه خاص
+          const murFollows = !plan.murDirection;
+          setPlan({
+            ...plan,
+            direction: dir,
+            startAyah: plan.startSurah
+              ? desc
+                ? ayahCount(plan.startSurah)
+                : 1
+              : plan.startAyah,
+            murStartAyah:
+              murFollows && plan.murStartSurah
+                ? desc
+                  ? ayahCount(plan.murStartSurah)
+                  : 1
+                : plan.murStartAyah,
+          });
+        }}
+      />
+      <DirectionPicker
+        label="🔁 اتجاه مراجعتي"
+        value={plan.murDirection ?? plan.direction ?? "asc"}
+        onChange={(dir) =>
+          setPlan({
+            ...plan,
+            murDirection: dir,
+            murStartAyah: plan.murStartSurah
+              ? dir === "desc"
+                ? ayahCount(plan.murStartSurah)
+                : 1
+              : plan.murStartAyah,
+          })
+        }
+      />
 
       {/* بداية الحفظ */}
       <div className="grid grid-cols-2 gap-3">
@@ -1103,7 +1097,7 @@ function MyPlanEditor({ student }: { student: Student }) {
               setPlan({
                 ...plan,
                 murStartSurah: e.target.value,
-                murStartAyah: isDesc(plan) ? ayahCount(e.target.value) : 1,
+                murStartAyah: isMurDesc(plan) ? ayahCount(e.target.value) : 1,
               })
             }
           >

@@ -8,6 +8,7 @@ import {
   formatSchedDate,
   RECITE_PARTS,
   isDesc,
+  isMurDesc,
   recitePartLabel,
   useApp,
   type Halaqa,
@@ -207,7 +208,9 @@ export function ReciteHistory({
 }) {
   const { recitations, terms, students } = useApp();
   // اتجاه حفظ الطالبة — يغيّر قاعدة عدّ الأوجه المكتملة
-  const desc = isDesc(students.find((s) => s.id === studentId)?.plan);
+  const myPlan = students.find((s) => s.id === studentId)?.plan;
+  const desc = isDesc(myPlan);
+  const mdesc = isMurDesc(myPlan);
   const mine = useMemo(
     () =>
       recitations
@@ -264,10 +267,14 @@ export function ReciteHistory({
           label: recitePartLabel(r[p.key] as RecitePart),
           verdict:
             row && r.attended
-              ? partVerdict(r[p.key] as RecitePart, row[ROW_REQ[p.key]], desc)
+              ? partVerdict(
+                  r[p.key] as RecitePart,
+                  row[ROW_REQ[p.key]],
+                  p.key === "muraja" ? mdesc : desc
+                )
               : null,
         })).filter((x) => x.label);
-        const overall = row && r.attended ? sessionVerdict(r, row, desc) : null;
+        const overall = row && r.attended ? sessionVerdict(r, row, desc, mdesc) : null;
         return (
           <div
             key={r.id}

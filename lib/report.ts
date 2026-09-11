@@ -6,6 +6,7 @@ import {
   dateKey,
   halaqaTitle,
   isDesc,
+  isMurDesc,
   type AppState,
   type Halaqa,
   type Student,
@@ -61,7 +62,7 @@ export function buildReports(s: AppState): StudentReport[] {
       if (r.attended) attended++;
       else absent++;
       hifzFaces += partFaces(r.tasmi, isDesc(st.plan));
-      murFaces += partFaces(r.muraja, isDesc(st.plan));
+      murFaces += partFaces(r.muraja, isMurDesc(st.plan));
     }
 
     const prog = computeProgress(st, s.recitations, halaqa);
