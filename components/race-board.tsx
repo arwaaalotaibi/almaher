@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { useRole } from "./auth-gate";
 import { useApp } from "@/lib/store";
-import { computeRace, POINTS_RULES, sinceDays } from "@/lib/points";
+import { computeRace, POINTS_RULES, sinceDays, type RaceEntry } from "@/lib/points";
 import { facesLabel } from "@/lib/arabic";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
@@ -36,7 +38,45 @@ export function RaceBoard({
     [halaqas]
   );
 
-  const entries = useMemo(() => {
+  // عند الطالبة: الترتيب من قاعدة البيانات (العشر الأوائل + ترتيبها فقط)
+  const role = useRole();
+  const remote = role === "student";
+  const [remoteEntries, setRemoteEntries] = useState<RaceEntry[] | null>(null);
+  useEffect(() => {
+    if (!remote) return;
+    let alive = true;
+    const p = PERIODS.find((x) => x.key === period)!;
+    setRemoteEntries(null);
+    supabase
+      .rpc("almaher_race", {
+        p_mosque: mosque || null,
+        p_since: p.days ? sinceDays(p.days) : null,
+      })
+      .then(({ data }) => {
+        if (!alive) return;
+        const rows = (data ?? []) as {
+          student_id: string; name: string; halaqa_label: string; mosque: string;
+          points: number; faces: number; attends: number; rank: number;
+        }[];
+        setRemoteEntries(
+          rows.map((r) => ({
+            studentId: r.student_id,
+            name: r.name,
+            halaqaLabel: r.halaqa_label,
+            mosque: r.mosque,
+            points: Number(r.points) || 0,
+            faces: Number(r.faces) || 0,
+            attends: Number(r.attends) || 0,
+            rank: Number(r.rank) || 0,
+          }))
+        );
+      });
+    return () => {
+      alive = false;
+    };
+  }, [remote, mosque, period]);
+
+  const localEntries = useMemo(() => {
     const p = PERIODS.find((x) => x.key === period)!;
     return computeRace(
       students,
@@ -50,6 +90,8 @@ export function RaceBoard({
       }
     );
   }, [students, halaqas, recitations, readingProgress, tajweedResults, mosque, period]);
+  const entries = remote ? (remoteEntries ?? []) : localEntries;
+  const loading = remote && remoteEntries === null;
 
   const active = entries.filter((e) => e.points > 0);
   const podium = active.slice(0, 3);
@@ -92,7 +134,9 @@ export function RaceBoard({
         ))}
       </div>
 
-      {active.length === 0 ? (
+      {loading ? (
+        <p className="py-8 text-center text-sm font-bold text-silver-600">جاري تحميل الترتيب…</p>
+      ) : active.length === 0 ? (
         <div className="card rounded-2xl p-8 text-center">
           <p className="text-3xl">🏁</p>
           <p className="mt-2 font-kufi font-bold text-plum-800">

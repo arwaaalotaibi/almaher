@@ -275,8 +275,8 @@ export interface RecitationLog {
   tathbit: RecitePart;
   note?: string;
   createdAt?: string;
-  /** أوجه مكتملة لكل قسم — تُحسب عند التسجيل وتُحفظ رقماً، فتُحسب نقاط السباق
-      دون كشف مقاطع الطالبة لغيرها (سجلات الزميلات تصل «خفيفة» بهذه الأرقام فقط) */
+  /** أوجه مكتملة لكل قسم — تُحسب عند التسجيل وتُحفظ رقماً، ومنها تحسب
+      قاعدة البيانات ترتيب السباق دون كشف مقاطع الطالبة لغيرها */
   faces?: { tasmi: number; tathbit: number; muraja: number };
 }
 
@@ -816,7 +816,7 @@ function run(op: () => PromiseLike<{ error: unknown }>) {
 
 /** جلب كل البيانات من قاعدة البيانات وتحديث العرض */
 export async function pullRemote(): Promise<void> {
-  const [h, t, s, a, b, r, sess, trm, tj, tjr, rdp, sup, codes, peers, setg, race] = await Promise.all([
+  const [h, t, s, a, b, r, sess, trm, tj, tjr, rdp, sup, codes, setg] = await Promise.all([
     supabase
       .from("almaher_halaqas")
       // «*» لا «أعمدة محدّدة»: يعمل قبل إضافة عمودَي السرد/الاختبار وبعدها
@@ -862,12 +862,8 @@ export async function pullRemote(): Promise<void> {
       .order("created_at", { ascending: false }),
     // رموز الدخول — لا تُرجع إلا للإدارة/المعلّمات (RLS)
     supabase.from("almaher_student_codes").select("student_id,code"),
-    // زميلات المسجد (اسم وحلقة فقط) — لا تُرجع إلا للطالبة (للسباق)
-    supabase.from("almaher_peers").select("id,name,halaqa_id,teacher_id,track"),
     // الإعدادات العامة (يقرؤها الجميع، تكتبها الإدارة)
     supabase.from("almaher_settings").select("key,value"),
-    // سجلات السباق «الخفيفة» لكل الطالبات (حضور وأرقام أوجه فقط) — للطالبة فقط
-    supabase.from("almaher_race_sessions").select("id,student_id,log_date,attended,faces"),
   ]);
   const normFaces = (v: unknown): RecitationLog["faces"] => {
     const f = (v ?? {}) as Record<string, unknown>;
@@ -911,36 +907,6 @@ export async function pullRemote(): Promise<void> {
     agreedVersion: row.agreed_version ?? "",
     lastSeen: row.last_seen ?? undefined,
   }));
-  const ownIds = new Set(ownStudents.map((x) => x.id));
-  // عند الطالبة: صفّها كاملاً + زميلات مسجدها بالاسم فقط (بلا خطة ولا هاتف)
-  const peerStudents: Student[] = (peers.data ?? [])
-    .filter((p) => !ownIds.has(p.id as string))
-    .map((p) => ({
-      id: p.id as string,
-      name: p.name as string,
-      halaqaId: (p.halaqa_id as string) ?? "",
-      teacherId: (p.teacher_id as string) ?? "",
-      code: "",
-      track: (p.track as TrackKey) ?? "hifz",
-      plan: { ...EMPTY_PLAN },
-      sessions: [],
-      goals: { ...EMPTY_GOALS },
-      done: { ...EMPTY_DONE },
-    }));
-  // سجلات الزميلات «الخفيفة» (عند الطالبة فقط): حضور وأرقام أوجه بلا أي مقطع
-  const ownSessionIds = new Set((sess.data ?? []).map((row) => row.id as string));
-  const raceLite: RecitationLog[] = (race.data ?? [])
-    .filter((row) => !ownSessionIds.has(row.id as string))
-    .map((row) => ({
-      id: row.id as string,
-      studentId: row.student_id as string,
-      date: row.log_date as string,
-      attended: (row.attended as boolean) ?? true,
-      tasmi: { status: "none" },
-      muraja: { status: "none" },
-      tathbit: { status: "none" },
-      faces: normFaces(row.faces) ?? { tasmi: 0, tathbit: 0, muraja: 0 },
-    }));
   persist({
     halaqas: (h.data ?? []).map((row) => ({
       id: row.id as string,
@@ -956,7 +922,7 @@ export async function pullRemote(): Promise<void> {
       name: row.name as string,
       halaqaIds: Array.isArray(row.halaqa_ids) ? (row.halaqa_ids as string[]) : [],
     })),
-    students: [...ownStudents, ...peerStudents],
+    students: ownStudents,
     announcements: (a.data ?? []).map((row) => ({
       id: row.id as string,
       body: row.body as string,
@@ -983,7 +949,7 @@ export async function pullRemote(): Promise<void> {
       studentId: row.student_id as string,
       readAt: (row.read_at as string) ?? undefined,
     })),
-    recitations: [...(sess.data ?? []).map((row) => {
+    recitations: (sess.data ?? []).map((row) => {
       const parts = (row.parts ?? {}) as Record<string, unknown>;
       return {
         id: row.id as string,
@@ -997,7 +963,7 @@ export async function pullRemote(): Promise<void> {
         createdAt: (row.created_at as string) ?? undefined,
         faces: normFaces(row.faces),
       };
-    }), ...raceLite],
+    }),
     terms: (trm.data ?? []).map((row) => ({
       id: row.id as string,
       halaqaId: row.halaqa_id as string,
