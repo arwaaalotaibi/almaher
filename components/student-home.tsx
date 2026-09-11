@@ -77,6 +77,7 @@ export function StudentHome() {
     terms,
     tajweed,
     tajweedResults,
+    settings,
   } = useApp();
   const [myId, setMyId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -431,8 +432,12 @@ export function StudentHome() {
             <span className="text-xl text-white/70">‹</span>
           </Link>
 
-          {/* سجلّ التسميع بعد كل لقاء */}
-          <ReciteLogger student={me} halaqa={halaqa} />
+          {/* سجلّ التسميع بعد كل لقاء — أو قراءة فقط إن كانت الإدارة هي من تسجّل */}
+          <ReciteLogger
+            student={me}
+            halaqa={halaqa}
+            readOnly={!settings.studentRecite}
+          />
             </>
           )}
 

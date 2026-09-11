@@ -374,6 +374,13 @@ export interface TermArchive {
   closedAt: string;
 }
 
+/** إعدادات عامة تضبطها الإدارة (جدول almaher_settings) */
+export interface AppSettings {
+  studentRecite: boolean; // هل تسجّل الطالبة تسميعها بنفسها؟ (وإلا الإدارة/المعلّمات فقط)
+}
+
+export const DEFAULT_SETTINGS: AppSettings = { studentRecite: true };
+
 export interface AppState {
   halaqas: Halaqa[];
   teachers: Teacher[];
@@ -387,6 +394,7 @@ export interface AppState {
   tajweedResults: TajweedResult[];
   readingProgress: ReadingProgress[];
   support: SupportMsg[];
+  settings: AppSettings;
 }
 
 export const EMPTY_GOALS: Goals = {};
@@ -671,6 +679,7 @@ const SEED: AppState = {
   tajweedResults: [],
   readingProgress: [],
   support: [],
+  settings: { ...DEFAULT_SETTINGS },
 };
 
 /* ================== المخزن المحلي (نسخة سريعة للعرض) ================== */
@@ -705,6 +714,7 @@ function load(): AppState {
           ? parsed.readingProgress
           : [],
         support: Array.isArray(parsed.support) ? parsed.support : [],
+        settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
       };
     } else {
       cache = SEED;
@@ -803,7 +813,7 @@ function run(op: () => PromiseLike<{ error: unknown }>) {
 
 /** جلب كل البيانات من قاعدة البيانات وتحديث العرض */
 export async function pullRemote(): Promise<void> {
-  const [h, t, s, a, b, r, sess, trm, tj, tjr, rdp, sup, codes, peers] = await Promise.all([
+  const [h, t, s, a, b, r, sess, trm, tj, tjr, rdp, sup, codes, peers, setg] = await Promise.all([
     supabase
       .from("almaher_halaqas")
       // «*» لا «أعمدة محدّدة»: يعمل قبل إضافة عمودَي السرد/الاختبار وبعدها
@@ -851,7 +861,17 @@ export async function pullRemote(): Promise<void> {
     supabase.from("almaher_student_codes").select("student_id,code"),
     // زميلات المسجد (اسم وحلقة فقط) — لا تُرجع إلا للطالبة (للسباق)
     supabase.from("almaher_peers").select("id,name,halaqa_id,teacher_id,track"),
+    // الإعدادات العامة (يقرؤها الجميع، تكتبها الإدارة)
+    supabase.from("almaher_settings").select("key,value"),
   ]);
+  const settingsRows = (setg.data ?? []) as { key: string; value: Record<string, unknown> }[];
+  const reciteRow = settingsRows.find((x) => x.key === "student_recite");
+  const settings: AppSettings = {
+    ...DEFAULT_SETTINGS,
+    ...(reciteRow && typeof reciteRow.value?.enabled === "boolean"
+      ? { studentRecite: reciteRow.value.enabled as boolean }
+      : {}),
+  };
   if (h.error || t.error || s.error || a.error || b.error) {
     throw h.error ?? t.error ?? s.error ?? a.error ?? b.error;
   }
@@ -995,6 +1015,7 @@ export async function pullRemote(): Promise<void> {
       createdAt: (row.created_at as string) ?? "",
       repliedAt: (row.replied_at as string) ?? undefined,
     })),
+    settings,
   });
 }
 
@@ -1119,6 +1140,7 @@ export function subscribeRealtime() {
     "almaher_books",
     "almaher_notif_reads",
     "almaher_sessions",
+    "almaher_settings",
   ]) {
     channel.on("postgres_changes", { event: "*", schema: "public", table }, refresh);
   }
@@ -1128,6 +1150,17 @@ export function subscribeRealtime() {
 /* ================== الإجراءات (محلي فوري + حفظ بعيد) ================== */
 
 export const actions = {
+  /** من يسجّل التسميع: الطالبات أيضاً (true) أو الإدارة/المعلّمات فقط (false) */
+  setStudentRecite(enabled: boolean) {
+    setState((s) => ({ ...s, settings: { ...s.settings, studentRecite: enabled } }));
+    run(() =>
+      supabase.from("almaher_settings").upsert({
+        key: "student_recite",
+        value: { enabled },
+        updated_at: new Date().toISOString(),
+      })
+    );
+  },
   addHalaqa(mosque: string, day: string) {
     const halaqa: Halaqa = {
       id: uid(),
@@ -1694,6 +1727,7 @@ export const actions = {
         support: Array.isArray(parsed.support)
           ? parsed.support
           : getState().support,
+        settings: getState().settings,
       };
       persist(state);
       pushAll(state).catch(() => syncAlert());

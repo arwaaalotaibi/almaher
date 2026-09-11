@@ -24,7 +24,7 @@ export default function SettingsPage() {
 }
 
 function SettingsInner() {
-  const { halaqas, students, teachers } = useApp();
+  const { halaqas, students, teachers, settings } = useApp();
   const hydrated = useHydrated();
   const fileRef = useRef<HTMLInputElement>(null);
   const [adding, setAdding] = useState(false);
@@ -84,6 +84,58 @@ function SettingsInner() {
         <p className="mt-2 text-center text-xs text-silver-600">
           تعديل أو حذف الحلقة من داخل صفحتها
         </p>
+      </section>
+
+      {/* من يسجّل التسميع */}
+      <section className="card mb-4 rounded-2xl p-4">
+        <h2 className="mb-1 font-kufi text-lg font-bold text-plum-800">
+          🎙️ من يسجّل التسميع؟
+        </h2>
+        <p className="mb-3 text-sm text-silver-600">
+          يُطبَّق على كل الحلقات فوراً. في وضع «الإدارة فقط» تختفي خانة التسجيل عند
+          الطالبة وترفض قاعدة البيانات أي تسجيل منها.
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          {(
+            [
+              {
+                v: true,
+                icon: "🌸",
+                label: "الطالبات والإدارة",
+                hint: "الطالبة تسجّل بعد كل لقاء",
+              },
+              {
+                v: false,
+                icon: "🗝️",
+                label: "الإدارة فقط",
+                hint: "المعلّمة/الإدارة تُدخل التسميع",
+              },
+            ] as const
+          ).map((o) => {
+            const on = settings.studentRecite === o.v;
+            return (
+              <button
+                key={String(o.v)}
+                type="button"
+                onClick={() => actions.setStudentRecite(o.v)}
+                className={`rounded-xl border px-3 py-2.5 text-start transition ${
+                  on
+                    ? "border-plum-600 bg-plum-600 text-white"
+                    : "border-cream-dark bg-white text-plum-800"
+                }`}
+              >
+                <span className="block text-sm font-bold">
+                  {o.icon} {o.label}
+                </span>
+                <span
+                  className={`block text-[11px] ${on ? "text-white/80" : "text-silver-600"}`}
+                >
+                  {o.hint}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </section>
 
       {/* الحساب */}
