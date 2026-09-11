@@ -109,15 +109,24 @@ export default function PrintCodesPage() {
         .print-codes .hint{font-size:10.5px;color:#6f5f68;margin-top:auto;padding-top:2mm;line-height:1.55}
         .print-codes .hint b{color:#5d3f4e;direction:ltr;unicode-bidi:embed}
         @media print{
-          @page{size:A4;margin:0}
-          html,body{background:#fff !important;margin:0;padding:0}
+          @page{size:A4 portrait;margin:10mm}
+          html,body{background:#fff !important;margin:0;padding:0;height:auto}
           .print-codes{background:#fff;padding:0;min-height:0}
           .print-codes .bar{display:none}
           .print-codes .pages{display:block;padding:0;gap:0}
-          /* ارتفاع أقل من الورقة (٢٩٠ ملم من ٢٩٧) حتى لا يفيض أي بكسل ويولّد ورقة فارغة */
-          .print-codes .page{height:auto;grid-template-rows:137mm 137mm;box-shadow:none;margin:0;overflow:hidden;break-inside:avoid;page-break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+          /* الصفحة بعرض المساحة المتاحة (لا ٢١٠ ملم ثابتة) وارتفاع ٢٥٦ ملم:
+             يتّسع لأي هوامش يفرضها المتصفح (كروم أو سفاري أو الجوال) فلا تفيض ورقة فارغة */
+          .print-codes .page{width:100%;height:auto;padding:0;grid-template-rows:128mm 128mm;box-shadow:none;margin:0;overflow:hidden;break-inside:avoid;page-break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact}
           .print-codes .page + .page{break-before:page;page-break-before:always}
           .print-codes .cell{padding:2mm}
+          .print-codes .card{padding:3mm 4mm}
+          .print-codes .card img.logo{height:11mm}
+          .print-codes .rule{margin:1.5mm 0}
+          .print-codes .name{font-size:19px}
+          .print-codes .qr{width:34mm;height:34mm;margin-top:1.5mm}
+          .print-codes .lbl{margin-top:1.5mm}
+          .print-codes .code{font-size:28px}
+          .print-codes .hint{padding-top:1.5mm}
         }
       `}</style>
 
