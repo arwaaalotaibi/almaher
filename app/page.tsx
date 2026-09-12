@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { studentCountLabel, useApp } from "@/lib/store";
+import { planConfirmMark, studentCountLabel, useApp } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import { Ribbon, useHydrated } from "@/components/ui";
 import { useRole } from "@/components/auth-gate";
@@ -13,6 +13,10 @@ export default function Home() {
   const { halaqas, students, support } = useApp();
   const hydrated = useHydrated();
   const newSupport = support.filter((m) => m.status === "new").length;
+  // طالبات أبلغن عن خطأ في خطة الفصل ولم تُعدَّل بعد
+  const planIssues = students.filter(
+    (st) => planConfirmMark(st, halaqas.find((h) => h.id === st.halaqaId), support) === "⚠️"
+  ).length;
 
   if (role === "teacher") return <TeacherHome />;
   if (role === "student") return <StudentHome />;
@@ -113,6 +117,19 @@ export default function Home() {
           <span className="text-2xl">🏆</span>
           <span className="font-kufi text-sm font-bold text-plum-800">سباق الحلقات</span>
           <span className="text-[11px] text-silver-600">منافسة تلقائية</span>
+        </Link>
+        <Link
+          href="/plans"
+          className="card relative flex flex-col items-center gap-1.5 rounded-2xl py-4 transition active:scale-[0.97]"
+        >
+          <span className="text-2xl">📋</span>
+          <span className="font-kufi text-sm font-bold text-plum-800">تأكيد الخطط</span>
+          <span className="text-[11px] text-silver-600">من أكّدت ومن لديها ملاحظة</span>
+          {planIssues > 0 && (
+            <span className="absolute end-3 top-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+              {planIssues.toLocaleString("ar-EG")}
+            </span>
+          )}
         </Link>
         <Link
           href="/support"

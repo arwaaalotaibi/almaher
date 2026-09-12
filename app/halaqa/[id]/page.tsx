@@ -4,6 +4,7 @@ import { confirmDanger } from "@/lib/confirm";
 import { printCodeCards } from "@/lib/print-codes";
 import { use, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   actions,
   buildSchedule,
@@ -338,9 +339,12 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
           else pending++;
         }
         return (
-          <p className="mb-3 rounded-xl bg-plum-50 px-3 py-2 text-center text-xs font-bold text-plum-700">
-            📋 تأكيد خطط الفصل: ✅ {ok.toLocaleString("ar-EG")} · ⚠️ {issue.toLocaleString("ar-EG")} · ⏳ {pending.toLocaleString("ar-EG")}
-          </p>
+          <Link
+            href="/plans"
+            className="mb-3 block rounded-xl bg-plum-50 px-3 py-2 text-center text-xs font-bold text-plum-700"
+          >
+            📋 تأكيد خطط الفصل: ✅ {ok.toLocaleString("ar-EG")} · ⚠️ {issue.toLocaleString("ar-EG")} · ⏳ {pending.toLocaleString("ar-EG")} — التفاصيل ‹
+          </Link>
         );
       })()}
 
