@@ -5,7 +5,6 @@ import { useRef, useState } from "react";
 import { actions, halaqaTitle, useApp, WEEK_DAYS } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import {
-  DangerBtn,
   Field,
   inputCls,
   PageHeader,
@@ -258,15 +257,8 @@ function SettingsInner() {
         </p>
       </section>
 
-      <DangerBtn
-        onClick={() => {
-          if (confirmDanger("مسح كل البيانات من قاعدة البيانات لكل الأجهزة والبدء من جديد", "مسح الكل")) {
-            actions.resetAll();
-          }
-        }}
-      >
-        🗑️ مسح كل البيانات
-      </DangerBtn>
+      {/* زر «مسح كل البيانات» أُزيل من الواجهة عمداً (خطر الحذف بالخطأ).
+          الإجراء ما زال موجوداً في actions.resetAll إن احتيج إليه يوماً. */}
 
       <Sheet open={adding} onClose={() => setAdding(false)} title="إضافة حلقة">
         <Field label="اسم المسجد" icon="🕌">
