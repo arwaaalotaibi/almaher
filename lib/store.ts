@@ -400,9 +400,15 @@ export interface TermArchive {
 /** إعدادات عامة تضبطها الإدارة (جدول almaher_settings) */
 export interface AppSettings {
   studentRecite: boolean; // هل تسجّل الطالبة تسميعها بنفسها؟ الافتراضي: لا — الإدارة/المعلّمات فقط
+  hideReading: boolean; // إخفاء تبويب القراءة عند الطالبة مؤقتاً
+  hideTajweed: boolean; // إخفاء تبويب التجويد عند الطالبة مؤقتاً
 }
 
-export const DEFAULT_SETTINGS: AppSettings = { studentRecite: false };
+export const DEFAULT_SETTINGS: AppSettings = {
+  studentRecite: false,
+  hideReading: false,
+  hideTajweed: false,
+};
 
 export interface AppState {
   halaqas: Halaqa[];
@@ -897,10 +903,17 @@ export async function pullRemote(): Promise<void> {
   };
   const settingsRows = (setg.data ?? []) as { key: string; value: Record<string, unknown> }[];
   const reciteRow = settingsRows.find((x) => x.key === "student_recite");
+  const tabsRow = settingsRows.find((x) => x.key === "student_tabs");
   const settings: AppSettings = {
     ...DEFAULT_SETTINGS,
     ...(reciteRow && typeof reciteRow.value?.enabled === "boolean"
       ? { studentRecite: reciteRow.value.enabled as boolean }
+      : {}),
+    ...(tabsRow
+      ? {
+          hideReading: tabsRow.value?.hideReading === true,
+          hideTajweed: tabsRow.value?.hideTajweed === true,
+        }
       : {}),
   };
   if (h.error || t.error || s.error || a.error || b.error) {
@@ -1173,6 +1186,22 @@ export const actions = {
       supabase.from("almaher_settings").upsert({
         key: "student_recite",
         value: { enabled },
+        updated_at: new Date().toISOString(),
+      })
+    );
+  },
+  /** إظهار/إخفاء تبويبي القراءة والتجويد عند الطالبة (مؤقتاً حتى لا تتشتت) */
+  setStudentTabs(patch: Partial<Pick<AppSettings, "hideReading" | "hideTajweed">>) {
+    const cur = getState().settings;
+    const next = {
+      hideReading: patch.hideReading ?? cur.hideReading,
+      hideTajweed: patch.hideTajweed ?? cur.hideTajweed,
+    };
+    setState((s) => ({ ...s, settings: { ...s.settings, ...next } }));
+    run(() =>
+      supabase.from("almaher_settings").upsert({
+        key: "student_tabs",
+        value: next,
         updated_at: new Date().toISOString(),
       })
     );

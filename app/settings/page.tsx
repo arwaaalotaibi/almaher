@@ -146,6 +146,55 @@ function SettingsInner() {
         </div>
       </section>
 
+      {/* تبويبات الطالبة: إخفاء القراءة/التجويد مؤقتاً */}
+      <section className="card mb-4 rounded-2xl p-4">
+        <h2 className="mb-1 font-kufi text-lg font-bold text-plum-800">
+          👀 تبويبات الطالبة
+        </h2>
+        <p className="mb-3 text-sm text-silver-600">
+          أخفي تبويباً مؤقتاً حتى لا تتشتت الطالبات، ويعود بضغطة. يُطبَّق على
+          الجميع فوراً، ولا تُحذف أي بيانات.
+        </p>
+        <div className="grid gap-2">
+          {(
+            [
+              { key: "hideReading", icon: "📚", label: "تبويب القراءة" },
+              { key: "hideTajweed", icon: "📿", label: "تبويب التجويد" },
+            ] as const
+          ).map((t) => {
+            const hidden = settings[t.key];
+            return (
+              <div
+                key={t.key}
+                className="flex items-center justify-between rounded-xl border border-cream-dark bg-white px-3 py-2.5"
+              >
+                <span className="text-sm font-bold text-plum-800">
+                  {t.icon} {t.label}
+                  <span
+                    className={`ms-2 rounded-full px-2 py-0.5 text-[10px] ${
+                      hidden ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"
+                    }`}
+                  >
+                    {hidden ? "مخفي" : "ظاهر"}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => actions.setStudentTabs({ [t.key]: !hidden })}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                    hidden
+                      ? "bg-plum-600 text-white"
+                      : "bg-cream text-plum-700"
+                  }`}
+                >
+                  {hidden ? "إظهار" : "إخفاء"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
       {/* الحساب */}
       <section className="card mb-4 rounded-2xl p-4">
         <h2 className="mb-1 font-kufi text-lg font-bold text-plum-800">

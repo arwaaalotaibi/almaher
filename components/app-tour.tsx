@@ -29,6 +29,7 @@ interface Slide {
   title: string;
   intro?: string;
   items: string[];
+  tab?: "reading" | "tajweed"; // شريحة تبويب قد يخفيه الإعداد
 }
 
 const SLIDES: Slide[] = [
@@ -37,7 +38,7 @@ const SLIDES: Slide[] = [
     title: "أهلاً بكِ في الماهر",
     intro: "هذا التطبيق رفيقكِ في رحلة الحفظ: يعرض لكِ ما عليكِ في كل لقاء، ويتابع تقدّمكِ، ويذكّركِ بما يهمّ.",
     items: [
-      "الشاشة الرئيسية فيها أربعة تبويبات أسفل الاسم: القراءة، القرآن، التجويد، السباق",
+      "__TABS__",
       "الجرس 🔔 أعلى الشاشة للإشعارات، والترس ⚙️ للإعدادات",
     ],
   },
@@ -54,6 +55,7 @@ const SLIDES: Slide[] = [
   {
     icon: "📚",
     title: "تبويب القراءة",
+    tab: "reading",
     items: [
       "كتب تختارها الإدارة لكِ، تقرئينها داخل التطبيق",
       "لكل كتاب خطة قراءة: تظهر لكِ مهمة اليوم والصفحات المطلوبة",
@@ -63,6 +65,7 @@ const SLIDES: Slide[] = [
   {
     icon: "📿",
     title: "تبويب التجويد",
+    tab: "tajweed",
     items: [
       "دروس مختصرة في أحكام التجويد",
       "بعد كل درس اختبار قصير تتأكدين به من فهمكِ",
@@ -99,12 +102,40 @@ const SLIDES: Slide[] = [
   },
 ];
 
-export function AppTour({ open, onClose }: { open: boolean; onClose: () => void }) {
+const TAB_NAMES: Record<string, string> = {
+  reading: "القراءة",
+  quran: "القرآن",
+  tajweed: "التجويد",
+  race: "السباق",
+};
+const AR_COUNT = ["", "تبويب واحد", "تبويبان", "ثلاثة تبويبات", "أربعة تبويبات"];
+
+export function AppTour({
+  open,
+  onClose,
+  hidden,
+}: {
+  open: boolean;
+  onClose: () => void;
+  hidden?: { reading?: boolean; tajweed?: boolean }; // تبويبات أخفتها الإدارة
+}) {
   const [i, setI] = useState(0);
   if (!open) return null;
 
-  const slide = SLIDES[i];
-  const last = i === SLIDES.length - 1;
+  // الشرائح حسب التبويبات الظاهرة فعلاً
+  const shown = ["reading", "quran", "tajweed", "race"].filter(
+    (k) => !(k === "reading" && hidden?.reading) && !(k === "tajweed" && hidden?.tajweed)
+  );
+  const tabsLine = `الشاشة الرئيسية فيها ${AR_COUNT[shown.length] ?? "تبويبات"} أسفل الاسم: ${shown
+    .map((k) => TAB_NAMES[k])
+    .join("، ")}`;
+  const slides = SLIDES.filter((sl) => !sl.tab || !hidden?.[sl.tab]).map((sl) => ({
+    ...sl,
+    items: sl.items.map((it) => (it === "__TABS__" ? tabsLine : it)),
+  }));
+
+  const slide = slides[Math.min(i, slides.length - 1)];
+  const last = i >= slides.length - 1;
   const finish = () => {
     markTourSeen();
     setI(0);
@@ -128,7 +159,7 @@ export function AppTour({ open, onClose }: { open: boolean; onClose: () => void 
           تخطّي
         </button>
         <div className="flex items-center gap-1.5" aria-hidden>
-          {SLIDES.map((_, k) => (
+          {slides.map((_, k) => (
             <span
               key={k}
               className={`h-2 rounded-full transition-all ${
@@ -188,7 +219,7 @@ export function AppTour({ open, onClose }: { open: boolean; onClose: () => void 
         </button>
       </div>
       <p className="mt-3 text-center text-[11px] text-silver-600">
-        {(i + 1).toLocaleString("ar-EG")} / {SLIDES.length.toLocaleString("ar-EG")}
+        {(i + 1).toLocaleString("ar-EG")} / {slides.length.toLocaleString("ar-EG")}
       </p>
     </div>
   );

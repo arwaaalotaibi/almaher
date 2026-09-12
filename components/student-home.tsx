@@ -83,7 +83,7 @@ export function StudentHome() {
   } = useApp();
   const [myId, setMyId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const [tab, setTab] = useState<StudentTab>("reading");
+  const [tab, setTab] = useState<StudentTab>("quran");
   const [quranSec, setQuranSec] = useState<QuranSec>("today");
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [quizFor, setQuizFor] = useState<string | null>(null); // درس الأسئلة المفتوح
@@ -100,6 +100,19 @@ export function StudentHome() {
   useEffect(() => {
     if (myId) actions.touchSeen(myId);
   }, [myId]);
+
+  // التبويبات الظاهرة (الإدارة قد تخفي القراءة/التجويد مؤقتاً)
+  const visibleTabs = STUDENT_TABS.filter(
+    (t) =>
+      !(t.key === "reading" && settings.hideReading) &&
+      !(t.key === "tajweed" && settings.hideTajweed)
+  );
+  const tabHidden =
+    (tab === "reading" && settings.hideReading) ||
+    (tab === "tajweed" && settings.hideTajweed);
+  useEffect(() => {
+    if (tabHidden) setTab("quran");
+  }, [tabHidden]);
 
   // شرح البرنامج يظهر تلقائياً أول مرة على هذا الجهاز — بعد إقرار اللائحة
   const agreed =
@@ -189,7 +202,11 @@ export function StudentHome() {
       <WelcomeSplash name={me.name} />
 
       {/* 🎓 شرح البرنامج — أول مرة تلقائياً، ثم من الإعدادات */}
-      <AppTour open={tourOpen} onClose={() => setTourOpen(false)} />
+      <AppTour
+        open={tourOpen}
+        onClose={() => setTourOpen(false)}
+        hidden={{ reading: settings.hideReading, tajweed: settings.hideTajweed }}
+      />
 
       {/* ⚙️ الإعدادات — في الطرف الآخر من الجرس */}
       <button
@@ -296,7 +313,7 @@ export function StudentHome() {
 
       {/* شريط التبويبات */}
       <div className="mb-6 flex gap-1.5 rounded-2xl bg-cream p-1.5">
-        {STUDENT_TABS.map((t) => (
+        {visibleTabs.map((t) => (
           <button
             key={t.key}
             type="button"
@@ -314,7 +331,7 @@ export function StudentHome() {
       </div>
 
       {/* شاشة القراءة */}
-      {tab === "reading" && (
+      {tab === "reading" && !settings.hideReading && (
         <section>
           {books.length === 0 ? (
             <div className="card rounded-2xl p-8 text-center">
@@ -712,7 +729,7 @@ const md = isMurDesc(me.plan);
       )}
 
       {/* شاشة التجويد — دروس فيديو/PDF مع أسئلة */}
-      {tab === "tajweed" && (
+      {tab === "tajweed" && !settings.hideTajweed && (
         <section>
           {tajweed.length === 0 ? (
             <div className="card rounded-2xl p-8 text-center">
