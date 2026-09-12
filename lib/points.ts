@@ -19,10 +19,9 @@ export const POINTS_RULES = [
   { icon: "📖", label: "إتمام مقرر الحفظ في اللقاء", pts: 5 },
   { icon: "📌", label: "إتمام مقرر التثبيت (حفظ اللقاء السابق)", pts: 5 },
   { icon: "🔁", label: "إتمام مقرر المراجعة في اللقاء", pts: 5 },
-  { icon: "📚", label: "ورد قراءة تمّ", pts: 5 },
-  { icon: "✅", label: "كل إجابة صحيحة في اختبار", pts: 1 },
-  { icon: "🌟", label: "العلامة الكاملة في اختبار", pts: 5 },
+  { icon: "🌟", label: "أي زيادة عن مقرر الحفظ", pts: 5 },
 ] as const;
+// لاحقاً (غير محسوبة الآن بقرار الإدارة): ورد قراءة كتاب ٣ · إضافة فائدة من كتاب ٢
 
 export interface RaceEntry {
   studentId: string;
@@ -83,28 +82,14 @@ export function computeRace(
         if (fH > 0 && fH >= reqH) points += 5;
         if (fT > 0 && fT >= prevTasmi) points += 5;
         if (fM > 0 && fM >= reqM) points += 5;
+        if (reqH > 0 && fH > reqH) points += 5; // زيادة عن المقرر — مرة واحدة في اللقاء
       }
       prevTasmi = fH;
     }
 
-    // القراءة: أوراد تمّت + اختبارات الأقسام
-    for (const p of readingProgress) {
-      if (p.studentId !== st.id) continue;
-      if (since && p.updatedAt.slice(0, 10) < since) continue;
-      if (p.done) points += 5;
-      if (p.score !== undefined && p.total !== undefined) {
-        points += p.score;
-        if (p.total > 0 && p.score === p.total) points += 5;
-      }
-    }
-
-    // التجويد: نتائج أسئلة الدروس
-    for (const t of tajweedResults) {
-      if (t.studentId !== st.id) continue;
-      if (since && t.answeredAt.slice(0, 10) < since) continue;
-      points += t.score;
-      if (t.total > 0 && t.score === t.total) points += 5;
-    }
+    // القراءة والاختبارات لا تدخل في النقاط حالياً (قرار الإدارة ١٢ سبتمبر ٢٠٢٦)
+    void readingProgress;
+    void tajweedResults;
 
     entries.push({
       studentId: st.id,

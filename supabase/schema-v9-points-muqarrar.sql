@@ -3,7 +3,8 @@
 --  يُشغَّل بعد schema-v8-plan-confirm.sql. آمن لإعادة التشغيل.
 --
 --  حضور لقاء ١٠ · إتمام مقرر الحفظ ٥ · إتمام مقرر التثبيت ٥ · إتمام مقرر المراجعة ٥
---  · ورد قراءة تمّ ٥ · كل إجابة صحيحة ١ · العلامة الكاملة +٥
+--  · أي زيادة عن مقرر الحفظ ٥ (مرة واحدة في اللقاء)
+--  القراءة والاختبارات والفوائد لا تُحسب حالياً (تُضاف لاحقاً: ورد كتاب ٣، فائدة ٢).
 --
 --  «المقرر» = أوجه الخطة لكل لقاء (plan.hifz / plan.murajaah)،
 --  ومقرر التثبيت = أوجه حفظ اللقاء السابق (الحاضر) للطالبة نفسها.
@@ -54,39 +55,23 @@ as $$
            sum(case when x.f_tathbit > 0
                      and x.f_tathbit >= x.prev_tasmi then 1 else 0 end) as tathbit_done,
            sum(case when x.f_muraja > 0
-                     and x.f_muraja >= round(coalesce((b.plan ->> 'murajaah')::numeric, 0)) then 1 else 0 end) as mur_done
+                     and x.f_muraja >= round(coalesce((b.plan ->> 'murajaah')::numeric, 0)) then 1 else 0 end) as mur_done,
+           sum(case when round(coalesce((b.plan ->> 'hifz')::numeric, 0)) > 0
+                     and x.f_tasmi > round(coalesce((b.plan ->> 'hifz')::numeric, 0)) then 1 else 0 end) as hifz_extra
     from rows_att x
     join base b on b.id = x.student_id
     where p_since is null or x.log_date >= p_since
     group by x.student_id
   ),
-  rd as (
-    select p.student_id,
-           sum(case when p.done then 5 else 0 end
-               + coalesce(p.score, 0)
-               + case when p.total > 0 and p.score = p.total then 5 else 0 end) as pts
-    from public.almaher_reading_progress p
-    where p_since is null or p.updated_at::date >= p_since
-    group by p.student_id
-  ),
-  tj as (
-    select t.student_id,
-           sum(t.score + case when t.total > 0 and t.score = t.total then 5 else 0 end) as pts
-    from public.almaher_tajweed_results t
-    where p_since is null or t.answered_at::date >= p_since
-    group by t.student_id
-  ),
   scored as (
     select b.id, b.name, b.halaqa_label, b.mosque,
            (coalesce(sess.attends, 0) * 10
-            + (coalesce(sess.hifz_done, 0) + coalesce(sess.tathbit_done, 0) + coalesce(sess.mur_done, 0)) * 5
-            + coalesce(rd.pts, 0) + coalesce(tj.pts, 0))::integer as points,
+            + (coalesce(sess.hifz_done, 0) + coalesce(sess.tathbit_done, 0)
+               + coalesce(sess.mur_done, 0) + coalesce(sess.hifz_extra, 0)) * 5)::integer as points,
            coalesce(sess.f_tasmi, 0) as faces,
            coalesce(sess.attends, 0)::integer as attends
     from base b
     left join sess on sess.student_id = b.id
-    left join rd on rd.student_id = b.id
-    left join tj on tj.student_id = b.id
   ),
   ranked as (
     select *, rank() over (order by points desc) as rank
