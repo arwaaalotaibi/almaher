@@ -35,7 +35,7 @@ export function ProgressSummary({
   if (!p.hasData) {
     return (
       <p className="rounded-xl bg-cream/60 px-3 py-3 text-center text-xs text-silver-600">
-        لم تبدأ الطالبة تسجيل التسميع بعد
+        لم يُسجَّل لها تسميع بعد
       </p>
     );
   }
@@ -234,7 +234,7 @@ export function MotivationPanel({
   student: Student;
   halaqa?: Halaqa;
 }) {
-  const { recitations } = useApp();
+  const { recitations, settings } = useApp();
   const p = computeProgress(student, recitations, halaqa);
 
   // مسار الفصل: نقاط اللقاءات + المحطتان الذهبيتان (السرد والاختبار)
@@ -254,10 +254,14 @@ export function MotivationPanel({
         <div className="p-5 text-center">
           <p className="text-2xl">🌱</p>
           <p className="mt-1 font-kufi text-sm font-bold text-plum-800">
-            ابدئي بتسجيل تسميعكِ
+            {settings.studentRecite
+              ? "ابدئي بتسجيل تسميعكِ"
+              : "لم يُسجَّل لكِ تسميع بعد"}
           </p>
           <p className="mt-1 text-xs text-silver-600">
-            فور أول تسجيل تظهر لكِ رحلتكِ وتقدّمكِ 🧭
+            {settings.studentRecite
+              ? "فور أول تسجيل تظهر لكِ رحلتكِ وتقدّمكِ 🧭"
+              : "بعد أول لقاء تُسجّله معلّمتكِ تظهر لكِ رحلتكِ وتقدّمكِ 🧭"}
           </p>
         </div>
         {track}
