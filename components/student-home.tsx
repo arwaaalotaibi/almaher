@@ -718,7 +718,7 @@ const md = isMurDesc(me.plan);
             <div className="card rounded-2xl p-8 text-center">
               <p className="text-3xl">📿</p>
               <p className="mt-2 font-kufi font-bold text-plum-800">
-                لا دروس تجويد بعد
+                لا توجد دروس تجويد حالياً
               </p>
               <p className="mt-1 text-sm text-silver-600">
                 ستظهر هنا الدروس التي تضيفها الإدارة
