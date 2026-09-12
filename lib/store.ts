@@ -48,6 +48,12 @@ export interface CoursePlan {
   startAyah?: number; // بداية الحفظ: رقم الآية (في النازل: آخر آية تُحفظ أولاً — حافة الحفظ)
   murStartSurah?: string; // بداية المراجعة: السورة
   murStartAyah?: number; // بداية المراجعة: رقم الآية
+  // تأكيد الفصل من الطالبة (تكتبها الدالة الآمنة almaher_confirm_plan)
+  confirmedTerm?: string; // بداية الفصل الذي أكّدت خطته
+  confirmedAt?: string;
+  studentEditedTerm?: string; // الفصل الذي عدّلت فيه خطتها (مرة واحدة فقط)
+  studentEditedAt?: string;
+  planBeforeEdit?: Record<string, unknown>; // الخطة قبل تعديل الطالبة — للإدارة
 }
 
 export const EMPTY_PLAN: CoursePlan = {
@@ -366,7 +372,7 @@ export function videoEmbedUrl(url: string): string {
 
 /* ================== الدعم والاقتراحات ================== */
 
-export type SupportKind = "issue" | "idea" | "question" | "plan_ok" | "plan_issue";
+export type SupportKind = "issue" | "idea" | "question" | "plan_edit";
 
 export const SUPPORT_KINDS: { key: SupportKind; icon: string; label: string }[] = [
   { key: "issue", icon: "🛠️", label: "مشكلة تقنية" },
@@ -374,65 +380,35 @@ export const SUPPORT_KINDS: { key: SupportKind; icon: string; label: string }[] 
   { key: "question", icon: "💬", label: "استفسار" },
 ];
 
-/** أيقونة واسم كل نوع (بما فيها تأكيد الخطة الذي لا يُختار يدوياً) */
+/** أيقونة واسم كل نوع (بما فيها تعديل الخطة الذي لا يُختار يدوياً) */
 export const SUPPORT_KIND_META: Record<SupportKind, { icon: string; label: string }> = {
   issue: { icon: "🛠️", label: "مشكلة تقنية" },
   idea: { icon: "💡", label: "اقتراح" },
   question: { icon: "💬", label: "استفسار" },
-  plan_ok: { icon: "✅", label: "تأكيد الخطة" },
-  plan_issue: { icon: "⚠️", label: "خطأ في الخطة" },
+  plan_edit: { icon: "✏️", label: "عدّلت خطتها" },
 };
 
 /* ================== تأكيد خطة الفصل ==================
-   في بداية كل فصل تؤكّد الطالبة خطتها (أوجه الحفظ والمراجعة والبداية) أو تبلّغ عن خطأ.
-   يُحفظ التأكيد كرسالة دعم من نوع plan_ok / plan_issue تحمل تاريخ بداية الفصل،
-   فلا يحتاج جدولاً جديداً، والطالبة ترى رسائلها والإدارة ترى الجميع. */
+   في بداية كل فصل تؤكّد الطالبة خطتها أو تعدّلها مرة واحدة. تُكتب النتيجة داخل plan
+   (confirmedTerm / studentEditedTerm) عبر الدالة الآمنة almaher_confirm_plan. */
 
-export function planConfirmBody(termStart: string, ok: boolean, note = ""): string {
-  return ok
-    ? `✅ أكّدتُ خطة فصل ${termStart}`
-    : `⚠️ خطأ في خطة فصل ${termStart}: ${note.trim()}`;
-}
-
-/** آخر تأكيد/بلاغ للطالبة عن خطة هذا الفصل (أو null) */
-export function planConfirmation(
-  support: SupportMsg[],
-  studentId: string,
-  termStart: string
-): { ok: boolean; at: string; body: string } | null {
-  if (!termStart) return null;
-  const mine = support
-    .filter(
-      (m) =>
-        m.studentId === studentId &&
-        (m.kind === "plan_ok" || m.kind === "plan_issue") &&
-        m.body.includes(termStart)
-    )
-    .sort((x, y) => (x.createdAt < y.createdAt ? 1 : -1));
-  const last = mine[0];
-  return last ? { ok: last.kind === "plan_ok", at: last.createdAt, body: last.body } : null;
-}
-
-/** هل على الطالبة تأكيد خطتها الآن؟ يُطلب مرة كل فصل، ويُعاد الطلب إن عُدّلت بياناتها بعد التأكيد */
-export function needsPlanConfirm(
-  student: Student,
-  halaqa: Halaqa | undefined,
-  support: SupportMsg[]
-): boolean {
+/** هل على الطالبة تأكيد خطتها الآن؟ مرة كل فصل (حسب تاريخ بداية الفصل) */
+export function needsPlanConfirm(student: Student, halaqa: Halaqa | undefined): boolean {
   const termStart = halaqa?.termStart ?? "";
   if (!termStart) return false;
   const p = student.plan;
   if (!p || (p.hifz ?? 0) + (p.murajaah ?? 0) + (p.tathbit ?? 0) <= 0) return false;
-  const c = planConfirmation(support, student.id, termStart);
-  if (!c) return true;
-  return !!student.updatedAt && c.at < student.updatedAt;
+  return p.confirmedTerm !== termStart;
 }
 
-/** نص بداية المراجعة للعرض */
-export function murStartLabel(plan?: CoursePlan): string {
-  if (!plan?.murStartSurah) return "";
-  const base = `سورة ${plan.murStartSurah} — آية ${(plan.murStartAyah ?? 1).toLocaleString("ar-EG")}`;
-  return isMurDesc(plan) ? `${base} ⬇️ نزولاً` : base;
+/** علامة حالة التأكيد للإدارة: ✅ أكّدت · ✏️ عدّلت · ⏳ لم تؤكّد · "" لا فصل */
+export function planConfirmMark(student: Student, halaqa: Halaqa | undefined): "" | "✅" | "✏️" | "⏳" {
+  const termStart = halaqa?.termStart ?? "";
+  if (!termStart) return "";
+  const p = student.plan;
+  if (p?.studentEditedTerm === termStart) return "✏️";
+  if (p?.confirmedTerm === termStart) return "✅";
+  return "⏳";
 }
 
 export interface SupportMsg {
@@ -1266,6 +1242,22 @@ export const actions = {
         updated_at: new Date().toISOString(),
       })
     );
+  },
+  /** تأكيد خطة الفصل من الطالبة، أو تعديلها مرة واحدة (edit) — عبر الدالة الآمنة.
+      يعيد true عند النجاح ويحدّث الخطة محلياً بما أعادته قاعدة البيانات */
+  async confirmPlan(studentId: string, edit?: Partial<CoursePlan>, summary?: string): Promise<boolean> {
+    const { data, error } = await supabase.rpc("almaher_confirm_plan", {
+      p_edit: edit ?? null,
+    });
+    if (error || !data || typeof data !== "object") return false;
+    const plan = { ...EMPTY_PLAN, ...(data as CoursePlan) };
+    const updatedAt = new Date().toISOString();
+    setState((s) => ({
+      ...s,
+      students: s.students.map((st) => (st.id === studentId ? { ...st, plan, updatedAt } : st)),
+    }));
+    if (edit && summary) actions.addSupport(studentId, "plan_edit", summary);
+    return true;
   },
   addHalaqa(mosque: string, day: string) {
     const halaqa: Halaqa = {

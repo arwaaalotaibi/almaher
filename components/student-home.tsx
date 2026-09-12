@@ -82,7 +82,6 @@ export function StudentHome() {
     tajweed,
     tajweedResults,
     settings,
-    support,
   } = useApp();
   const [myId, setMyId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -175,7 +174,7 @@ export function StudentHome() {
   const teacher = teachers.find((t) => t.id === me.teacherId);
 
   // تأكيد خطة الفصل: مرة في بداية كل فصل (بعد اللائحة وقبل الدخول)
-  if (halaqa && needsPlanConfirm(me, halaqa, support)) {
+  if (halaqa && needsPlanConfirm(me, halaqa)) {
     return <PlanConfirmGate student={me} halaqa={halaqa} onLogout={logout} />;
   }
   const schedule = halaqa ? buildSchedule(halaqa, me.plan) : null;

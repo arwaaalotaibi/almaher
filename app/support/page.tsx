@@ -36,8 +36,7 @@ function SupportInner() {
 
   if (!hydrated) return <main className="mx-auto max-w-2xl px-4 pt-10" />;
 
-  // تأكيدات الخطة الإيجابية لا تُعرض هنا (تظهر في صفحة الحلقة كعلامة ✅)
-  const inbox = support.filter((m) => m.kind !== "plan_ok");
+  const inbox = support;
   const list = inbox.filter((m) =>
     filter === "all" ? true : m.status === filter
   );
