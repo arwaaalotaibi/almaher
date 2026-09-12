@@ -48,3 +48,4 @@ next-env.d.ts
 /supabase/plans-*.sql
 /supabase/roster-*.sql
 /supabase/fix-*.sql
+/supabase/cron-*.sql

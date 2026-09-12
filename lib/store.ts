@@ -1501,7 +1501,14 @@ export const actions = {
         console.error(e);
         syncAlert();
       });
+    // إشعار الجهاز (Web Push) لطالبات الحلقة المستهدفة — يتجاهل الإعلانات المجدولة للمستقبل
+    void supabase.functions
+      .invoke("almaher-push", { body: { kind: "announce", id: note.id } })
+      .catch(() => {
+        /* بلا اتصال أو الدالة غير منشورة — الإعلان محفوظ ويظهر داخل التطبيق على كل حال */
+      });
   },
+
   /** تثبيت إشعار واحد على الواجهة (يُلغي تثبيت الباقي)، أو فكّ التثبيت */
   setAnnouncementPinned(id: string, pinned: boolean) {
     setState((s) => ({

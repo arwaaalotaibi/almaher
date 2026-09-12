@@ -4,7 +4,7 @@ import { supabase } from "./supabase";
 
 /** مفتاح VAPID العام — آمن في كود العميل (السرّي في الـEdge Function) */
 export const VAPID_PUBLIC_KEY =
-  "BPNxeLfMIGH8j7mwimMSDppNi2yRp-Jt80T0l9MRcSEPDdGLie98uxUBhMz25I-_2TCGZpaPIhc2EXnIcVV0gak";
+  "BNue3VBfDgKXX5nr0ro1HMz3NpWsGp8EpaAkup1luLNDqff4qTyn_TfWnu9M1-7jTvvELrL_TcsohouDuU_A3nc";
 
 export type PushState =
   | "unsupported" // المتصفح لا يدعم الإشعارات

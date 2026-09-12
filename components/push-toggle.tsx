@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 import {
   disablePush,
   enablePush,
@@ -56,7 +57,34 @@ export function PushToggle({
   }
 
   const on = state === "subscribed";
+  // إشعار تجريبي فوري — للتأكد أن الأذونات والاشتراك يعملان على هذا الجهاز
+  const sendTest = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("almaher-push", {
+        body: { kind: "test" },
+      });
+      if (error) throw error;
+      const sent = (data as { sent?: number } | null)?.sent ?? 0;
+      if (sent === 0) window.alert("لم يصل الإشعار لأي جهاز — أعيدي تفعيل الإشعارات ثم جرّبي");
+    } catch {
+      window.alert("تعذّر إرسال الإشعار التجريبي — تحققي من الاتصال");
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
+    <>
+    {on && (
+      <button
+        type="button"
+        onClick={sendTest}
+        className="mb-2 w-full rounded-xl bg-cream py-2 text-xs font-bold text-plum-700"
+      >
+        {busy ? "⏳ …" : "📨 أرسلي لي إشعاراً تجريبياً"}
+      </button>
+    )}
     <button
       type="button"
       onClick={toggle}
@@ -79,5 +107,6 @@ export function PushToggle({
         />
       </span>
     </button>
+    </>
   );
 }
