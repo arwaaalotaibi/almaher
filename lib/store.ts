@@ -372,7 +372,7 @@ export function videoEmbedUrl(url: string): string {
 
 /* ================== الدعم والاقتراحات ================== */
 
-export type SupportKind = "issue" | "idea" | "question" | "plan_edit";
+export type SupportKind = "issue" | "idea" | "question" | "plan_issue" | "plan_edit";
 
 export const SUPPORT_KINDS: { key: SupportKind; icon: string; label: string }[] = [
   { key: "issue", icon: "🛠️", label: "مشكلة تقنية" },
@@ -385,29 +385,61 @@ export const SUPPORT_KIND_META: Record<SupportKind, { icon: string; label: strin
   issue: { icon: "🛠️", label: "مشكلة تقنية" },
   idea: { icon: "💡", label: "اقتراح" },
   question: { icon: "💬", label: "استفسار" },
-  plan_edit: { icon: "✏️", label: "عدّلت خطتها" },
+  plan_issue: { icon: "⚠️", label: "خطأ في الخطة" },
+  plan_edit: { icon: "✏️", label: "عدّلت خطتها" }, // (قديم — لم يعد التعديل متاحاً للطالبة)
 };
 
 /* ================== تأكيد خطة الفصل ==================
-   في بداية كل فصل تؤكّد الطالبة خطتها أو تعدّلها مرة واحدة. تُكتب النتيجة داخل plan
-   (confirmedTerm / studentEditedTerm) عبر الدالة الآمنة almaher_confirm_plan. */
+   في بداية كل فصل تؤكّد الطالبة خطتها («صحيحة» تُكتب داخل plan.confirmedTerm عبر
+   الدالة الآمنة almaher_confirm_plan)، أو تبلّغ عن خطأ برسالة دعم plan_issue.
+   بعد البلاغ لا تُطلب منها الشاشة حتى تعدّل الإدارة بياناتها، فتُطلب من جديد. */
 
-/** هل على الطالبة تأكيد خطتها الآن؟ مرة كل فصل (حسب تاريخ بداية الفصل) */
-export function needsPlanConfirm(student: Student, halaqa: Halaqa | undefined): boolean {
+export function planIssueBody(termStart: string, note: string): string {
+  return `⚠️ خطأ في خطة فصل ${termStart}: ${note.trim()}`;
+}
+
+/** آخر بلاغ خطأ للطالبة عن خطة هذا الفصل (أو null) */
+export function lastPlanIssue(
+  support: SupportMsg[],
+  studentId: string,
+  termStart: string
+): SupportMsg | null {
+  let last: SupportMsg | null = null;
+  for (const m of support) {
+    if (m.studentId !== studentId || m.kind !== "plan_issue" || !m.body.includes(termStart)) continue;
+    if (!last || m.createdAt > last.createdAt) last = m;
+  }
+  return last;
+}
+
+/** هل على الطالبة تأكيد خطتها الآن؟ مرة كل فصل، وتعود بعد أن تعدّل الإدارة بياناتها إثر بلاغها */
+export function needsPlanConfirm(
+  student: Student,
+  halaqa: Halaqa | undefined,
+  support: SupportMsg[]
+): boolean {
   const termStart = halaqa?.termStart ?? "";
   if (!termStart) return false;
   const p = student.plan;
   if (!p || (p.hifz ?? 0) + (p.murajaah ?? 0) + (p.tathbit ?? 0) <= 0) return false;
-  return p.confirmedTerm !== termStart;
+  if (p.confirmedTerm === termStart) return false;
+  const issue = lastPlanIssue(support, student.id, termStart);
+  // بلاغ قائم لم تعدّل الإدارة بعده ⇒ لا نزعجها بالشاشة
+  if (issue && (!student.updatedAt || issue.createdAt >= student.updatedAt)) return false;
+  return true;
 }
 
-/** علامة حالة التأكيد للإدارة: ✅ أكّدت · ✏️ عدّلت · ⏳ لم تؤكّد · "" لا فصل */
-export function planConfirmMark(student: Student, halaqa: Halaqa | undefined): "" | "✅" | "✏️" | "⏳" {
+/** علامة حالة التأكيد للإدارة: ✅ أكّدت · ⚠️ أبلغت عن خطأ · ⏳ لم تؤكّد · "" لا فصل */
+export function planConfirmMark(
+  student: Student,
+  halaqa: Halaqa | undefined,
+  support: SupportMsg[]
+): "" | "✅" | "⚠️" | "⏳" {
   const termStart = halaqa?.termStart ?? "";
   if (!termStart) return "";
-  const p = student.plan;
-  if (p?.studentEditedTerm === termStart) return "✏️";
-  if (p?.confirmedTerm === termStart) return "✅";
+  if (student.plan?.confirmedTerm === termStart) return "✅";
+  const issue = lastPlanIssue(support, student.id, termStart);
+  if (issue && (!student.updatedAt || issue.createdAt >= student.updatedAt)) return "⚠️";
   return "⏳";
 }
 
@@ -1243,12 +1275,9 @@ export const actions = {
       })
     );
   },
-  /** تأكيد خطة الفصل من الطالبة، أو تعديلها مرة واحدة (edit) — عبر الدالة الآمنة.
-      يعيد true عند النجاح ويحدّث الخطة محلياً بما أعادته قاعدة البيانات */
-  async confirmPlan(studentId: string, edit?: Partial<CoursePlan>, summary?: string): Promise<boolean> {
-    const { data, error } = await supabase.rpc("almaher_confirm_plan", {
-      p_edit: edit ?? null,
-    });
+  /** تأكيد خطة الفصل من الطالبة («صحيحة») عبر الدالة الآمنة — يعيد true عند النجاح */
+  async confirmPlan(studentId: string): Promise<boolean> {
+    const { data, error } = await supabase.rpc("almaher_confirm_plan", { p_edit: null });
     if (error || !data || typeof data !== "object") return false;
     const plan = { ...EMPTY_PLAN, ...(data as CoursePlan) };
     const updatedAt = new Date().toISOString();
@@ -1256,8 +1285,11 @@ export const actions = {
       ...s,
       students: s.students.map((st) => (st.id === studentId ? { ...st, plan, updatedAt } : st)),
     }));
-    if (edit && summary) actions.addSupport(studentId, "plan_edit", summary);
     return true;
+  },
+  /** بلاغ الطالبة عن خطأ في خطتها — يصل الإدارة في صندوق الدعم، والتعديل من شاشة الإدارة */
+  reportPlanIssue(studentId: string, termStart: string, note: string) {
+    actions.addSupport(studentId, "plan_issue", planIssueBody(termStart, note));
   },
   addHalaqa(mosque: string, day: string) {
     const halaqa: Halaqa = {

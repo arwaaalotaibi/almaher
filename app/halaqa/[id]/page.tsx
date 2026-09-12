@@ -55,7 +55,7 @@ export default function HalaqaPage({
 function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const { halaqas, teachers, students, recitations } = useApp();
+  const { halaqas, teachers, students, recitations, support } = useApp();
   const hydrated = useHydrated();
 
   const halaqa = halaqas.find((h) => h.id === id);
@@ -330,16 +330,16 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
       )}
 
       {halaqaStudents.length > 0 && halaqa.termStart && (() => {
-        let ok = 0, edited = 0, pending = 0;
+        let ok = 0, issue = 0, pending = 0;
         for (const s of halaqaStudents) {
-          const m = planConfirmMark(s, halaqa);
+          const m = planConfirmMark(s, halaqa, support);
           if (m === "✅") ok++;
-          else if (m === "✏️") edited++;
+          else if (m === "⚠️") issue++;
           else pending++;
         }
         return (
           <p className="mb-3 rounded-xl bg-plum-50 px-3 py-2 text-center text-xs font-bold text-plum-700">
-            📋 تأكيد خطط الفصل: ✅ {ok.toLocaleString("ar-EG")} · ✏️ {edited.toLocaleString("ar-EG")} · ⏳ {pending.toLocaleString("ar-EG")}
+            📋 تأكيد خطط الفصل: ✅ {ok.toLocaleString("ar-EG")} · ⚠️ {issue.toLocaleString("ar-EG")} · ⏳ {pending.toLocaleString("ar-EG")}
           </p>
         );
       })()}
@@ -375,7 +375,7 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
           )}
           <div className="grid gap-2.5 sm:grid-cols-2">
             {g.list.map((s) => {
-              const mark = planConfirmMark(s, halaqa);
+              const mark = planConfirmMark(s, halaqa, support);
               return (
                 <NameBox key={s.id} onClick={() => setSelected(s)}>
                   <span className="block">
@@ -385,8 +385,8 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
                         title={
                           mark === "✅"
                             ? "أكّدت خطتها"
-                            : mark === "✏️"
-                              ? "عدّلت خطتها بنفسها — التفاصيل في الدعم"
+                            : mark === "⚠️"
+                              ? "أبلغت عن خطأ في الخطة — راجعي الدعم وعدّليها من هنا"
                               : "لم تؤكّد خطتها بعد"
                         }
                       >
