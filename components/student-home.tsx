@@ -21,6 +21,7 @@ import {
   STUDENT_PICK_KEY,
   todaySegment,
   useApp,
+  needsPlanConfirm,
   visibleAnnouncements,
   type Student,
 } from "@/lib/store";
@@ -44,6 +45,7 @@ import { NotificationsCenter, PinnedNotice } from "./notifications-card";
 import { PushToggle } from "./push-toggle";
 import { AppTour, hasSeenTour } from "./app-tour";
 import { BookQuotes } from "./book-quotes";
+import { PlanConfirmGate } from "./plan-confirm";
 import { ReciteLogger, SessionVerdictChip, VerdictChip } from "./recite-log";
 import { MotivationPanel } from "./motivation-panel";
 import { computeProgress, partVerdict, sessionVerdict } from "@/lib/progress";
@@ -80,6 +82,7 @@ export function StudentHome() {
     tajweed,
     tajweedResults,
     settings,
+    support,
   } = useApp();
   const [myId, setMyId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -170,6 +173,11 @@ export function StudentHome() {
 
   const halaqa = halaqas.find((h) => h.id === me.halaqaId);
   const teacher = teachers.find((t) => t.id === me.teacherId);
+
+  // تأكيد خطة الفصل: مرة في بداية كل فصل (بعد اللائحة وقبل الدخول)
+  if (halaqa && needsPlanConfirm(me, halaqa, support)) {
+    return <PlanConfirmGate student={me} halaqa={halaqa} onLogout={logout} />;
+  }
   const schedule = halaqa ? buildSchedule(halaqa, me.plan) : null;
   const prog = computeProgress(me, recitations, halaqa);
   const logFor = (d: Date) =>

@@ -6,6 +6,7 @@ import {
   actions,
   halaqaTitle,
   SUPPORT_KINDS,
+  SUPPORT_KIND_META,
   useApp,
 } from "@/lib/store";
 import { inputCls, PageHeader, useHydrated } from "@/components/ui";
@@ -35,10 +36,12 @@ function SupportInner() {
 
   if (!hydrated) return <main className="mx-auto max-w-2xl px-4 pt-10" />;
 
-  const list = support.filter((m) =>
+  // تأكيدات الخطة الإيجابية لا تُعرض هنا (تظهر في صفحة الحلقة كعلامة ✅)
+  const inbox = support.filter((m) => m.kind !== "plan_ok");
+  const list = inbox.filter((m) =>
     filter === "all" ? true : m.status === filter
   );
-  const newCount = support.filter((m) => m.status === "new").length;
+  const newCount = inbox.filter((m) => m.status === "new").length;
 
   const studentLabel = (id: string) => {
     const st = students.find((s) => s.id === id);
@@ -94,7 +97,7 @@ function SupportInner() {
       ) : (
         <div className="grid gap-2.5">
           {list.map((m) => {
-            const k = SUPPORT_KINDS.find((x) => x.key === m.kind);
+            const k = SUPPORT_KIND_META[m.kind] ?? SUPPORT_KINDS.find((x) => x.key === m.kind);
             return (
               <div key={m.id} className="card rounded-2xl p-4">
                 <div className="mb-1 flex items-center justify-between gap-2">

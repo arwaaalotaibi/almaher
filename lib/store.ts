@@ -366,13 +366,74 @@ export function videoEmbedUrl(url: string): string {
 
 /* ================== الدعم والاقتراحات ================== */
 
-export type SupportKind = "issue" | "idea" | "question";
+export type SupportKind = "issue" | "idea" | "question" | "plan_ok" | "plan_issue";
 
 export const SUPPORT_KINDS: { key: SupportKind; icon: string; label: string }[] = [
   { key: "issue", icon: "🛠️", label: "مشكلة تقنية" },
   { key: "idea", icon: "💡", label: "اقتراح" },
   { key: "question", icon: "💬", label: "استفسار" },
 ];
+
+/** أيقونة واسم كل نوع (بما فيها تأكيد الخطة الذي لا يُختار يدوياً) */
+export const SUPPORT_KIND_META: Record<SupportKind, { icon: string; label: string }> = {
+  issue: { icon: "🛠️", label: "مشكلة تقنية" },
+  idea: { icon: "💡", label: "اقتراح" },
+  question: { icon: "💬", label: "استفسار" },
+  plan_ok: { icon: "✅", label: "تأكيد الخطة" },
+  plan_issue: { icon: "⚠️", label: "خطأ في الخطة" },
+};
+
+/* ================== تأكيد خطة الفصل ==================
+   في بداية كل فصل تؤكّد الطالبة خطتها (أوجه الحفظ والمراجعة والبداية) أو تبلّغ عن خطأ.
+   يُحفظ التأكيد كرسالة دعم من نوع plan_ok / plan_issue تحمل تاريخ بداية الفصل،
+   فلا يحتاج جدولاً جديداً، والطالبة ترى رسائلها والإدارة ترى الجميع. */
+
+export function planConfirmBody(termStart: string, ok: boolean, note = ""): string {
+  return ok
+    ? `✅ أكّدتُ خطة فصل ${termStart}`
+    : `⚠️ خطأ في خطة فصل ${termStart}: ${note.trim()}`;
+}
+
+/** آخر تأكيد/بلاغ للطالبة عن خطة هذا الفصل (أو null) */
+export function planConfirmation(
+  support: SupportMsg[],
+  studentId: string,
+  termStart: string
+): { ok: boolean; at: string; body: string } | null {
+  if (!termStart) return null;
+  const mine = support
+    .filter(
+      (m) =>
+        m.studentId === studentId &&
+        (m.kind === "plan_ok" || m.kind === "plan_issue") &&
+        m.body.includes(termStart)
+    )
+    .sort((x, y) => (x.createdAt < y.createdAt ? 1 : -1));
+  const last = mine[0];
+  return last ? { ok: last.kind === "plan_ok", at: last.createdAt, body: last.body } : null;
+}
+
+/** هل على الطالبة تأكيد خطتها الآن؟ يُطلب مرة كل فصل، ويُعاد الطلب إن عُدّلت بياناتها بعد التأكيد */
+export function needsPlanConfirm(
+  student: Student,
+  halaqa: Halaqa | undefined,
+  support: SupportMsg[]
+): boolean {
+  const termStart = halaqa?.termStart ?? "";
+  if (!termStart) return false;
+  const p = student.plan;
+  if (!p || (p.hifz ?? 0) + (p.murajaah ?? 0) + (p.tathbit ?? 0) <= 0) return false;
+  const c = planConfirmation(support, student.id, termStart);
+  if (!c) return true;
+  return !!student.updatedAt && c.at < student.updatedAt;
+}
+
+/** نص بداية المراجعة للعرض */
+export function murStartLabel(plan?: CoursePlan): string {
+  if (!plan?.murStartSurah) return "";
+  const base = `سورة ${plan.murStartSurah} — آية ${(plan.murStartAyah ?? 1).toLocaleString("ar-EG")}`;
+  return isMurDesc(plan) ? `${base} ⬇️ نزولاً` : base;
+}
 
 export interface SupportMsg {
   id: string;

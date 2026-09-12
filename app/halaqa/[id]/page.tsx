@@ -15,6 +15,7 @@ import {
   normalizeDigits,
   studentCountLabel,
   useApp,
+  planConfirmation,
   WEEK_DAYS,
   whatsappLink,
   type CoursePlan,
@@ -54,7 +55,7 @@ export default function HalaqaPage({
 function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const { halaqas, teachers, students, recitations } = useApp();
+  const { halaqas, teachers, students, recitations, support } = useApp();
   const hydrated = useHydrated();
 
   const halaqa = halaqas.find((h) => h.id === id);
@@ -328,6 +329,21 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
         </div>
       )}
 
+      {halaqaStudents.length > 0 && halaqa.termStart && (() => {
+        let ok = 0, issue = 0, pending = 0;
+        for (const s of halaqaStudents) {
+          const c = planConfirmation(support, s.id, halaqa.termStart);
+          if (!c || (s.updatedAt && c.at < s.updatedAt)) pending++;
+          else if (c.ok) ok++;
+          else issue++;
+        }
+        return (
+          <p className="mb-3 rounded-xl bg-plum-50 px-3 py-2 text-center text-xs font-bold text-plum-700">
+            📋 تأكيد خطط الفصل: ✅ {ok.toLocaleString("ar-EG")} · ⚠️ {issue.toLocaleString("ar-EG")} · ⏳ {pending.toLocaleString("ar-EG")}
+          </p>
+        );
+      })()}
+
       {halaqaStudents.length > 0 && (
         <button
           type="button"
@@ -358,12 +374,33 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
             </h2>
           )}
           <div className="grid gap-2.5 sm:grid-cols-2">
-            {g.list.map((s) => (
-              <NameBox key={s.id} onClick={() => setSelected(s)}>
-                <span className="block">{s.name}</span>
-                <GoalDots student={s} />
-              </NameBox>
-            ))}
+            {g.list.map((s) => {
+              const c = halaqa.termStart ? planConfirmation(support, s.id, halaqa.termStart) : null;
+              const stale = c && s.updatedAt && c.at < s.updatedAt; // عُدّلت بعد التأكيد
+              const mark = !halaqa.termStart ? "" : !c || stale ? "⏳" : c.ok ? "✅" : "⚠️";
+              return (
+                <NameBox key={s.id} onClick={() => setSelected(s)}>
+                  <span className="block">
+                    {mark && (
+                      <span
+                        className="me-1.5 text-sm"
+                        title={
+                          mark === "✅"
+                            ? "أكّدت خطتها"
+                            : mark === "⚠️"
+                              ? "أبلغت عن خطأ في الخطة — راجعي الدعم"
+                              : "لم تؤكّد خطتها بعد"
+                        }
+                      >
+                        {mark}
+                      </span>
+                    )}
+                    {s.name}
+                  </span>
+                  <GoalDots student={s} />
+                </NameBox>
+              );
+            })}
           </div>
         </section>
       ))}
