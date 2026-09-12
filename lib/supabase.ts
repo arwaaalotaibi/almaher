@@ -34,11 +34,10 @@ export function isStaffRole(role: Role | null | undefined): boolean {
 }
 
 // مفاتيح عامة قابلة للنشر (publishable) — آمنة في كود العميل، والحماية عبر RLS.
-// تُقرأ من .env.local إن وُجدت، وإلا فالقيم المضمّنة (مشروع الماهر الحالي)
-const SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://rpsxmqtxoapfcbbkckgv.supabase.co";
-const SUPABASE_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_WoWuQImdLUVO_R7Qhg7Beg_FAcNQCl1";
+// مضمّنة عمداً ولا تُقرأ من متغيرات البيئة: Vercel يحمل متغيرات قديمة تشير إلى
+// المشروع السابق، وقراءتها أوقفت دخول الطالبات (١٢ سبتمبر ٢٠٢٦).
+const SUPABASE_URL = "https://rpsxmqtxoapfcbbkckgv.supabase.co";
+const SUPABASE_KEY = "sb_publishable_WoWuQImdLUVO_R7Qhg7Beg_FAcNQCl1";
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: true, autoRefreshToken: true },
