@@ -16,9 +16,9 @@ import {
 
 export const POINTS_RULES = [
   { icon: "🕌", label: "حضور لقاء", pts: 10 },
-  { icon: "📖", label: "كل وجه حفظ مكتمل", pts: 5 },
-  { icon: "📌", label: "كل وجه تثبيت", pts: 2 },
-  { icon: "🔁", label: "كل وجه مراجعة", pts: 1 },
+  { icon: "📖", label: "إتمام مقرر الحفظ في اللقاء", pts: 5 },
+  { icon: "📌", label: "إتمام مقرر التثبيت (حفظ اللقاء السابق)", pts: 5 },
+  { icon: "🔁", label: "إتمام مقرر المراجعة في اللقاء", pts: 5 },
   { icon: "📚", label: "ورد قراءة تمّ", pts: 5 },
   { icon: "✅", label: "كل إجابة صحيحة في اختبار", pts: 1 },
   { icon: "🌟", label: "العلامة الكاملة في اختبار", pts: 5 },
@@ -57,21 +57,34 @@ export function computeRace(
     let faces = 0;
     let attends = 0;
 
-    // التسميع: حضور + أوجه الحفظ/التثبيت/المراجعة المكتملة
-    for (const r of recitations) {
-      if (r.studentId !== st.id) continue;
-      if (since && r.date < since) continue;
-      if (r.attended) {
-        attends++;
-        points += 10;
-      }
+    // التسميع: حضور ١٠ + ٥ لكل مقرر مكتمل (حفظ / تثبيت / مراجعة).
+    // المقرر = أوجه الخطة لكل لقاء، ومقرر التثبيت = حفظ اللقاء السابق الحاضر.
+    // نمرّ على اللقاءات الحاضرة بترتيب التاريخ لمعرفة حفظ اللقاء السابق (ولو قبل الفترة).
+    const reqH = Math.max(0, Math.round(st.plan?.hifz || 0));
+    const reqM = Math.max(0, Math.round(st.plan?.murajaah || 0));
+    const d = isDesc(st.plan);
+    const md = isMurDesc(st.plan);
+    const mine = recitations
+      .filter((r) => r.studentId === st.id && r.attended)
+      .sort((a, b) =>
+        a.date < b.date ? -1 : a.date > b.date ? 1 : (a.createdAt ?? "") < (b.createdAt ?? "") ? -1 : 1
+      );
+    let prevTasmi = 0;
+    for (const r of mine) {
       // الأوجه المحفوظة رقماً مع السجلّ (سجلات الزميلات تصل بها فقط)، وإلا من المقاطع
-      const d = isDesc(st.plan);
       const fH = r.faces?.tasmi ?? partFaces(r.tasmi, d);
       const fT = r.faces?.tathbit ?? partFaces(r.tathbit, d);
-      const fM = r.faces?.muraja ?? partFaces(r.muraja, isMurDesc(st.plan));
-      faces += fH;
-      points += fH * 5 + fT * 2 + fM * 1;
+      const fM = r.faces?.muraja ?? partFaces(r.muraja, md);
+      const inRange = !since || r.date >= since;
+      if (inRange) {
+        attends++;
+        faces += fH;
+        points += 10;
+        if (fH > 0 && fH >= reqH) points += 5;
+        if (fT > 0 && fT >= prevTasmi) points += 5;
+        if (fM > 0 && fM >= reqM) points += 5;
+      }
+      prevTasmi = fH;
     }
 
     // القراءة: أوراد تمّت + اختبارات الأقسام
