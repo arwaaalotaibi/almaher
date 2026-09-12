@@ -12,7 +12,9 @@ export default function Home() {
   const role = useRole();
   const { halaqas, students, support } = useApp();
   const hydrated = useHydrated();
-  const newSupport = support.filter((m) => m.status === "new").length;
+  const newSupport = support.filter(
+    (m) => m.status === "new" && m.kind !== "plan_issue" && m.kind !== "plan_edit"
+  ).length;
   // طالبات أبلغن عن خطأ في خطة الفصل ولم تُعدَّل بعد
   const planIssues = students.filter(
     (st) => planConfirmMark(st, halaqas.find((h) => h.id === st.halaqaId), support) === "⚠️"

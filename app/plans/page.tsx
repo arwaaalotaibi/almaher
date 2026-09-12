@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import {
   halaqaTitle,
   lastPlanIssue,
@@ -221,13 +220,6 @@ function PlansInner() {
           </div>
         )}
       </section>
-
-      <p className="mt-6 text-center text-xs text-silver-600">
-        الملاحظات كاملة أيضاً في{" "}
-        <Link href="/support" className="font-bold text-plum-700 underline">
-          صندوق الدعم
-        </Link>
-      </p>
 
       <StudentSheet
         student={selected ? (students.find((s) => s.id === selected.id) ?? selected) : null}
