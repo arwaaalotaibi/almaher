@@ -372,7 +372,7 @@ export function videoEmbedUrl(url: string): string {
 
 /* ================== الدعم والاقتراحات ================== */
 
-export type SupportKind = "issue" | "idea" | "question" | "plan_issue" | "plan_edit";
+export type SupportKind = "issue" | "idea" | "question" | "plan_issue" | "plan_edit" | "admin_msg";
 
 export const SUPPORT_KINDS: { key: SupportKind; icon: string; label: string }[] = [
   { key: "issue", icon: "🛠️", label: "مشكلة تقنية" },
@@ -387,6 +387,7 @@ export const SUPPORT_KIND_META: Record<SupportKind, { icon: string; label: strin
   question: { icon: "💬", label: "استفسار" },
   plan_issue: { icon: "⚠️", label: "خطأ في الخطة" },
   plan_edit: { icon: "✏️", label: "عدّلت خطتها" }, // (قديم — لم يعد التعديل متاحاً للطالبة)
+  admin_msg: { icon: "✉️", label: "رسالة من الإدارة" }, // رسالة خاصة من الإدارة إلى الطالبة
 };
 
 /* ================== تأكيد خطة الفصل ==================
@@ -1745,6 +1746,34 @@ export const actions = {
         body: msg.body,
       })
     );
+  },
+  /** رسالة خاصة من الإدارة/المعلّمة إلى طالبة واحدة: تظهر في صندوق الدعم عندها
+      وتصلها إشعاراً على الجهاز (عبر الدالة almaher-push) */
+  sendDirectMessage(studentId: string, body: string) {
+    const msg: SupportMsg = {
+      id: uid(),
+      studentId,
+      kind: "admin_msg",
+      body: body.trim(),
+      reply: "",
+      status: "done",
+      createdAt: new Date().toISOString(),
+    };
+    setState((s) => ({ ...s, support: [msg, ...s.support] }));
+    run(() =>
+      supabase.from("almaher_support").insert({
+        id: msg.id,
+        student_id: msg.studentId,
+        kind: msg.kind,
+        body: msg.body,
+        status: "done",
+      })
+    );
+    void supabase.functions
+      .invoke("almaher-push", { body: { kind: "direct", student_id: studentId, body: msg.body } })
+      .catch(() => {
+        /* الإشعار إضافة — الرسالة محفوظة على كل حال */
+      });
   },
   /** ردّ الإدارة — يُغلق الرسالة */
   replySupport(id: string, reply: string) {

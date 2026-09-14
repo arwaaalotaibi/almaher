@@ -4,6 +4,7 @@
 //   { kind: "announce", id }  إعلان جديد من الإدارة → لطالبات الحلقة المستهدفة (أو الكل)
 //                             — يتطلب جلسة إدارة/معلّمة (Authorization: Bearer <jwt>)
 //   { kind: "test" }          إشعار تجريبي لأجهزة الطالبة صاحبة الجلسة نفسها
+//   { kind: "direct", student_id, body }  رسالة خاصة من الإدارة لطالبة واحدة (جلسة إدارة/معلّمة)
 //   { kind: "reminders" }     تذكير «لقاؤكِ غداً» لطالبات حلقات الغد — يُستدعى من
 //                             المجدول (pg_cron) مع الترويسة x-cron-secret
 //
@@ -195,6 +196,24 @@ Deno.serve(async (req) => {
       body: text.length > 140 ? text.slice(0, 137) + "…" : text,
       url: "/",
       tag: `announce-${a.id}`,
+    });
+    return json({ ok: true, ...r });
+  }
+
+  if (body.kind === "direct") {
+    if (who.role !== "admin" && who.role !== "teacher") return json({ error: "forbidden" }, 403);
+    const b = body as { student_id?: string; body?: string };
+    if (!b.student_id || !b.body) return json({ error: "student_id and body required" }, 400);
+    const { data: subs } = await admin
+      .from("almaher_push_subs")
+      .select("endpoint,p256dh,auth,student_id,halaqa_id")
+      .eq("student_id", b.student_id);
+    const text = String(b.body);
+    const r = await sendTo(subs ?? [], {
+      title: "✉️ رسالة خاصة من الإدارة",
+      body: text.length > 140 ? text.slice(0, 137) + "…" : text,
+      url: "/",
+      tag: `direct-${Date.now()}`,
     });
     return json({ ok: true, ...r });
   }

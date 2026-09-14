@@ -37,7 +37,9 @@ function SupportInner() {
   if (!hydrated) return <main className="mx-auto max-w-2xl px-4 pt-10" />;
 
   // ملاحظات الخطة لها صفحتها (تأكيد الخطط) — لا تزاحم صندوق الدعم
-  const inbox = support.filter((m) => m.kind !== "plan_issue" && m.kind !== "plan_edit");
+  const inbox = support.filter(
+    (m) => m.kind !== "plan_issue" && m.kind !== "plan_edit" && m.kind !== "admin_msg"
+  );
   const list = inbox.filter((m) =>
     filter === "all" ? true : m.status === filter
   );

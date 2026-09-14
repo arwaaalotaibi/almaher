@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   actions,
+  getReadIds,
+  markNotifsRead,
   SUPPORT_KINDS,
+  SUPPORT_KIND_META,
   useApp,
   type SupportKind,
 } from "@/lib/store";
@@ -19,6 +22,15 @@ export function SupportBox({ studentId }: { studentId: string }) {
 
   const mine = support.filter((m) => m.studentId === studentId);
   const hasNewReply = mine.some((m) => m.status === "done" && m.reply);
+  // رسائل الإدارة الخاصة: شارة حتى تُفتح الورقة (تُحفظ القراءة على الجهاز)
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  useEffect(() => setReadIds(getReadIds()), []);
+  const adminMsgs = mine.filter((m) => m.kind === "admin_msg");
+  const unreadAdmin = adminMsgs.filter((m) => !readIds.has(m.id)).length;
+  useEffect(() => {
+    if (open && unreadAdmin > 0) setReadIds(markNotifsRead(adminMsgs.map((m) => m.id)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const send = () => {
     if (body.trim().length < 3) {
@@ -45,7 +57,12 @@ export function SupportBox({ studentId }: { studentId: string }) {
         className="card mx-auto mt-8 flex items-center gap-2 rounded-full px-5 py-2.5 font-kufi text-sm font-bold text-plum-700 transition active:scale-[0.98]"
       >
         🛟 الدعم والاقتراحات
-        {hasNewReply && (
+        {unreadAdmin > 0 && (
+          <span className="rounded-full bg-plum-600 px-2 py-0.5 text-[10px] font-bold text-white">
+            ✉️ رسالة من الإدارة
+          </span>
+        )}
+        {hasNewReply && unreadAdmin === 0 && (
           <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-white">
             تم الرد ✓
           </span>
@@ -101,11 +118,21 @@ export function SupportBox({ studentId }: { studentId: string }) {
         {mine.length > 0 && (
           <>
             <p className="mb-2 mt-5 font-kufi text-sm font-bold text-plum-700">
-              رسائلي السابقة
+              رسائلي ورسائل الإدارة
             </p>
             <div className="grid gap-2">
               {mine.map((m) => {
-                const k = SUPPORT_KINDS.find((x) => x.key === m.kind);
+                const k = SUPPORT_KIND_META[m.kind] ?? SUPPORT_KINDS.find((x) => x.key === m.kind);
+                if (m.kind === "admin_msg") {
+                  return (
+                    <div key={m.id} className="rounded-xl border-2 border-plum-200 bg-plum-50 p-3">
+                      <p className="mb-1 text-[11px] font-bold text-plum-700">
+                        ✉️ رسالة من الإدارة · {fmtDate(m.createdAt)}
+                      </p>
+                      <p className="text-sm font-bold text-plum-800">{m.body}</p>
+                    </div>
+                  );
+                }
                 return (
                   <div key={m.id} className="rounded-xl bg-cream/60 p-3">
                     <div className="mb-1 flex items-center justify-between">

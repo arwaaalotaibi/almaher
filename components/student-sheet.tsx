@@ -48,6 +48,9 @@ export function StudentSheet({
   const [phone, setPhone] = useState("");
   const [plan, setPlan] = useState<CoursePlan>({ ...EMPTY_PLAN });
   const [copied, setCopied] = useState(false);
+  const [msgOpen, setMsgOpen] = useState(false); // ✉️ رسالة خاصة للطالبة
+  const [msg, setMsg] = useState("");
+  const [msgSent, setMsgSent] = useState(false);
 
   useEffect(() => {
     if (student) {
@@ -140,6 +143,13 @@ export function StudentSheet({
             </a>
             <button
               type="button"
+              onClick={() => setMsgOpen((v) => !v)}
+              className="rounded-xl bg-plum-600 px-4 py-2 text-center text-sm font-bold text-white"
+            >
+              ✉️ رسالة خاصة
+            </button>
+            <button
+              type="button"
               onClick={() => {
                 navigator.clipboard?.writeText(student.code).then(
                   () => setCopied(true),
@@ -156,6 +166,51 @@ export function StudentSheet({
         </div>
       )}
 
+      {/* ✉️ رسالة خاصة: تظهر في صندوق الدعم عند الطالبة وتصلها إشعاراً */}
+      {msgOpen && (
+        <div className="mb-4 rounded-2xl border-2 border-plum-200 bg-plum-50 p-3">
+          <p className="mb-1.5 text-xs font-bold text-plum-700">
+            ✉️ رسالة خاصة إلى {student.name} — تصلها إشعاراً وتبقى في صندوق الدعم عندها
+          </p>
+          <textarea
+            className={`${inputCls} min-h-20`}
+            value={msg}
+            onChange={(e) => setMsg(e.target.value)}
+            placeholder="اكتبي رسالتك…"
+          />
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setMsgOpen(false);
+                setMsg("");
+              }}
+              className="rounded-xl bg-white py-2 text-xs font-bold text-plum-700 ring-1 ring-cream-dark"
+            >
+              إلغاء
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (msg.trim().length < 2) return;
+                actions.sendDirectMessage(student.id, msg);
+                setMsg("");
+                setMsgOpen(false);
+                setMsgSent(true);
+                setTimeout(() => setMsgSent(false), 2500);
+              }}
+              className="rounded-xl bg-plum-600 py-2 text-xs font-bold text-white"
+            >
+              📨 إرسال
+            </button>
+          </div>
+        </div>
+      )}
+      {msgSent && (
+        <p className="mb-3 rounded-xl bg-emerald-50 px-3 py-2 text-center text-xs font-bold text-emerald-700">
+          وصلت الرسالة إلى صندوق الطالبة ✓
+        </p>
+      )}
       <Field label="جوال الطالبة / وليّة الأمر (اختياري — للواتساب)" icon="📱">
         <input
           className={inputCls}
