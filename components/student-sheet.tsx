@@ -143,13 +143,6 @@ export function StudentSheet({
             </a>
             <button
               type="button"
-              onClick={() => setMsgOpen((v) => !v)}
-              className="rounded-xl bg-plum-600 px-4 py-2 text-center text-sm font-bold text-white"
-            >
-              ✉️ رسالة خاصة
-            </button>
-            <button
-              type="button"
               onClick={() => {
                 navigator.clipboard?.writeText(student.code).then(
                   () => setCopied(true),
@@ -167,6 +160,15 @@ export function StudentSheet({
       )}
 
       {/* ✉️ رسالة خاصة: تظهر في صندوق الدعم عند الطالبة وتصلها إشعاراً */}
+      <button
+        type="button"
+        onClick={() => setMsgOpen((v) => !v)}
+        className={`mb-3 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 font-kufi text-sm font-bold transition active:scale-[0.98] ${
+          msgOpen ? "bg-cream text-plum-700" : "bg-plum-600 text-white"
+        }`}
+      >
+        ✉️ {msgOpen ? "إغلاق الرسالة" : `رسالة خاصة إلى ${student.name}`}
+      </button>
       {msgOpen && (
         <div className="mb-4 rounded-2xl border-2 border-plum-200 bg-plum-50 p-3">
           <p className="mb-1.5 text-xs font-bold text-plum-700">
