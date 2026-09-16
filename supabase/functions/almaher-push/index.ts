@@ -5,6 +5,8 @@
 //                             — يتطلب جلسة إدارة/معلّمة (Authorization: Bearer <jwt>)
 //   { kind: "test" }          إشعار تجريبي لأجهزة الطالبة صاحبة الجلسة نفسها
 //   { kind: "direct", student_id, body }  رسالة خاصة من الإدارة لطالبة واحدة (جلسة إدارة/معلّمة)
+//   { kind: "session", date, items: [{ student_id, attended, hifz, tathbit, muraja }] }
+//                             بعد اعتماد سجلّ اللقاء: تشجيع للحاضرة بما سمّعته، ورسالة متدرّجة للغائبة
 //   { kind: "reminders" }     تذكير «لقاؤكِ غداً» لطالبات حلقات الغد — يُستدعى من
 //                             المجدول (pg_cron) مع الترويسة x-cron-secret
 //
@@ -216,6 +218,71 @@ Deno.serve(async (req) => {
       tag: `direct-${Date.now()}`,
     });
     return json({ ok: true, ...r });
+  }
+
+  if (body.kind === "session") {
+    if (who.role !== "admin" && who.role !== "teacher") return json({ error: "forbidden" }, 403);
+    const b = body as {
+      date?: string;
+      items?: { student_id: string; attended: boolean; hifz?: number; tathbit?: number; muraja?: number; absences?: number }[];
+    };
+    const items = (b.items ?? []).filter((x) => x && x.student_id);
+    if (items.length === 0) return json({ error: "items required" }, 400);
+    const ids = items.map((x) => x.student_id);
+    const [{ data: subs }, { data: students }, { data: absences }] = await Promise.all([
+      admin.from("almaher_push_subs").select("endpoint,p256dh,auth,student_id,halaqa_id").in("student_id", ids),
+      admin.from("almaher_students").select("id, name, halaqa_id, almaher_halaqas(term_start)").in("id", ids),
+      admin.from("almaher_sessions").select("student_id, log_date").in("student_id", ids).eq("attended", false),
+    ]);
+    const nameOf = new Map((students ?? []).map((s) => [s.id, s.name as string]));
+    const termOf = new Map(
+      (students ?? []).map((s) => [s.id, ((s as { almaher_halaqas?: { term_start?: string } | null }).almaher_halaqas?.term_start ?? "") as string])
+    );
+    // عدد غيابات الفصل (بما فيها اللقاء الحالي المعتمَد الآن)
+    const absCount = new Map<string, number>();
+    for (const a of absences ?? []) {
+      const t = termOf.get(a.student_id) ?? "";
+      if (!t || a.log_date >= t) absCount.set(a.student_id, (absCount.get(a.student_id) ?? 0) + 1);
+    }
+    const PRAISE = [
+      "ما شاء الله تبارك الله 🌟 استمرّي، فكل وجه تحفظينه نور لكِ",
+      "أحسنتِ وبوركتِ 🌸 «خيركم من تعلّم القرآن وعلّمه»",
+      "طوبى لكِ يا حاملة القرآن 💛 لقاء اليوم أُنجز، ووردكِ القادم بانتظاركِ",
+      "بارك الله في حفظكِ وثبّته في صدركِ 🤍 راجعي وردكِ غداً ليبقى راسخاً",
+    ];
+    const seed = (b.date ?? "").split("-").join("").length + items.length;
+    let sent = 0;
+    let removed = 0;
+    for (const it of items) {
+      const name = nameOf.get(it.student_id) ?? "";
+      const mine = (subs ?? []).filter((s) => s.student_id === it.student_id);
+      if (mine.length === 0) continue;
+      let title: string;
+      let text: string;
+      if (it.attended) {
+        const parts: string[] = [];
+        if (it.hifz) parts.push(`📖 حفظ ${ar(it.hifz)}`);
+        if (it.tathbit) parts.push(`📌 تثبيت ${ar(it.tathbit)}`);
+        if (it.muraja) parts.push(`🔁 مراجعة ${ar(it.muraja)}`);
+        const praise = PRAISE[(seed + it.student_id.charCodeAt(0)) % PRAISE.length];
+        title = `أحسنتِ يا ${name} ✅`;
+        text = (parts.length ? `سمّعتِ اليوم: ${parts.join(" · ")}
+` : "") + praise;
+      } else {
+        const n = it.absences ?? absCount.get(it.student_id) ?? 1;
+        title = `افتقدناكِ اليوم يا ${name} 🌸`;
+        text =
+          n <= 1
+            ? "غبتِ عن لقاء اليوم. حافظي على وردكِ في البيت، وننتظركِ في اللقاء القادم بإذن الله"
+            : n === 2
+              ? "هذا غيابكِ الثاني هذا الفصل. تذكّري أن الغياب ثلاث مرات يستبعد من الدورة، ونحبّ أن تكملي معنا 💛"
+              : "غيابكِ الثالث هذا الفصل ⚠️ تواصلي مع معلّمتكِ اليوم من فضلكِ حتى لا يُطبَّق الاستبعاد";
+      }
+      const r = await sendTo(mine, { title, body: text, url: "/", tag: `session-${b.date ?? "x"}` });
+      sent += r.sent;
+      removed += r.removed;
+    }
+    return json({ ok: true, sent, removed, students: items.length });
   }
 
   return json({ error: "unknown kind" }, 400);

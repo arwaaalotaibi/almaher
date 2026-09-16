@@ -28,6 +28,7 @@ import {
 import { surahName, surahNumber } from "@/lib/mushaf";
 import { ayahCount, SURAHS } from "@/lib/surahs";
 import { PrimaryBtn, inputCls } from "./ui";
+import { supabase } from "@/lib/supabase";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 
@@ -179,8 +180,8 @@ export function QuickSession({
 
   const sessionNo = termRows?.find((r) => dateKey(r.date) === date)?.n;
 
-  /** حفظ سجلّ طالبة واحدة كما هو معروض في صفّها */
-  const saveOne = (s: Student) => {
+  /** حفظ سجلّ طالبة واحدة كما هو معروض في صفّها — يعيد بيانات إشعارها */
+  const saveOne = (s: Student, batch = false): SessionItem => {
     const i = info[s.id];
     const st = rowOf(s);
     const data: Omit<RecitationLog, "id" | "createdAt"> = {
@@ -204,19 +205,50 @@ export function QuickSession({
     });
     setJustSaved((j) => ({ ...j, [s.id]: Date.now() }));
     setTimeout(() => setJustSaved((j) => (j[s.id] ? { ...j, [s.id]: 0 } : j)), 2500);
+    const item = itemOf(s, st, data);
+    if (!batch) pushSession([item]);
+    return item;
   };
   const [justSaved, setJustSaved] = useState<Record<string, number>>({});
+  const [notify, setNotify] = useState(true); // 🔔 إشعار للطالبة عند الاعتماد
+  const [notified, setNotified] = useState<string | null>(null);
+
+  type SessionItem = { student_id: string; attended: boolean; hifz: number; tathbit: number; muraja: number; absences: number };
+  /** بيانات إشعار طالبة من صفّها: الأوجه الفعلية، وعدد غياباتها هذا الفصل بعد هذا اللقاء */
+  const itemOf = (s: Student, st: RowState, data: Omit<RecitationLog, "id" | "createdAt">): SessionItem => {
+    const f = data.faces ?? { tasmi: 0, tathbit: 0, muraja: 0 };
+    const term = halaqa.termStart ?? "";
+    const prevAbs = recitations.filter(
+      (r) => r.studentId === s.id && !r.attended && r.date !== date && (!term || r.date >= term)
+    ).length;
+    return {
+      student_id: s.id,
+      attended: st.attended,
+      hifz: f.tasmi,
+      tathbit: f.tathbit,
+      muraja: f.muraja,
+      absences: prevAbs + (st.attended ? 0 : 1),
+    };
+  };
+  const pushSession = (items: SessionItem[]) => {
+    if (!notify || items.length === 0) return;
+    void supabase.functions
+      .invoke("almaher-push", { body: { kind: "session", date, items } })
+      .then(({ data }) => {
+        const sent = (data as { sent?: number } | null)?.sent ?? 0;
+        setNotified(sent > 0 ? `🔔 وصل الإشعار إلى ${ar(sent)} جهاز` : "🔕 لا أجهزة مفعّلة الإشعارات لهؤلاء");
+        setTimeout(() => setNotified(null), 3500);
+      })
+      .catch(() => setNotified("تعذّر إرسال الإشعار"));
+  };
 
   const saveAll = () => {
-    let n = 0;
-    for (const g of shown)
-      for (const s of g.list) {
-        saveOne(s);
-        n++;
-      }
+    const items: SessionItem[] = [];
+    for (const g of shown) for (const s of g.list) items.push(saveOne(s, true));
     setRows({});
-    setSaved(n);
+    setSaved(items.length);
     setTimeout(() => setSaved(null), 2500);
+    pushSession(items);
   };
 
   const total = shown.reduce((n, g) => n + g.list.length, 0);
@@ -278,6 +310,28 @@ export function QuickSession({
             </label>
           </div>
 
+          <button
+            type="button"
+            onClick={() => setNotify((v) => !v)}
+            className={`mb-2 flex w-full items-center justify-between rounded-xl border px-3 py-2 text-start text-xs font-bold ${
+              notify ? "border-plum-500 bg-plum-50 text-plum-800" : "border-cream-dark bg-white text-silver-600"
+            }`}
+          >
+            <span>
+              {notify ? "🔔 إشعار للطالبة عند الاعتماد" : "🔕 بلا إشعار عند الاعتماد"}
+              <span className="block text-[10px] font-normal">
+                الحاضرة: تشجيع بما سمّعته · الغائبة: رسالة لطيفة تتدرّج مع تكرار الغياب
+              </span>
+            </span>
+            <span className={`relative h-5 w-9 rounded-full ${notify ? "bg-plum-600" : "bg-silver-400"}`}>
+              <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${notify ? "start-4" : "start-0.5"}`} />
+            </span>
+          </button>
+          {notified && (
+            <p className="mb-2 rounded-xl bg-emerald-50 px-3 py-1.5 text-center text-[11px] font-bold text-emerald-700">
+              {notified}
+            </p>
+          )}
           <p className="mb-2 text-[11px] text-silver-600">
             الكل «حاضرة» وسمّعت وردها كاملاً افتراضياً — عدّلي الغائبات، ومن سمّعت
             أكثر أو أقل استخدمي «− / +» لتغيير الأوجه أو ✏️ لتحديد آية النهاية بدقة،
