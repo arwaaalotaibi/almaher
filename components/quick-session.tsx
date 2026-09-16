@@ -179,25 +179,39 @@ export function QuickSession({
 
   const sessionNo = termRows?.find((r) => dateKey(r.date) === date)?.n;
 
+  /** حفظ سجلّ طالبة واحدة كما هو معروض في صفّها */
+  const saveOne = (s: Student) => {
+    const i = info[s.id];
+    const st = rowOf(s);
+    const data: Omit<RecitationLog, "id" | "createdAt"> = {
+      studentId: s.id,
+      date,
+      attended: st.attended,
+      tasmi: st.attended && st.tasmi ? rangePart(rangeOf(s, "tasmi", st)) : { status: "none" },
+      muraja: st.attended && st.muraja ? rangePart(rangeOf(s, "muraja", st)) : { status: "none" },
+      tathbit:
+        st.attended && st.tathbit ? rangePart(rangeOf(s, "tathbit", st)) : { status: "none" },
+      note: i.existing?.note ?? "",
+    };
+    data.faces = logFaces(data, s.plan);
+    if (i.existing) actions.updateRecitation(i.existing.id, data);
+    else actions.addRecitation(data);
+    // نُفرغ تعديلات هذا الصف فقط — يُعرض بعدها من سجلّه المحفوظ
+    setRows((r) => {
+      const next = { ...r };
+      delete next[s.id];
+      return next;
+    });
+    setJustSaved((j) => ({ ...j, [s.id]: Date.now() }));
+    setTimeout(() => setJustSaved((j) => (j[s.id] ? { ...j, [s.id]: 0 } : j)), 2500);
+  };
+  const [justSaved, setJustSaved] = useState<Record<string, number>>({});
+
   const saveAll = () => {
     let n = 0;
     for (const g of shown)
       for (const s of g.list) {
-        const i = info[s.id];
-        const st = rowOf(s);
-        const data: Omit<RecitationLog, "id" | "createdAt"> = {
-          studentId: s.id,
-          date,
-          attended: st.attended,
-          tasmi: st.attended && st.tasmi ? rangePart(rangeOf(s, "tasmi", st)) : { status: "none" },
-          muraja: st.attended && st.muraja ? rangePart(rangeOf(s, "muraja", st)) : { status: "none" },
-          tathbit:
-            st.attended && st.tathbit ? rangePart(rangeOf(s, "tathbit", st)) : { status: "none" },
-          note: i.existing?.note ?? "",
-        };
-        data.faces = logFaces(data, s.plan);
-        if (i.existing) actions.updateRecitation(i.existing.id, data);
-        else actions.addRecitation(data);
+        saveOne(s);
         n++;
       }
     setRows({});
@@ -267,7 +281,8 @@ export function QuickSession({
           <p className="mb-2 text-[11px] text-silver-600">
             الكل «حاضرة» وسمّعت وردها كاملاً افتراضياً — عدّلي الغائبات، ومن سمّعت
             أكثر أو أقل استخدمي «− / +» لتغيير الأوجه أو ✏️ لتحديد آية النهاية بدقة،
-            ثم احفظي. من لها سجلّ لهذا اللقاء تظهر عليها «مسجّل ✓» ويُحدَّث.
+            ثم «اعتماد» لكل طالبة على حدة، أو زر الحفظ في الأسفل للجميع دفعة واحدة.
+            من لها سجلّ لهذا اللقاء تظهر عليها «مسجّل ✓» ويُحدَّث.
           </p>
 
           <div className="grid gap-2">
@@ -300,17 +315,33 @@ export function QuickSession({
                             </span>
                           )}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => setRow(s.id, { attended: !st.attended }, st)}
-                          className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                            st.attended
-                              ? "bg-emerald-500 text-white"
-                              : "bg-red-500 text-white"
-                          }`}
-                        >
-                          {st.attended ? "حاضرة ✓" : "غائبة ✗"}
-                        </button>
+                        <span className="flex shrink-0 items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setRow(s.id, { attended: !st.attended }, st)}
+                            className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                              st.attended
+                                ? "bg-emerald-500 text-white"
+                                : "bg-red-500 text-white"
+                            }`}
+                          >
+                            {st.attended ? "حاضرة ✓" : "غائبة ✗"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => saveOne(s)}
+                            className={`rounded-full px-2.5 py-1 text-[11px] font-bold transition ${
+                              justSaved[s.id]
+                                ? "bg-emerald-600 text-white"
+                                : rows[s.id]
+                                  ? "bg-amber-500 text-white"
+                                  : "bg-plum-600 text-white"
+                            }`}
+                            title="اعتماد سجلّ هذه الطالبة وحدها"
+                          >
+                            {justSaved[s.id] ? "تم ✓" : rows[s.id] ? "💾 اعتماد*" : "💾 اعتماد"}
+                          </button>
+                        </span>
                       </div>
                       {st.attended && (
                         <div className="mt-1.5 grid gap-1.5">
@@ -443,8 +474,11 @@ export function QuickSession({
             <PrimaryBtn onClick={saveAll}>
               {saved !== null
                 ? `تم حفظ ${ar(saved)} سجلّاً ✓`
-                : `حفظ لقاء ${sessionNo ? ar(sessionNo) : ""} لـ ${ar(total)} طالبة`}
+                : `حفظ الجميع — لقاء ${sessionNo ? ar(sessionNo) : ""} لـ ${ar(total)} طالبة`}
             </PrimaryBtn>
+            <p className="mt-1.5 text-center text-[10px] text-silver-600">
+              «اعتماد*» بعلامة النجمة = صفّ فيه تعديل لم يُحفظ بعد
+            </p>
           </div>
         </div>
       )}
