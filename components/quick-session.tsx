@@ -15,8 +15,18 @@ import {
   type RecitePart,
   type Student,
 } from "@/lib/store";
-import { computeProgress, logFaces, type PosRange } from "@/lib/progress";
-import { surahName } from "@/lib/mushaf";
+import {
+  computeProgress,
+  hifzMode,
+  logFaces,
+  murMode,
+  partFaces,
+  rangeForFaces,
+  type PathMode,
+  type PosRange,
+} from "@/lib/progress";
+import { surahName, surahNumber } from "@/lib/mushaf";
+import { ayahCount, SURAHS } from "@/lib/surahs";
 import { PrimaryBtn, inputCls } from "./ui";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
@@ -27,6 +37,8 @@ interface RowState {
   tasmi: boolean;
   tathbit: boolean;
   muraja: boolean;
+  // تعديل المقطع الفعلي (زيادة/نقصان): نهاية مختلفة عن المطلوب
+  edit?: Partial<Record<PartKey, PosRange>>;
 }
 
 const PARTS: { key: PartKey; icon: string; label: string }[] = [
@@ -34,6 +46,15 @@ const PARTS: { key: PartKey; icon: string; label: string }[] = [
   { key: "tathbit", icon: "📌", label: "تثبيت" },
   { key: "muraja", icon: "🔁", label: "مراجعة" },
 ];
+
+/** قسم تسميع إلى مقطع (للتثبيت المأخوذ من آخر حفظ) */
+function partRange(p: RecitePart | null): PosRange | null {
+  if (!p || p.status !== "done" || !p.fromSurah) return null;
+  return {
+    from: { surah: surahNumber(p.fromSurah), ayah: p.fromAyah ?? 1 },
+    to: { surah: surahNumber(p.toSurah || p.fromSurah), ayah: p.toAyah ?? p.fromAyah ?? 1 },
+  };
+}
 
 /** مقطع من موضعين إلى قسم تسميع */
 function rangePart(r: PosRange | null): RecitePart {
@@ -124,6 +145,37 @@ export function QuickSession({
   };
   const setRow = (id: string, patch: Partial<RowState>, base: RowState) =>
     setRows((r) => ({ ...r, [id]: { ...base, ...patch } }));
+  const [editing, setEditing] = useState<string | null>(null); // "studentId:part" المفتوح للتعديل الدقيق
+
+  /** المقطع الفعلي لقسم: المعدَّل إن وُجد، وإلا المطلوب */
+  const rangeOf = (s: Student, key: PartKey, st: RowState): PosRange | null => {
+    const i = info[s.id];
+    if (st.edit?.[key]) return st.edit[key]!;
+    if (key === "tasmi") return i?.hifz ?? null;
+    if (key === "muraja") return i?.mur ?? null;
+    return partRange(i?.tathbit ?? null);
+  };
+  const modeOf = (s: Student, key: PartKey): PathMode =>
+    key === "muraja" ? murMode(s.plan) : hifzMode(s.plan);
+  const facesOf = (s: Student, key: PartKey, r: PosRange | null) =>
+    partFaces(rangePart(r), modeOf(s, key) !== "asc", key === "muraja" ? "muraja" : "hifz");
+  /** زيادة/نقصان وجه: يُعاد حساب النهاية من البداية نفسها */
+  // المراجعة النازلة بالصفحات تُبنى من طرفها الأعلى («إلى») نزولاً؛ البقية من «من»
+  const anchorIsTo = (s: Student, key: PartKey) => modeOf(s, key) === "pageDesc";
+  const bump = (s: Student, key: PartKey, st: RowState, delta: number) => {
+    const cur = rangeOf(s, key, st);
+    if (!cur) return;
+    const k = Math.max(1, facesOf(s, key, cur) + delta);
+    const next = rangeForFaces(anchorIsTo(s, key) ? cur.to : cur.from, k, modeOf(s, key));
+    if (next) setRow(s.id, { edit: { ...st.edit, [key]: next } }, st);
+  };
+  /** تحديد الطرف المتحرّك بدقة الآية (النهاية عادةً، والبداية في المراجعة النازلة) */
+  const setEnd = (s: Student, key: PartKey, st: RowState, pos: { surah: number; ayah: number }) => {
+    const cur = rangeOf(s, key, st);
+    if (!cur) return;
+    const next = anchorIsTo(s, key) ? { from: pos, to: cur.to } : { from: cur.from, to: pos };
+    setRow(s.id, { edit: { ...st.edit, [key]: next } }, st);
+  };
 
   const sessionNo = termRows?.find((r) => dateKey(r.date) === date)?.n;
 
@@ -137,10 +189,10 @@ export function QuickSession({
           studentId: s.id,
           date,
           attended: st.attended,
-          tasmi: st.attended && st.tasmi ? rangePart(i.hifz) : { status: "none" },
-          muraja: st.attended && st.muraja ? rangePart(i.mur) : { status: "none" },
+          tasmi: st.attended && st.tasmi ? rangePart(rangeOf(s, "tasmi", st)) : { status: "none" },
+          muraja: st.attended && st.muraja ? rangePart(rangeOf(s, "muraja", st)) : { status: "none" },
           tathbit:
-            st.attended && st.tathbit && i.tathbit ? { ...i.tathbit } : { status: "none" },
+            st.attended && st.tathbit ? rangePart(rangeOf(s, "tathbit", st)) : { status: "none" },
           note: i.existing?.note ?? "",
         };
         data.faces = logFaces(data, s.plan);
@@ -213,8 +265,9 @@ export function QuickSession({
           </div>
 
           <p className="mb-2 text-[11px] text-silver-600">
-            الكل «حاضرة» وسمّعت وردها كاملاً افتراضياً — عدّلي الغائبات ومن سمّعت
-            جزءاً فقط، ثم احفظي. من لها سجلّ لهذا اللقاء تظهر عليها «مسجّل ✓» ويُحدَّث.
+            الكل «حاضرة» وسمّعت وردها كاملاً افتراضياً — عدّلي الغائبات، ومن سمّعت
+            أكثر أو أقل استخدمي «− / +» لتغيير الأوجه أو ✏️ لتحديد آية النهاية بدقة،
+            ثم احفظي. من لها سجلّ لهذا اللقاء تظهر عليها «مسجّل ✓» ويُحدَّث.
           </p>
 
           <div className="grid gap-2">
@@ -227,9 +280,9 @@ export function QuickSession({
                   const i = info[s.id];
                   const st = rowOf(s);
                   const labels: Record<PartKey, string> = {
-                    tasmi: i.hifz ? recitePartLabel(rangePart(i.hifz)) : "",
-                    tathbit: i.tathbit ? recitePartLabel(i.tathbit) : "",
-                    muraja: i.mur ? recitePartLabel(rangePart(i.mur)) : "",
+                    tasmi: recitePartLabel(rangePart(rangeOf(s, "tasmi", st))),
+                    tathbit: recitePartLabel(rangePart(rangeOf(s, "tathbit", st))),
+                    muraja: recitePartLabel(rangePart(rangeOf(s, "muraja", st))),
                   };
                   return (
                     <div
@@ -260,34 +313,121 @@ export function QuickSession({
                         </button>
                       </div>
                       {st.attended && (
-                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        <div className="mt-1.5 grid gap-1.5">
                           {PARTS.map((p) => {
                             const has = !!labels[p.key];
                             const on = has && st[p.key];
+                            const r = rangeOf(s, p.key, st);
+                            const edited = !!st.edit?.[p.key];
+                            const ek = `${s.id}:${p.key}`;
+                            const isEditing = editing === ek;
+                            const n = has ? facesOf(s, p.key, r) : 0;
                             return (
-                              <button
-                                key={p.key}
-                                type="button"
-                                disabled={!has}
-                                title={labels[p.key] || "لا مطلوب"}
-                                onClick={() => setRow(s.id, { [p.key]: !st[p.key] }, st)}
-                                className={`rounded-lg border px-2 py-1 text-start text-[11px] ${
-                                  !has
-                                    ? "border-cream-dark text-silver-400 line-through"
-                                    : on
-                                      ? "border-plum-600 bg-plum-600 text-white"
-                                      : "border-cream-dark bg-white text-silver-600"
-                                }`}
-                              >
-                                <span className="font-bold">
-                                  {p.icon} {p.label}
-                                </span>
-                                {has && (
-                                  <span className={`block ${on ? "text-white/85" : ""}`}>
-                                    {labels[p.key]}
-                                  </span>
-                                )}
-                              </button>
+                              <div key={p.key}>
+                                <div className="flex items-stretch gap-1">
+                                  <button
+                                    type="button"
+                                    disabled={!has}
+                                    title={labels[p.key] || "لا مطلوب"}
+                                    onClick={() => setRow(s.id, { [p.key]: !st[p.key] }, st)}
+                                    className={`min-w-0 flex-1 rounded-lg border px-2 py-1 text-start text-[11px] ${
+                                      !has
+                                        ? "border-cream-dark text-silver-400 line-through"
+                                        : on
+                                          ? edited
+                                            ? "border-amber-500 bg-amber-500 text-white"
+                                            : "border-plum-600 bg-plum-600 text-white"
+                                          : "border-cream-dark bg-white text-silver-600"
+                                    }`}
+                                  >
+                                    <span className="font-bold">
+                                      {p.icon} {p.label}
+                                      {has && (
+                                        <span className={`ms-1 font-normal ${on ? "text-white/85" : ""}`}>
+                                          ({ar(n)} {n === 1 ? "وجه" : n === 2 ? "وجهان" : "أوجه"})
+                                          {edited && " ✏️"}
+                                        </span>
+                                      )}
+                                    </span>
+                                    {has && (
+                                      <span className={`block ${on ? "text-white/85" : ""}`}>
+                                        {labels[p.key]}
+                                      </span>
+                                    )}
+                                  </button>
+                                  {has && on && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => bump(s, p.key, st, -1)}
+                                        className="w-8 rounded-lg bg-cream text-sm font-bold text-plum-700"
+                                        aria-label="وجه أقل"
+                                      >
+                                        −
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => bump(s, p.key, st, +1)}
+                                        className="w-8 rounded-lg bg-cream text-sm font-bold text-plum-700"
+                                        aria-label="وجه أكثر"
+                                      >
+                                        +
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditing(isEditing ? null : ek)}
+                                        className={`w-8 rounded-lg text-sm ${isEditing ? "bg-plum-600 text-white" : "bg-cream text-plum-700"}`}
+                                        aria-label="تعديل آية النهاية"
+                                      >
+                                        ✏️
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                                {has && on && isEditing && r && (() => {
+                                  const toAnchored = anchorIsTo(s, p.key);
+                                  const fixed = toAnchored ? r.to : r.from;
+                                  const mov = toAnchored ? r.from : r.to;
+                                  return (
+                                  <div className="mt-1 grid grid-cols-[1fr_auto_auto] items-center gap-1.5 rounded-lg bg-cream/60 px-2 py-1.5 text-[11px]">
+                                    <span className="font-bold text-plum-700">
+                                      {toAnchored
+                                        ? `إلى ${surahName(fixed.surah)} ${ar(fixed.ayah)} — من:`
+                                        : `من ${surahName(fixed.surah)} ${ar(fixed.ayah)} — إلى:`}
+                                    </span>
+                                    <select
+                                      className={`${inputCls} py-1 text-[11px]`}
+                                      value={surahName(mov.surah)}
+                                      onChange={(e) =>
+                                        setEnd(s, p.key, st, {
+                                          surah: surahNumber(e.target.value),
+                                          ayah: Math.min(mov.ayah, ayahCount(e.target.value)),
+                                        })
+                                      }
+                                    >
+                                      {SURAHS.map((x) => (
+                                        <option key={x} value={x}>
+                                          {x}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <select
+                                      className={`${inputCls} py-1 text-[11px]`}
+                                      value={mov.ayah}
+                                      onChange={(e) =>
+                                        setEnd(s, p.key, st, { surah: mov.surah, ayah: Number(e.target.value) })
+                                      }
+                                    >
+                                      {Array.from({ length: ayahCount(surahName(mov.surah)) }, (_, k) => k + 1).map((k) => (
+                                        <option key={k} value={k}>
+                                          {ar(k)}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  );
+                                })()}
+                              </div>
                             );
                           })}
                         </div>

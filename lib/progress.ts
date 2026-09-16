@@ -158,6 +158,11 @@ function nextLabel(
   };
 }
 
+/** مقطع بمقدار k وجه ابتداءً من موضع على مسار معيّن — للتسجيل السريع (زيادة/نقصان) */
+export function rangeForFaces(from: Pos | null, k: number, mode: PathMode): PosRange | null {
+  return nextLabel(from, k, mode).range;
+}
+
 /** الحافة التي يبدأ منها المقطع الذي يلي مقطعاً محسوباً (للإسقاط) */
 function edgeAfter(
   nl: { fromPage: number; toPage: number; next?: Pos | null },
