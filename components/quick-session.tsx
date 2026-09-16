@@ -262,7 +262,7 @@ export function QuickSession({
         className="flex w-full items-center justify-between"
       >
         <span className="font-kufi text-sm font-bold text-plum-800">
-          📋 تسجيل لقاء كامل بضغطة
+          📋 تسجيل تسميع اللقاء
         </span>
         <span className="text-plum-600">{open ? "▴" : "▾"}</span>
       </button>
