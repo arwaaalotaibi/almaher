@@ -439,7 +439,7 @@ export function StudentSheet({
 const md = isMurDesc(plan);
               const vH = att && log ? partVerdict(log.tasmi, s.hifz, d) : null;
               const vT = att && log ? partVerdict(log.tathbit, s.tathbit, d) : null;
-              const vM = att && log ? partVerdict(log.muraja, s.murajaah, md) : null;
+              const vM = att && log ? partVerdict(log.muraja, s.murajaah, md, "muraja") : null;
               const overall = att && log ? sessionVerdict(log, s, d, md) : null;
               // اللقاءات القادمة: المقطع مُسقَط من الموضع الفعلي
               const pj = !log ? prog.projected[s.n] : undefined;

@@ -73,7 +73,7 @@ export function computeRace(
       // الأوجه المحفوظة رقماً مع السجلّ (سجلات الزميلات تصل بها فقط)، وإلا من المقاطع
       const fH = r.faces?.tasmi ?? partFaces(r.tasmi, d);
       const fT = r.faces?.tathbit ?? partFaces(r.tathbit, d);
-      const fM = r.faces?.muraja ?? partFaces(r.muraja, md);
+      const fM = r.faces?.muraja ?? partFaces(r.muraja, md, "muraja");
       const inRange = !since || r.date >= since;
       if (inRange) {
         attends++;

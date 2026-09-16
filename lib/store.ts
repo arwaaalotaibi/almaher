@@ -8,6 +8,7 @@ import {
   pageOf,
   surahNumber,
 } from "./mushaf";
+import { descSegments, normalizeDescStart, type Pos as PathPos } from "./hifz-path";
 
 /* ================== الأنواع ================== */
 
@@ -617,6 +618,10 @@ export function buildSchedule(
   const hPage0 = plan.startSurah
     ? pageOf(surahNumber(plan.startSurah), plan.startAyah || 1)
     : 0;
+  // الحفظ النازل «بالسور»: موضع البداية (آخر آية في السورة = لم تبدأ بعد)
+  let hPos: PathPos | null = plan.startSurah
+    ? normalizeDescStart({ surah: surahNumber(plan.startSurah), ayah: plan.startAyah || 1 })
+    : null;
   const mPage0 = plan.murStartSurah
     ? pageOf(surahNumber(plan.murStartSurah), plan.murStartAyah || 1)
     : 0;
@@ -649,6 +654,8 @@ export function buildSchedule(
   let hCur = hPage0; // مؤشّر صفحة الحفظ التالية
   let mCur = mPage0; // مؤشّر صفحة المراجعة التالية
   let prevH: Rng = empty; // حفظ اللقاء السابق (= تثبيت اللقاء الحالي)
+  let prevHLabel = ""; // نصّ حفظ اللقاء السابق (للنازل بالسور)
+  let prevHCount = 0;
   let ch = 0,
     ct = 0,
     cm = 0;
@@ -659,11 +666,23 @@ export function buildSchedule(
 
     // مقطع الحفظ الجديد لهذا اللقاء
     let hRange: Rng = empty;
+    let hLabel = "";
     let hCount = perH;
-    if (hPage0) {
-      const s = step(hCur, perH, hDesc);
+    if (hPage0 && hDesc) {
+      // نازل بالسور: السورة من أوّلها إلى آخرها ثم السورة التي قبلها
+      if (hPos && perH > 0) {
+        const r = descSegments(hPos, perH);
+        hLabel = r.label;
+        hCount = r.pages;
+        hPos = r.next;
+      } else {
+        hCount = 0; // انتهى المصحف
+      }
+    } else if (hPage0) {
+      const s = step(hCur, perH, false);
       if (s) {
         hRange = s.rng;
+        hLabel = hifzRangeLabel(hRange.from, hRange.to);
         hCount = hRange.to - hRange.from + 1;
         hCur = s.next;
       } else {
@@ -672,8 +691,8 @@ export function buildSchedule(
     }
 
     // التثبيت = مقطع حفظ اللقاء السابق
-    const tRange = prevH;
-    const tCount = tRange.from ? tRange.to - tRange.from + 1 : 0;
+    const tLabel = prevHLabel;
+    const tCount = prevHCount;
 
     // مقطع المراجعة (إن حُدّدت بدايتها)
     let mRange: Rng = empty;
@@ -698,14 +717,16 @@ export function buildSchedule(
       hifz: hCount,
       tathbit: tCount,
       murajaah: mCount,
-      hifzLabel: hRange.from ? hifzRangeLabel(hRange.from, hRange.to) : "",
-      tathbitLabel: tRange.from ? hifzRangeLabel(tRange.from, tRange.to) : "",
+      hifzLabel: hLabel,
+      tathbitLabel: tLabel,
       murajaahLabel: mRange.from ? hifzRangeLabel(mRange.from, mRange.to) : "",
       cumHifz: ch,
       cumTathbit: ct,
       cumMurajaah: cm,
     });
     prevH = hRange;
+    prevHLabel = hLabel;
+    prevHCount = hCount;
   }
   return rows;
 }

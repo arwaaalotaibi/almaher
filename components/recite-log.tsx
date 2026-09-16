@@ -276,7 +276,8 @@ export function ReciteHistory({
               ? partVerdict(
                   r[p.key] as RecitePart,
                   row[ROW_REQ[p.key]],
-                  p.key === "muraja" ? mdesc : desc
+                  p.key === "muraja" ? mdesc : desc,
+                  p.key === "muraja" ? "muraja" : "hifz"
                 )
               : null,
         })).filter((x) => x.label);
