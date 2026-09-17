@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { ALLOWED_ABSENCES, absenceMessage } from "./absence";
 import { supabase } from "./supabase";
 import {
   hifzRangeLabel,
@@ -2351,12 +2352,18 @@ export function autoNotifsFor(
         body: (parts.length ? `سمّعتِ: ${parts.join(" · ")}\n` : "") + praise,
       });
     } else {
+      // ترتيب هذا الغياب في الفصل (المسموح ٣) — نفس تدرّج إشعار الجهاز
+      const term = halaqa?.termStart ?? "";
+      const n = recitations.filter(
+        (x) => x.studentId === student.id && !x.attended && x.date <= r.date && (!term || x.date >= term)
+      ).length;
+      const m = absenceMessage(firstName, Math.max(1, n));
       out.push({
         id: `auto:session:${r.id}:absent`,
         type: "reminder",
-        icon: "🌸",
-        title: `افتقدناكِ يا ${firstName} 🌸 — لقاء ${when}`,
-        body: "غبتِ عن هذا اللقاء. حافظي على وردكِ في البيت، وننتظركِ في اللقاء القادم بإذن الله",
+        icon: n >= ALLOWED_ABSENCES ? "⚠️" : "🌸",
+        title: `${m.title} — لقاء ${when}`,
+        body: m.body.replace("لقاء اليوم", "هذا اللقاء"),
       });
     }
   }

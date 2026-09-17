@@ -95,6 +95,36 @@ function tomorrowKuwait(): { iso: string; weekday: number } {
   return { iso: t.toISOString().slice(0, 10), weekday: t.getUTCDay() };
 }
 
+
+/** لائحة الغياب: المسموح ٣ غيابات في الفصل — نسخة مطابقة لـ lib/absence.ts في التطبيق */
+const ALLOWED_ABSENCES = 3;
+const ORD = ["", "الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس"];
+function absenceMessage(name: string, n: number): { title: string; body: string } {
+  const who = name ? ` يا ${name}` : "";
+  const ordinal = ORD[n] ?? `رقم ${ar(n)}`;
+  if (n <= 1) {
+    return {
+      title: `افتقدناكِ${who} 🌸`,
+      body: `غبتِ عن لقاء اليوم، وهو غيابكِ الأول هذا الفصل. حافظي على وردكِ في البيت، وننتظركِ في اللقاء القادم بإذن الله`,
+    };
+  }
+  if (n < ALLOWED_ABSENCES) {
+    return {
+      title: `افتقدناكِ مرة أخرى${who} 🌸`,
+      body: `هذا غيابكِ ${ordinal} هذا الفصل، والمسموح ${ar(ALLOWED_ABSENCES)} غيابات فقط. حافظي على وردكِ، وننتظركِ في اللقاء القادم بإذن الله`,
+    };
+  }
+  if (n === ALLOWED_ABSENCES) {
+    return {
+      title: `تنبيه: غيابكِ ${ordinal}${who} ⚠️`,
+      body: `وصلتِ إلى الحدّ المسموح من الغياب (${ar(ALLOWED_ABSENCES)} غيابات) هذا الفصل. احرصي على حضور كل لقاء قادم، ونسأل الله أن يعينكِ 🌸`,
+    };
+  }
+  return {
+    title: `تجاوزتِ الغياب المسموح${who} ⚠️`,
+    body: `هذا غيابكِ ${ordinal} هذا الفصل، والمسموح ${ar(ALLOWED_ABSENCES)} فقط. يُرجى التواصل مع الإدارة في أقرب وقت`,
+  };
+}
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
@@ -270,11 +300,12 @@ Deno.serve(async (req) => {
         text = (parts.length ? `سمّعتِ اليوم: ${parts.join(" · ")}
 ` : "") + praise;
       } else {
-        // حالياً رسالة واحدة لكل الغيابات (بقرار الإدارة ١٧ سبتمبر ٢٠٢٦) —
-        // التدرّج حسب عدد الغيابات (it.absences) جاهز للتفعيل لاحقاً
-        void absCount;
-        title = name ? `افتقدناكِ اليوم يا ${name} 🌸` : "افتقدناكِ اليوم 🌸";
-        text = "غبتِ عن لقاء اليوم. حافظي على وردكِ في البيت، وننتظركِ في اللقاء القادم بإذن الله";
+        // تدرّج حسب ترتيب الغياب هذا الفصل (المسموح ٣ — لائحة الإدارة ١٧ سبتمبر ٢٠٢٦):
+        // نأخذ الأكبر من عدّ الخادم وعدّ الشاشة (it.absences) لأن السجل قد لا يكون مكتوباً بعد
+        const n = Math.max(1, absCount.get(it.student_id) ?? 0, it.absences ?? 0);
+        const m = absenceMessage(name, n);
+        title = m.title;
+        text = m.body;
       }
       const r = await sendTo(mine, { title, body: text, url: "/", tag: `session-${b.date ?? "x"}` });
       sent += r.sent;
