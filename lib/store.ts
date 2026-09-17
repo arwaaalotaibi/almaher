@@ -2363,7 +2363,7 @@ export function autoNotifsFor(
         type: "reminder",
         icon: n >= ALLOWED_ABSENCES ? "⚠️" : "🌸",
         title: `${m.title} — لقاء ${when}`,
-        body: m.body.replace("لقاء اليوم", "هذا اللقاء"),
+        body: m.body.replace("حلقة اليوم", "هذه الحلقة"),
       });
     }
   }
