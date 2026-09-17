@@ -2311,9 +2311,55 @@ function whenLabel(days: number): string {
 export function autoNotifsFor(
   student: Student,
   halaqa: Halaqa | undefined,
-  books: Book[]
+  books: Book[],
+  recitations: RecitationLog[] = []
 ): SmartNotif[] {
   const out: SmartNotif[] = [];
+
+  // نتيجة اللقاءات المعتمَدة (آخر ١٤ يوماً): تشجيع للحاضرة بما سمّعته، ورسالة لطيفة للغائبة —
+  // نفس نصّ إشعار الجهاز، حتى تراه من لم تفعّل الإشعارات
+  const PRAISE = [
+    "ما شاء الله تبارك الله 🌟 استمرّي، فكل وجه تحفظينه نور لكِ",
+    "أحسنتِ وبوركتِ 🌸 «خيركم من تعلّم القرآن وعلّمه»",
+    "طوبى لكِ يا حاملة القرآن 💛 لقاء اليوم أُنجز، ووردكِ القادم بانتظاركِ",
+    "بارك الله في حفظكِ وثبّته في صدركِ 🤍 راجعي وردكِ غداً ليبقى راسخاً",
+  ];
+  const cutoff = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
+  const mine = recitations
+    .filter((r) => r.studentId === student.id && r.date >= cutoff)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 3);
+  const firstName = student.name.trim().split(/\s+/)[0] || "";
+  for (const r of mine) {
+    const when = new Date(`${r.date}T00:00:00`).toLocaleDateString("ar-u-ca-gregory-nu-arab", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    });
+    if (r.attended) {
+      const f = r.faces ?? { tasmi: 0, tathbit: 0, muraja: 0 };
+      const parts: string[] = [];
+      if (f.tasmi) parts.push(`📖 حفظ ${f.tasmi.toLocaleString("ar-EG")}`);
+      if (f.tathbit) parts.push(`📌 تثبيت ${f.tathbit.toLocaleString("ar-EG")}`);
+      if (f.muraja) parts.push(`🔁 مراجعة ${f.muraja.toLocaleString("ar-EG")}`);
+      const praise = PRAISE[(r.date.replace(/-/g, "").length + r.id.charCodeAt(0)) % PRAISE.length];
+      out.push({
+        id: `auto:session:${r.id}:ok`,
+        type: "congrats",
+        icon: "✅",
+        title: `أحسنتِ يا ${firstName} ✅ — لقاء ${when}`,
+        body: (parts.length ? `سمّعتِ: ${parts.join(" · ")}\n` : "") + praise,
+      });
+    } else {
+      out.push({
+        id: `auto:session:${r.id}:absent`,
+        type: "reminder",
+        icon: "🌸",
+        title: `افتقدناكِ يا ${firstName} 🌸 — لقاء ${when}`,
+        body: "غبتِ عن هذا اللقاء. حافظي على وردكِ في البيت، وننتظركِ في اللقاء القادم بإذن الله",
+      });
+    }
+  }
 
   // اللقاء القادم (خلال ٣ أيام) أو اكتمال الفصل
   if (halaqa) {

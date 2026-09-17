@@ -185,7 +185,7 @@ export function StudentHome() {
 
   const myHalaqaIds = me.halaqaId ? [me.halaqaId] : [];
   const notifList = visibleAnnouncements(announcements, myHalaqaIds);
-  const smartNotifs = autoNotifsFor(me, halaqa, books);
+  const smartNotifs = autoNotifsFor(me, halaqa, books, recitations);
   const unreadNotifs =
     countUnread(notifList, readIds) +
     smartNotifs.filter((s) => !readIds.has(s.id)).length;
