@@ -1,6 +1,7 @@
 "use client";
 
 import { confirmDanger } from "@/lib/confirm";
+import { ALLOWED_ABSENCES, termAbsenceDates } from "@/lib/absence";
 import { printCodeCards } from "@/lib/print-codes";
 import { use, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -344,6 +345,22 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
             className="mb-3 block rounded-xl bg-plum-50 px-3 py-2 text-center text-xs font-bold text-plum-700"
           >
             📋 تأكيد خطط الفصل: ✅ {ok.toLocaleString("ar-EG")} · ⚠️ {issue.toLocaleString("ar-EG")} · ⏳ {pending.toLocaleString("ar-EG")} — التفاصيل ‹
+          </Link>
+        );
+      })()}
+
+      {halaqaStudents.length > 0 && (() => {
+        const counts = halaqaStudents.map((s) => termAbsenceDates(recitations, s.id, halaqa.termStart).length);
+        const once = counts.filter((n) => n === 1).length;
+        const twice = counts.filter((n) => n === 2).length;
+        const limit = counts.filter((n) => n >= ALLOWED_ABSENCES).length;
+        if (once + twice + limit === 0) return null;
+        return (
+          <Link
+            href="/absences"
+            className="mb-3 block rounded-xl bg-amber-50 px-3 py-2 text-center text-xs font-bold text-amber-900"
+          >
+            🚫 الغياب هذا الفصل: مرة {once.toLocaleString("ar-EG")} · مرتين {twice.toLocaleString("ar-EG")} · ٣ فأكثر {limit.toLocaleString("ar-EG")} — التفاصيل ‹
           </Link>
         );
       })()}

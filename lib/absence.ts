@@ -34,3 +34,16 @@ export function absenceMessage(name: string, n: number): { title: string; body: 
     body: `هذا غيابكِ ${ordinal} هذا الفصل، والمسموح ${ar(ALLOWED_ABSENCES)} فقط. يُرجى التواصل مع الإدارة في أقرب وقت`,
   };
 }
+
+/** تواريخ غياب الطالبة هذا الفصل (من بداية الفصل إن حُدِّدت)، الأحدث أولاً */
+export function termAbsenceDates(
+  recitations: { studentId: string; attended: boolean; date: string }[],
+  studentId: string,
+  termStart: string | undefined
+): string[] {
+  const t = termStart ?? "";
+  return recitations
+    .filter((r) => r.studentId === studentId && !r.attended && (!t || r.date >= t))
+    .map((r) => r.date)
+    .sort((a, b) => b.localeCompare(a));
+}

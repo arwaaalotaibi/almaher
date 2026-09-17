@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ALLOWED_ABSENCES, termAbsenceDates } from "@/lib/absence";
 import { planConfirmMark, studentCountLabel, useApp } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import { Ribbon, useHydrated } from "@/components/ui";
@@ -10,7 +11,11 @@ import { StudentHome } from "@/components/student-home";
 
 export default function Home() {
   const role = useRole();
-  const { halaqas, students, support } = useApp();
+  const { halaqas, students, support, recitations } = useApp();
+  // طالبات بلغن الحدّ المسموح من الغياب (٣) أو تجاوزنه هذا الفصل
+  const absenceAlerts = students.filter(
+    (s) => termAbsenceDates(recitations, s.id, halaqas.find((h) => h.id === s.halaqaId)?.termStart).length >= ALLOWED_ABSENCES
+  ).length;
   const hydrated = useHydrated();
   const newSupport = support.filter(
     (m) => m.status === "new" && m.kind !== "plan_issue" && m.kind !== "plan_edit"
@@ -130,6 +135,19 @@ export default function Home() {
           {planIssues > 0 && (
             <span className="absolute end-3 top-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
               {planIssues.toLocaleString("ar-EG")}
+            </span>
+          )}
+        </Link>
+        <Link
+          href="/absences"
+          className="card relative flex flex-col items-center gap-1.5 rounded-2xl py-4 transition active:scale-[0.97]"
+        >
+          <span className="text-2xl">🚫</span>
+          <span className="font-kufi text-sm font-bold text-plum-800">متابعة الغياب</span>
+          <span className="text-[11px] text-silver-600">مرة، مرتين، ٣ فأكثر</span>
+          {absenceAlerts > 0 && (
+            <span className="absolute end-3 top-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+              {absenceAlerts.toLocaleString("ar-EG")}
             </span>
           )}
         </Link>
