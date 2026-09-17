@@ -229,15 +229,16 @@ Deno.serve(async (req) => {
     const items = (b.items ?? []).filter((x) => x && x.student_id);
     if (items.length === 0) return json({ error: "items required" }, 400);
     const ids = items.map((x) => x.student_id);
-    const [{ data: subs }, { data: students }, { data: absences }] = await Promise.all([
+    // (لا مفتاح أجنبي بين الطالبات والحلقات — نقرأ الحلقات على حدة بدل التضمين)
+    const [{ data: subs }, { data: students }, { data: absences }, { data: halaqasAll }] = await Promise.all([
       admin.from("almaher_push_subs").select("endpoint,p256dh,auth,student_id,halaqa_id").in("student_id", ids),
-      admin.from("almaher_students").select("id, name, halaqa_id, almaher_halaqas(term_start)").in("id", ids),
+      admin.from("almaher_students").select("id, name, halaqa_id").in("id", ids),
       admin.from("almaher_sessions").select("student_id, log_date").in("student_id", ids).eq("attended", false),
+      admin.from("almaher_halaqas").select("id, term_start"),
     ]);
+    const termStartOf = new Map((halaqasAll ?? []).map((h) => [h.id, String(h.term_start ?? "")]));
     const nameOf = new Map((students ?? []).map((s) => [s.id, s.name as string]));
-    const termOf = new Map(
-      (students ?? []).map((s) => [s.id, ((s as { almaher_halaqas?: { term_start?: string } | null }).almaher_halaqas?.term_start ?? "") as string])
-    );
+    const termOf = new Map((students ?? []).map((s) => [s.id, termStartOf.get(s.halaqa_id) ?? ""]));
     // عدد غيابات الفصل (بما فيها اللقاء الحالي المعتمَد الآن)
     const absCount = new Map<string, number>();
     for (const a of absences ?? []) {
@@ -265,14 +266,14 @@ Deno.serve(async (req) => {
         if (it.tathbit) parts.push(`📌 تثبيت ${ar(it.tathbit)}`);
         if (it.muraja) parts.push(`🔁 مراجعة ${ar(it.muraja)}`);
         const praise = PRAISE[(seed + it.student_id.charCodeAt(0)) % PRAISE.length];
-        title = `أحسنتِ يا ${name} ✅`;
+        title = name ? `أحسنتِ يا ${name} ✅` : "أحسنتِ ✅";
         text = (parts.length ? `سمّعتِ اليوم: ${parts.join(" · ")}
 ` : "") + praise;
       } else {
         // حالياً رسالة واحدة لكل الغيابات (بقرار الإدارة ١٧ سبتمبر ٢٠٢٦) —
         // التدرّج حسب عدد الغيابات (it.absences) جاهز للتفعيل لاحقاً
         void absCount;
-        title = `افتقدناكِ اليوم يا ${name} 🌸`;
+        title = name ? `افتقدناكِ اليوم يا ${name} 🌸` : "افتقدناكِ اليوم 🌸";
         text = "غبتِ عن لقاء اليوم. حافظي على وردكِ في البيت، وننتظركِ في اللقاء القادم بإذن الله";
       }
       const r = await sendTo(mine, { title, body: text, url: "/", tag: `session-${b.date ?? "x"}` });
