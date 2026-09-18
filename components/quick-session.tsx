@@ -94,10 +94,29 @@ export function QuickSession({
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [saved, setSaved] = useState<number | null>(null);
 
-  const shown = useMemo(
-    () => (groupKey === "all" ? groups : groups.filter((g) => g.key === groupKey)),
-    [groups, groupKey]
-  );
+  // 🔤 ترتيب الطالبات: كما في القائمة (ترتيب الإدخال) أو أبجدياً — يُحفظ على الجهاز
+  const [alpha, setAlpha] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem("almaher_qs_alpha") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggleAlpha = () => {
+    setAlpha((v) => {
+      try {
+        window.localStorage.setItem("almaher_qs_alpha", v ? "0" : "1");
+      } catch {
+        /* لا تخزين */
+      }
+      return !v;
+    });
+  };
+  const shown = useMemo(() => {
+    const gs = groupKey === "all" ? groups : groups.filter((g) => g.key === groupKey);
+    if (!alpha) return gs;
+    return gs.map((g) => ({ ...g, list: [...g.list].sort((a, b) => a.name.localeCompare(b.name, "ar")) }));
+  }, [groups, groupKey, alpha]);
 
   // لكل طالبة: سجلّ هذا التاريخ إن وُجد، والمطلوب القادم، وآخر مقطع حفظ (= التثبيت)
   const info = useMemo(() => {
@@ -308,6 +327,25 @@ export function QuickSession({
                 ))}
               </select>
             </label>
+          </div>
+
+          <div className="mb-2 flex items-center gap-1.5 text-xs">
+            <span className="font-bold text-plum-700">الترتيب:</span>
+            {[
+              { v: false, l: "كما في القائمة" },
+              { v: true, l: "🔤 أبجدي" },
+            ].map((o) => (
+              <button
+                key={String(o.v)}
+                type="button"
+                onClick={() => alpha !== o.v && toggleAlpha()}
+                className={`rounded-full px-3 py-1 font-bold transition ${
+                  alpha === o.v ? "bg-plum-600 text-white" : "bg-cream text-plum-700"
+                }`}
+              >
+                {o.l}
+              </button>
+            ))}
           </div>
 
           <button
