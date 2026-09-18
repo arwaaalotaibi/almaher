@@ -195,12 +195,17 @@ export function QuickSession({
     const next = rangeForFaces(anchorIsTo(s, key) ? cur.to : cur.from, k, modeOf(s, key));
     if (next) setRow(s.id, { edit: { ...st.edit, [key]: next } }, st);
   };
-  /** تحديد الطرف المتحرّك بدقة الآية (النهاية عادةً، والبداية في المراجعة النازلة) */
-  const setEnd = (s: Student, key: PartKey, st: RowState, pos: { surah: number; ayah: number }) => {
+  /** تعديل أي طرف من المقطع بدقة الآية: «من» أو «إلى» (بترتيب المصحف) */
+  const setEdge = (
+    s: Student,
+    key: PartKey,
+    st: RowState,
+    edge: "from" | "to",
+    pos: { surah: number; ayah: number }
+  ) => {
     const cur = rangeOf(s, key, st);
     if (!cur) return;
-    const next = anchorIsTo(s, key) ? { from: pos, to: cur.to } : { from: cur.from, to: pos };
-    setRow(s.id, { edit: { ...st.edit, [key]: next } }, st);
+    setRow(s.id, { edit: { ...st.edit, [key]: { ...cur, [edge]: pos } } }, st);
   };
 
   const sessionNo = termRows?.find((r) => dateKey(r.date) === date)?.n;
@@ -520,7 +525,7 @@ export function QuickSession({
                                         type="button"
                                         onClick={() => setEditing(isEditing ? null : ek)}
                                         className={`w-8 rounded-lg text-sm ${isEditing ? "bg-plum-600 text-white" : "bg-cream text-plum-700"}`}
-                                        aria-label="تعديل آية النهاية"
+                                        aria-label="تعديل بداية المقطع ونهايته"
                                       >
                                         ✏️
                                       </button>
@@ -528,43 +533,54 @@ export function QuickSession({
                                   )}
                                 </div>
                                 {has && on && isEditing && r && (() => {
-                                  const toAnchored = anchorIsTo(s, p.key);
-                                  const fixed = toAnchored ? r.to : r.from;
-                                  const mov = toAnchored ? r.from : r.to;
+                                  // المراجعة النازلة تُعرض من الطرف الأعلى («إلى» في المصحف) إلى الأدنى
+                                  const topFirst = anchorIsTo(s, p.key);
+                                  const edges: { edge: "from" | "to"; label: string; pos: { surah: number; ayah: number } }[] =
+                                    topFirst
+                                      ? [
+                                          { edge: "to", label: "من", pos: r.to },
+                                          { edge: "from", label: "إلى", pos: r.from },
+                                        ]
+                                      : [
+                                          { edge: "from", label: "من", pos: r.from },
+                                          { edge: "to", label: "إلى", pos: r.to },
+                                        ];
                                   return (
-                                  <div className="mt-1 grid grid-cols-[1fr_auto_auto] items-center gap-1.5 rounded-lg bg-cream/60 px-2 py-1.5 text-[11px]">
-                                    <span className="font-bold text-plum-700">
-                                      {`من ${surahName(fixed.surah)} ${ar(fixed.ayah)} — إلى:`}
-                                    </span>
-                                    <select
-                                      className={`${inputCls} py-1 text-[11px]`}
-                                      value={surahName(mov.surah)}
-                                      onChange={(e) =>
-                                        setEnd(s, p.key, st, {
-                                          surah: surahNumber(e.target.value),
-                                          ayah: Math.min(mov.ayah, ayahCount(e.target.value)),
-                                        })
-                                      }
-                                    >
-                                      {SURAHS.map((x) => (
-                                        <option key={x} value={x}>
-                                          {x}
-                                        </option>
-                                      ))}
-                                    </select>
-                                    <select
-                                      className={`${inputCls} py-1 text-[11px]`}
-                                      value={mov.ayah}
-                                      onChange={(e) =>
-                                        setEnd(s, p.key, st, { surah: mov.surah, ayah: Number(e.target.value) })
-                                      }
-                                    >
-                                      {Array.from({ length: ayahCount(surahName(mov.surah)) }, (_, k) => k + 1).map((k) => (
-                                        <option key={k} value={k}>
-                                          {ar(k)}
-                                        </option>
-                                      ))}
-                                    </select>
+                                  <div className="mt-1 grid gap-1 rounded-lg bg-cream/60 px-2 py-1.5 text-[11px]">
+                                    {edges.map((e) => (
+                                      <div key={e.edge} className="grid grid-cols-[2.5rem_1fr_auto] items-center gap-1.5">
+                                        <span className="font-bold text-plum-700">{e.label}:</span>
+                                        <select
+                                          className={`${inputCls} py-1 text-[11px]`}
+                                          value={surahName(e.pos.surah)}
+                                          onChange={(ev) =>
+                                            setEdge(s, p.key, st, e.edge, {
+                                              surah: surahNumber(ev.target.value),
+                                              ayah: Math.min(e.pos.ayah, ayahCount(ev.target.value)),
+                                            })
+                                          }
+                                        >
+                                          {SURAHS.map((x) => (
+                                            <option key={x} value={x}>
+                                              {x}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        <select
+                                          className={`${inputCls} py-1 text-[11px]`}
+                                          value={e.pos.ayah}
+                                          onChange={(ev) =>
+                                            setEdge(s, p.key, st, e.edge, { surah: e.pos.surah, ayah: Number(ev.target.value) })
+                                          }
+                                        >
+                                          {Array.from({ length: ayahCount(surahName(e.pos.surah)) }, (_, k) => k + 1).map((k) => (
+                                            <option key={k} value={k}>
+                                              {ar(k)}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                    ))}
                                   </div>
                                   );
                                 })()}
