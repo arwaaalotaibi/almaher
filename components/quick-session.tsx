@@ -167,10 +167,13 @@ export function QuickSession({
     setRows((r) => ({ ...r, [id]: { ...base, ...patch } }));
   const [editing, setEditing] = useState<string | null>(null); // "studentId:part" المفتوح للتعديل الدقيق
 
-  /** المقطع الفعلي لقسم: المعدَّل إن وُجد، وإلا المطلوب */
+  /** المقطع الفعلي لقسم: المعدَّل الآن إن وُجد، وإلا المحفوظ في سجلّ هذا اللقاء،
+      وإلا المطلوب — حتى لا يعود المقطع المعدَّل إلى «المطلوب» بعد الاعتماد */
   const rangeOf = (s: Student, key: PartKey, st: RowState): PosRange | null => {
     const i = info[s.id];
     if (st.edit?.[key]) return st.edit[key]!;
+    const saved = partRange(i?.existing?.[key] ?? null);
+    if (saved) return saved;
     if (key === "tasmi") return i?.hifz ?? null;
     if (key === "muraja") return i?.mur ?? null;
     return partRange(i?.tathbit ?? null);
