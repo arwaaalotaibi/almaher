@@ -67,6 +67,31 @@ function PlansInner() {
     return { issue, pending, ok, noTerm };
   }, [students, halaqas, support, halaqaId]);
 
+  // 📜 سجلّ كل الملاحظات على الخطط (كل الفصول) مع حالة كل واحدة
+  const history = useMemo(() => {
+    const rows: {
+      m: (typeof support)[number];
+      st: Student | undefined;
+      note: string;
+      term: string;
+      state: "open" | "edited" | "done";
+    }[] = [];
+    for (const m of support) {
+      if (m.kind !== "plan_issue" && m.kind !== "plan_edit") continue;
+      const st = students.find((s) => s.id === m.studentId);
+      if (halaqaId && st && st.halaqaId !== halaqaId) continue;
+      const term = m.body.match(/فصل (\S+):/)?.[1] ?? "";
+      const note = m.body.replace(/^[^:]*:\s*/, "");
+      let state: "open" | "edited" | "done" = "open";
+      if (st?.plan?.confirmedAt && st.plan.confirmedAt > m.createdAt) state = "done";
+      else if (st?.updatedAt && st.updatedAt > m.createdAt) state = "edited";
+      else if (!st) state = "done";
+      rows.push({ m, st, note, term, state });
+    }
+    rows.sort((a, b) => (a.m.createdAt < b.m.createdAt ? 1 : -1));
+    return rows;
+  }, [support, students, halaqaId]);
+
   if (!hydrated) return <main className="mx-auto max-w-2xl px-4 pt-10" />;
 
   const hLabel = (st: Student) => {
@@ -217,6 +242,51 @@ function PlansInner() {
                 {at && <span className="ms-1 text-[10px] text-emerald-700">· {fmtDate(at)}</span>}
               </button>
             ))}
+          </div>
+        )}
+      </section>
+
+      {/* 📜 سجلّ الملاحظات */}
+      <section className="mt-8">
+        <h2 className="mb-1 font-kufi text-base font-bold text-plum-800">
+          📜 سجلّ ملاحظات الخطط ({ar(history.length)})
+        </h2>
+        <p className="mb-2 text-[11px] text-silver-600">
+          كل ما كتبته الطالبات عن خططهن، بما فيه ما عُولج وأُكّد بعد التعديل
+        </p>
+        {history.length === 0 ? (
+          <p className="rounded-xl bg-cream/60 px-3 py-2.5 text-xs text-silver-600">لا ملاحظات مسجّلة</p>
+        ) : (
+          <div className="grid gap-2">
+            {history.map(({ m, st, note, term, state }) => {
+              const badge =
+                state === "done"
+                  ? { t: "✅ عُدّلت وأكّدت", c: "bg-emerald-50 text-emerald-800" }
+                  : state === "edited"
+                    ? { t: "✏️ عُدّلت — بانتظار تأكيدها", c: "bg-plum-50 text-plum-700" }
+                    : { t: "⚠️ قائمة", c: "bg-amber-100 text-amber-900" };
+              return (
+                <div key={m.id} className="rounded-2xl border border-cream-dark bg-white p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => st && setSelected(st)}
+                      className="min-w-0 flex-1 truncate text-start text-sm font-bold text-plum-800"
+                    >
+                      🌸 {st?.name ?? "طالبة محذوفة"}
+                    </button>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${badge.c}`}>
+                      {badge.t}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-silver-600">
+                    {st ? hLabel(st) : ""}
+                    {term ? ` · فصل ${term}` : ""} · {fmtDate(m.createdAt)}
+                  </p>
+                  <p className="mt-1.5 rounded-xl bg-cream/60 px-3 py-2 text-sm text-ink">{note || "—"}</p>
+                </div>
+              );
+            })}
           </div>
         )}
       </section>
