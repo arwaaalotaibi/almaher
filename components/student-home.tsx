@@ -698,6 +698,9 @@ export function StudentHome() {
                           </p>
                         </>
                       )}
+                      {log?.note && (
+                        <p className={`mt-1 text-[11px] ${isCur ? "text-white/85" : "text-amber-800"}`}>📝 {log.note}</p>
+                      )}
                     </div>
                   );
                 })}

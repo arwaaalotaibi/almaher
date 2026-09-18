@@ -536,6 +536,7 @@ export function StudentSheet({
                         (s.murajaah ? facesLabel(s.murajaah) : "—")}{" "}
                     <VerdictChip v={vM} voice="admin" />
                   </p>
+                  {log?.note && <p className="mt-1 text-[11px] text-amber-800">📝 {log.note}</p>}
                 </div>
               );
             })}
