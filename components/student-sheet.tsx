@@ -69,22 +69,12 @@ export function StudentSheet({
 
   const save = () => {
     if (!name.trim()) return;
-    // تغيير بداية الحفظ أو المراجعة يُؤرَّخ بيوم التعديل — فتُطبَّق البداية الجديدة من الآن
-    const today = dateKey(new Date());
-    const p0 = student.plan;
-    const next: CoursePlan = { ...plan };
-    if ((plan.startSurah ?? "") !== (p0.startSurah ?? "") || (plan.startAyah ?? 1) !== (p0.startAyah ?? 1))
-      next.startFrom = today;
-    if (
-      (plan.murStartSurah ?? "") !== (p0.murStartSurah ?? "") ||
-      (plan.murStartAyah ?? 1) !== (p0.murStartAyah ?? 1)
-    )
-      next.murStartFrom = today;
+    // بداية الحفظ/المراجعة تحدّد مقطع أوّل لقاء يُسجَّل فقط؛ وكل لقاء بعده يكمل من سابقه
     actions.updateStudent(student.id, {
       name: name.trim(),
       teacherId,
       halaqaId,
-      plan: next,
+      plan,
       note: note.trim(),
       phone: phone.trim(),
     });
