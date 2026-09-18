@@ -403,7 +403,7 @@ export function QuickSession({
                   const labels: Record<PartKey, string> = {
                     tasmi: recitePartLabel(rangePart(rangeOf(s, "tasmi", st))),
                     tathbit: recitePartLabel(rangePart(rangeOf(s, "tathbit", st))),
-                    muraja: recitePartLabel(rangePart(rangeOf(s, "muraja", st))),
+                    muraja: recitePartLabel(rangePart(rangeOf(s, "muraja", st)), modeOf(s, "muraja") === "pageDesc"),
                   };
                   return (
                     <div
@@ -534,9 +534,7 @@ export function QuickSession({
                                   return (
                                   <div className="mt-1 grid grid-cols-[1fr_auto_auto] items-center gap-1.5 rounded-lg bg-cream/60 px-2 py-1.5 text-[11px]">
                                     <span className="font-bold text-plum-700">
-                                      {toAnchored
-                                        ? `إلى ${surahName(fixed.surah)} ${ar(fixed.ayah)} — من:`
-                                        : `من ${surahName(fixed.surah)} ${ar(fixed.ayah)} — إلى:`}
+                                      {`من ${surahName(fixed.surah)} ${ar(fixed.ayah)} — إلى:`}
                                     </span>
                                     <select
                                       className={`${inputCls} py-1 text-[11px]`}

@@ -3,11 +3,15 @@
 import { useSyncExternalStore } from "react";
 import { ALLOWED_ABSENCES, absenceMessage } from "./absence";
 import { supabase } from "./supabase";
+import { ayahCount } from "./surahs";
 import {
   hifzRangeLabel,
   MUSHAF_PAGES,
   pageOf,
   surahNumber,
+  pageEnd,
+  pageStart,
+  refLabel,
 } from "./mushaf";
 import { descSegments, normalizeDescStart, type Pos as PathPos } from "./hifz-path";
 
@@ -331,7 +335,9 @@ function normPart(p: unknown): RecitePart {
 }
 
 /** نص مقطع قسم: «الملك ١» أو «الملك ١ ← القلم ٥» */
-export function recitePartLabel(part?: RecitePart): string {
+/** نصّ المقطع. `reverse` للمراجعة النازلة بالصفحات: يُكتب من حيث تبدأ الطالبة
+    (الطرف الأعلى) إلى حيث تنتهي: «الناس ١ ← الملك ٣٠» */
+export function recitePartLabel(part?: RecitePart, reverse = false): string {
   if (!part || part.status !== "done" || !part.fromSurah) return "";
   const a = `${part.fromSurah} ${(part.fromAyah ?? 1).toLocaleString("ar-EG")}`;
   const b = `${part.toSurah || part.fromSurah} ${(
@@ -339,7 +345,18 @@ export function recitePartLabel(part?: RecitePart): string {
     part.fromAyah ??
     1
   ).toLocaleString("ar-EG")}`;
-  return a === b ? a : `${a} ← ${b}`;
+  if (a === b) return a;
+  if (!reverse) return `${a} ← ${b}`;
+  // الطرف الأعلى: إن كان آخر آية في سورة قصيرة تقع كلها في صفحة واحدة (الناس ٦) فالسورة
+  // تُراجَع كاملة، فتُكتب من أوّلها: «الناس ١ ← الملك ٣٠»
+  const topSurah = part.toSurah || part.fromSurah;
+  const topAyah = part.toAyah ?? part.fromAyah ?? 1;
+  const sn = surahNumber(topSurah);
+  const top =
+    sn > 0 && topAyah === ayahCount(topSurah) && pageOf(sn, 1) === pageOf(sn, topAyah)
+      ? `${topSurah} ${(1).toLocaleString("ar-EG")}`
+      : b;
+  return `${top} ← ${a}`;
 }
 
 /* ================== التجويد ================== */
@@ -630,6 +647,20 @@ export function buildSchedule(
   const mPage0 = plan.murStartSurah
     ? pageOf(surahNumber(plan.murStartSurah), plan.murStartAyah || 1)
     : 0;
+  // بداية المراجعة النازلة كما أدخلتها الإدارة (الطرف الأعلى للمقطع الأول): «الناس ١»
+  const mStartPos: PathPos | null = plan.murStartSurah
+    ? { surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 }
+    : null;
+  /** نصّ مقطع المراجعة: نازلاً يُكتب من الطرف الأعلى (بداية الإدارة في المقطع الأول،
+      ثم آخر آية في الصفحة) إلى أوّل آية في الصفحة الدنيا؛ صاعداً كالحفظ */
+  const murLabel = (rng: Rng, first: boolean): string => {
+    if (!mDesc) return hifzRangeLabel(rng.from, rng.to);
+    const top = first && mStartPos ? mStartPos : pageEnd(rng.to);
+    const bottom = pageStart(rng.from);
+    const a = refLabel(top.surah, top.ayah);
+    const b = refLabel(bottom.surah, bottom.ayah);
+    return a === b ? a : `${a} ← ${b}`;
+  };
 
   type Rng = { from: number; to: number };
   const empty: Rng = { from: 0, to: 0 };
@@ -724,7 +755,7 @@ export function buildSchedule(
       murajaah: mCount,
       hifzLabel: hLabel,
       tathbitLabel: tLabel,
-      murajaahLabel: mRange.from ? hifzRangeLabel(mRange.from, mRange.to) : "",
+      murajaahLabel: mRange.from ? murLabel(mRange, i === 0) : "",
       cumHifz: ch,
       cumTathbit: ct,
       cumMurajaah: cm,

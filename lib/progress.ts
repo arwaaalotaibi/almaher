@@ -136,8 +136,9 @@ function nextLabel(
     const toPage = pageOf(from.surah, from.ayah);
     const fromPage = Math.max(1, toPage - perH + 1);
     const start = pageStart(fromPage);
-    const a = refLabel(start.surah, start.ayah);
-    const b = refLabel(from.surah, from.ayah);
+    // المراجعة النازلة تُكتب من حيث تبدأ الطالبة فعلاً: «الناس ١ ← الملك ٣٠»
+    const a = refLabel(from.surah, from.ayah);
+    const b = refLabel(start.surah, start.ayah);
     return {
       label: a === b ? a : `${a} ← ${b}`,
       fromPage,

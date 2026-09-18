@@ -270,7 +270,7 @@ export function ReciteHistory({
         const row = rowFor(r.date);
         const done = RECITE_PARTS.map((p) => ({
           p,
-          label: recitePartLabel(r[p.key] as RecitePart),
+          label: recitePartLabel(r[p.key] as RecitePart, p.key === "muraja" && mdesc),
           verdict:
             row && r.attended
               ? partVerdict(

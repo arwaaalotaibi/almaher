@@ -614,7 +614,8 @@ export function StudentHome() {
                   const att = !!log?.attended;
                   const tasmiLabel = log ? recitePartLabel(log.tasmi) : "";
                   const thLabel = log ? recitePartLabel(log.tathbit) : "";
-                  const murLabel = log ? recitePartLabel(log.muraja) : "";
+                  const md = isMurDesc(me.plan);
+                  const murLabel = log ? recitePartLabel(log.muraja, md) : "";
                   // اللقاءات القادمة: المقطع مُسقَط من الموضع الفعلي (كالبطاقة)
                   const pj = !log ? prog.projected[s.n] : undefined;
                   const hifzPlan = pj?.hifzLabel || s.hifzLabel;
@@ -622,7 +623,6 @@ export function StudentHome() {
                   const murPlan = pj?.murajaahLabel || s.murajaahLabel;
                   // حكم كل قسم: أنجزت المطلوب / زادت / ناقص
                   const d = isDesc(me.plan);
-const md = isMurDesc(me.plan);
                   const vH = att && log ? partVerdict(log.tasmi, s.hifz, d) : null;
                   const vT = att && log ? partVerdict(log.tathbit, s.tathbit, d) : null;
                   const vM = att && log ? partVerdict(log.muraja, s.murajaah, md, "muraja") : null;

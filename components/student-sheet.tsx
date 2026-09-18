@@ -446,10 +446,10 @@ export function StudentSheet({
               const att = !!log?.attended;
               const tasmiLabel = log ? recitePartLabel(log.tasmi) : "";
               const thLabel = log ? recitePartLabel(log.tathbit) : "";
-              const murLabel = log ? recitePartLabel(log.muraja) : "";
+              const md = isMurDesc(plan);
+              const murLabel = log ? recitePartLabel(log.muraja, md) : "";
               // حكم كل قسم: أنجزت / زادت / ناقص — مقارنةً بمطلوب اللقاء
               const d = isDesc(plan);
-const md = isMurDesc(plan);
               const vH = att && log ? partVerdict(log.tasmi, s.hifz, d) : null;
               const vT = att && log ? partVerdict(log.tathbit, s.tathbit, d) : null;
               const vM = att && log ? partVerdict(log.muraja, s.murajaah, md, "muraja") : null;
