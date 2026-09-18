@@ -348,7 +348,6 @@ export function StudentSheet({
           </select>
         </Field>
       </div>
-      <StartFromRow value={plan.startFrom} onApply={() => setPlan({ ...plan, startFrom: dateKey(new Date()) })} />
 
       {/* بداية المراجعة */}
       <div className="mb-1 grid grid-cols-2 gap-3">
@@ -392,7 +391,6 @@ export function StudentSheet({
           </select>
         </Field>
       </div>
-      <StartFromRow value={plan.murStartFrom} onApply={() => setPlan({ ...plan, murStartFrom: dateKey(new Date()) })} />
 
       {/* خطة الفصل بالأوجه */}
       <div className="mb-3 rounded-2xl border border-cream-dark p-3">
@@ -566,27 +564,5 @@ export function GoalDots({ student }: { student: Student }) {
   if (!start) return null;
   return (
     <span className="text-[11px] font-normal text-white/80">📖 {start}</span>
-  );
-}
-
-
-/** سطر تحت حقول البداية: من أي تاريخ تُطبَّق البداية، وزر لتطبيقها من اليوم
-    (يتجاهل السجلات الأقدم فلا تُحرّك «المطلوب القادم») */
-function StartFromRow({ value, onApply }: { value?: string; onApply: () => void }) {
-  const today = dateKey(new Date());
-  const label = value
-    ? new Date(value + "T00:00:00").toLocaleDateString("ar-u-ca-gregory-nu-arab", { day: "numeric", month: "long" })
-    : "";
-  return (
-    <div className="-mt-1 mb-3 flex items-center justify-between gap-2 text-[11px]">
-      <span className="text-silver-600">
-        {value ? `🗓 تُطبَّق من ${label} — السجلات الأقدم لا تُحرّكها` : "تُحسب من آخر تسميع مسجّل"}
-      </span>
-      {value !== today && (
-        <button type="button" onClick={onApply} className="shrink-0 font-bold text-plum-700 underline">
-          تطبيق من اليوم
-        </button>
-      )}
-    </div>
   );
 }
