@@ -24,7 +24,7 @@ import {
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 import { ayahCount, SURAHS } from "@/lib/surahs";
-import { computeProgress, partVerdict, sessionVerdict } from "@/lib/progress";
+import { computeProgress, logFaces, partVerdict, sessionVerdict } from "@/lib/progress";
 import { facesLabel } from "@/lib/arabic";
 import { printHifzSchedule } from "@/lib/print-schedule";
 import { DirectionPicker } from "./direction-picker";
@@ -69,7 +69,8 @@ export function StudentSheet({
 
   const save = () => {
     if (!name.trim()) return;
-    // بداية الحفظ/المراجعة تحدّد مقطع أوّل لقاء يُسجَّل فقط؛ وكل لقاء بعده يكمل من سابقه
+    // بداية الحفظ/المراجعة تحدّد مقطع أوّل لقاء في الفصل فقط؛ وكل لقاء بعده يكمل من سابقه.
+    // فإن كان أوّل لقاء مسجّلاً بالفعل، يُضبط طرفُ بدايته على البداية الجديدة (وتُعاد أوجهه)
     actions.updateStudent(student.id, {
       name: name.trim(),
       teacherId,
@@ -78,7 +79,54 @@ export function StudentSheet({
       note: note.trim(),
       phone: phone.trim(),
     });
+    alignFirstSession(plan);
     onClose();
+  };
+
+  /** أوّل لقاء مسجّل هذا الفصل يبدأ دائماً من بداية الخطة — حفظاً ومراجعةً */
+  const alignFirstSession = (p: CoursePlan) => {
+    const termStart = halaqas.find((h) => h.id === halaqaId)?.termStart ?? "";
+    const first = recitations
+      .filter((r) => r.studentId === student.id && r.attended && (!termStart || r.date >= termStart))
+      .sort((a, b) => a.date.localeCompare(b.date))[0];
+    if (!first) return;
+    let changed = false;
+    const tasmi = { ...first.tasmi };
+    if (tasmi.status === "done" && p.startSurah) {
+      const a = p.startAyah || 1;
+      if (tasmi.fromSurah !== p.startSurah || (tasmi.fromAyah ?? 1) !== a) {
+        tasmi.fromSurah = p.startSurah;
+        tasmi.fromAyah = a;
+        changed = true;
+      }
+    }
+    const muraja = { ...first.muraja };
+    if (muraja.status === "done" && p.murStartSurah) {
+      const a = p.murStartAyah || 1;
+      if (isMurDesc(p)) {
+        // المراجعة النازلة بالصفحات: بداية الخطة هي الطرف الأعلى («إلى»)
+        if ((muraja.toSurah || muraja.fromSurah) !== p.murStartSurah || (muraja.toAyah ?? muraja.fromAyah ?? 1) !== a) {
+          muraja.toSurah = p.murStartSurah;
+          muraja.toAyah = a;
+          changed = true;
+        }
+      } else if (muraja.fromSurah !== p.murStartSurah || (muraja.fromAyah ?? 1) !== a) {
+        muraja.fromSurah = p.murStartSurah;
+        muraja.fromAyah = a;
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    const data = {
+      studentId: first.studentId,
+      date: first.date,
+      attended: first.attended,
+      tasmi,
+      tathbit: first.tathbit,
+      muraja,
+      note: first.note ?? "",
+    };
+    actions.updateRecitation(first.id, { ...data, faces: logFaces(data, p) });
   };
 
   const remove = () => {
