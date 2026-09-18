@@ -44,10 +44,16 @@ const cors = {
   "access-control-allow-methods": "POST, OPTIONS",
 };
 
-/** إرسال حمولة إلى مجموعة اشتراكات، مع حذف الاشتراكات الميتة (410/404) */
-async function sendTo(subs: Sub[], payload: Payload): Promise<{ sent: number; removed: number }> {
+/** إرسال حمولة إلى مجموعة اشتراكات، مع حذف الاشتراكات الميتة (410/404)
+    والاشتراكات بمفتاح VAPID قديم (401/403 من خادم الدفع) — التطبيق يعيد الاشتراك تلقائياً عند فتحه */
+async function sendTo(
+  subs: Sub[],
+  payload: Payload
+): Promise<{ sent: number; removed: number; failed: number; errors: string[] }> {
   let sent = 0;
   let removed = 0;
+  let failed = 0;
+  const errors: string[] = [];
   const body = JSON.stringify(payload);
   await Promise.all(
     subs.map(async (s) => {
@@ -60,14 +66,16 @@ async function sendTo(subs: Sub[], payload: Payload): Promise<{ sent: number; re
         sent++;
       } catch (e) {
         const code = (e as { statusCode?: number }).statusCode;
-        if (code === 404 || code === 410) {
+        if (code === 404 || code === 410 || code === 401 || code === 403) {
           await admin.from("almaher_push_subs").delete().eq("endpoint", s.endpoint);
           removed++;
-        }
+        } else failed++;
+        errors.push(`${code ?? "?"} ${(e as Error).message ?? ""}`.slice(0, 120));
+        console.error("push failed", s.student_id, code, (e as Error).message);
       }
     })
   );
-  return { sent, removed };
+  return { sent, removed, failed, errors };
 }
 
 /** دور صاحبة الجلسة (admin / teacher / student / null) ومعرّف الطالبة إن وُجد */
@@ -283,6 +291,8 @@ Deno.serve(async (req) => {
     const seed = (b.date ?? "").split("-").join("").length + items.length;
     let sent = 0;
     let removed = 0;
+    let failed = 0;
+    const errors: string[] = [];
     for (const it of items) {
       const name = nameOf.get(it.student_id) ?? "";
       const mine = (subs ?? []).filter((s) => s.student_id === it.student_id);
@@ -309,8 +319,10 @@ Deno.serve(async (req) => {
       const r = await sendTo(mine, { title, body: text, url: "/", tag: `session-${b.date ?? "x"}` });
       sent += r.sent;
       removed += r.removed;
+      failed += r.failed;
+      errors.push(...r.errors);
     }
-    return json({ ok: true, sent, removed, students: items.length });
+    return json({ ok: true, sent, removed, failed, errors, students: items.length });
   }
 
   return json({ error: "unknown kind" }, 400);

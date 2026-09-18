@@ -67,6 +67,66 @@ export async function getPushState(): Promise<PushState> {
   return "default";
 }
 
+/** هل اشتراك الجهاز مبنيّ على مفتاح VAPID الحالي؟ (اشتراك بمفتاح قديم لا يمكن الإرسال إليه) */
+function subMatchesKey(sub: PushSubscription): boolean {
+  const k = sub.options?.applicationServerKey;
+  if (!k) return true; // متصفح لا يكشفه — نفترض أنه سليم
+  const cur = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+  const got = new Uint8Array(k);
+  if (got.length !== cur.length) return false;
+  for (let i = 0; i < cur.length; i++) if (got[i] !== cur[i]) return false;
+  return true;
+}
+
+/** اشتراك جديد بالمفتاح الحالي وحفظه في قاعدة البيانات */
+async function subscribeAndSave(
+  reg: ServiceWorkerRegistration,
+  studentId: string,
+  halaqaId: string
+): Promise<void> {
+  const sub = await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as BufferSource,
+  });
+  const json = sub.toJSON();
+  // عبر دالة آمنة (SECURITY DEFINER) لتجاوز قيود RLS على الكتابة
+  const { error } = await supabase.rpc("almaher_save_push_sub", {
+    p_endpoint: sub.endpoint,
+    p_p256dh: json.keys?.p256dh ?? "",
+    p_auth: json.keys?.auth ?? "",
+    p_sid: studentId,
+    p_halaqa: halaqaId,
+  });
+  if (error) throw error;
+}
+
+/** مزامنة صامتة عند فتح التطبيق: إن كان الاشتراك بمفتاح قديم (قبل ١٢ سبتمبر ٢٠٢٦)
+    يُستبدل باشتراك جديد دون طلب إذن، وإن كان سليماً يُعاد حفظه ليبقى مرتبطاً بالطالبة الحالية */
+export async function syncPush(studentId: string, halaqaId: string): Promise<void> {
+  if (!pushSupported() || Notification.permission !== "granted") return;
+  const reg = await navigator.serviceWorker.getRegistration();
+  const sub = await reg?.pushManager.getSubscription();
+  if (!reg || !sub) return;
+  try {
+    if (!subMatchesKey(sub)) {
+      await supabase.rpc("almaher_delete_push_sub", { p_endpoint: sub.endpoint });
+      await sub.unsubscribe();
+      await subscribeAndSave(reg, studentId, halaqaId);
+      return;
+    }
+    const json = sub.toJSON();
+    await supabase.rpc("almaher_save_push_sub", {
+      p_endpoint: sub.endpoint,
+      p_p256dh: json.keys?.p256dh ?? "",
+      p_auth: json.keys?.auth ?? "",
+      p_sid: studentId,
+      p_halaqa: halaqaId,
+    });
+  } catch {
+    /* بلا إنترنت أو رفض — نحاول في الفتح القادم */
+  }
+}
+
 /** تفعيل إشعارات الجهاز: إذن + اشتراك + حفظه في قاعدة البيانات */
 export async function enablePush(
   studentId: string,
@@ -88,25 +148,13 @@ export async function enablePush(
   if (!reg) return "unsupported";
   await navigator.serviceWorker.ready;
 
-  const sub =
-    (await reg.pushManager.getSubscription()) ??
-    (await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(
-        VAPID_PUBLIC_KEY
-      ) as BufferSource,
-    }));
-
-  const json = sub.toJSON();
-  // عبر دالة آمنة (SECURITY DEFINER) لتجاوز قيود RLS على الكتابة
-  const { error } = await supabase.rpc("almaher_save_push_sub", {
-    p_endpoint: sub.endpoint,
-    p_p256dh: json.keys?.p256dh ?? "",
-    p_auth: json.keys?.auth ?? "",
-    p_sid: studentId,
-    p_halaqa: halaqaId,
-  });
-  if (error) throw error;
+  // اشتراك قائم بمفتاح قديم يُلغى أولاً — لا يمكن الإرسال إليه
+  const existing = await reg.pushManager.getSubscription();
+  if (existing && !subMatchesKey(existing)) {
+    await supabase.rpc("almaher_delete_push_sub", { p_endpoint: existing.endpoint });
+    await existing.unsubscribe();
+  }
+  await subscribeAndSave(reg, studentId, halaqaId);
   return "subscribed";
 }
 

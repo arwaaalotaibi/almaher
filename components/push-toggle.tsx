@@ -6,6 +6,7 @@ import {
   disablePush,
   enablePush,
   getPushState,
+  syncPush,
   registerServiceWorker,
   type PushState,
 } from "@/lib/push";
@@ -23,8 +24,9 @@ export function PushToggle({
 
   useEffect(() => {
     registerServiceWorker();
-    getPushState().then(setState);
-  }, []);
+    // تصحيح صامت للاشتراكات القديمة ثم قراءة الحالة
+    syncPush(studentId, halaqaId).finally(() => getPushState().then(setState));
+  }, [studentId, halaqaId]);
 
   if (state === null || state === "unsupported") return null;
 

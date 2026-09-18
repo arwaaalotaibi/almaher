@@ -259,10 +259,18 @@ export function QuickSession({
     if (!notify || items.length === 0) return;
     void supabase.functions
       .invoke("almaher-push", { body: { kind: "session", date, items } })
-      .then(({ data }) => {
-        const sent = (data as { sent?: number } | null)?.sent ?? 0;
-        setNotified(sent > 0 ? `🔔 وصل الإشعار إلى ${ar(sent)} جهاز` : "🔕 لا أجهزة مفعّلة الإشعارات لهؤلاء");
-        setTimeout(() => setNotified(null), 3500);
+      .then(({ data, error }) => {
+        const d = (data as { sent?: number; removed?: number; failed?: number } | null) ?? {};
+        const sent = d.sent ?? 0;
+        const dead = (d.removed ?? 0) + (d.failed ?? 0);
+        let msg: string;
+        if (error) msg = "⚠️ تعذّر الاتصال بخدمة الإشعارات — سُجّل اللقاء دون إشعار";
+        else if (sent > 0)
+          msg = `🔔 وصل الإشعار إلى ${ar(sent)} جهاز` + (dead ? ` · ⚠️ ${ar(dead)} اشتراك قديم أُلغي (يُجدَّد عند فتح التطبيق)` : "");
+        else if (dead) msg = `⚠️ لم يصل الإشعار: ${ar(dead)} اشتراك قديم أُلغي — يُجدَّد تلقائياً عند فتح الطالبة التطبيق`;
+        else msg = "🔕 لا أجهزة مفعّلة الإشعارات لهؤلاء";
+        setNotified(msg);
+        setTimeout(() => setNotified(null), 6000);
       })
       .catch(() => setNotified("تعذّر إرسال الإشعار"));
   };
