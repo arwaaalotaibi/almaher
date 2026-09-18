@@ -80,7 +80,7 @@ export default function Home() {
           className="card col-span-2 flex items-center justify-between gap-3 rounded-2xl bg-plum-800 px-5 py-4 text-white transition active:scale-[0.98]"
         >
           <span>
-            <span className="block font-kufi text-base font-bold">👩‍💼 لوحة المديرة</span>
+            <span className="block font-kufi text-base font-bold">📈 نبض الماهر</span>
             <span className="block text-[11px] text-white/80">نتائج السباق · كمية التسميع · الحضور · من تحتاج متابعة</span>
           </span>
           <span className="text-xl">‹</span>

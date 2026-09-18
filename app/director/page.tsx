@@ -33,7 +33,7 @@ const PERIODS: { key: PeriodKey; label: string }[] = [
 
 type SortKey = "points" | "hifz" | "mur" | "attend" | "name";
 
-/** 👩‍💼 لوحة المديرة — نظرة واحدة على كل الحلقات: نتائج السباق، كمية التسميع،
+/** 📈 نبض الماهر (شاشة المديرة) — نظرة واحدة على كل الحلقات: نتائج السباق، كمية التسميع،
     الحضور، ومن تحتاج متابعة. مختصرة في الأعلى وتفصيلية في الأسفل. */
 export default function DirectorPage() {
   return (
@@ -189,7 +189,7 @@ function DirectorInner() {
 
   const exportCsv = () => {
     const list = halaqaId ? reports.filter((r) => r.student.halaqaId === halaqaId) : reports;
-    downloadCsv(reportsToCsv(list), `تقرير-المديرة-${dateKey(new Date())}.csv`);
+    downloadCsv(reportsToCsv(list), `نبض-الماهر-${dateKey(new Date())}.csv`);
   };
 
   const Section = ({ title, children, hint }: { title: string; hint?: string; children: React.ReactNode }) => (
@@ -236,7 +236,7 @@ function DirectorInner() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
-      <PageHeader title="👩‍💼 لوحة المديرة" back="/" />
+      <PageHeader title="📈 نبض الماهر" back="/" />
 
       {/* النطاق والفترة */}
       <div className="mb-2 flex flex-wrap gap-1.5">
