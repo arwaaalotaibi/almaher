@@ -76,6 +76,16 @@ export default function Home() {
       {/* أقسام إضافية (البقية في الشريط السفلي) */}
       <div className="mt-6 grid grid-cols-2 gap-3">
         <Link
+          href="/director"
+          className="card col-span-2 flex items-center justify-between gap-3 rounded-2xl bg-plum-800 px-5 py-4 text-white transition active:scale-[0.98]"
+        >
+          <span>
+            <span className="block font-kufi text-base font-bold">👩‍💼 لوحة المديرة</span>
+            <span className="block text-[11px] text-white/80">نتائج السباق · كمية التسميع · الحضور · من تحتاج متابعة</span>
+          </span>
+          <span className="text-xl">‹</span>
+        </Link>
+        <Link
           href="/dashboard"
           className="card flex flex-col items-center gap-1.5 rounded-2xl py-4 transition active:scale-[0.97]"
         >
