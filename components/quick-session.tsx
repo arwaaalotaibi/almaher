@@ -396,11 +396,33 @@ export function QuickSession({
             من لها سجلّ لهذا اللقاء تظهر عليها «مسجّل ✓» ويُحدَّث.
           </p>
 
+          {/* عدّاد التسجيل: كم طالبة لها سجلّ لهذا اللقاء من مجموع الطالبات */}
+          {(() => {
+            const all = shown.flatMap((g) => g.list);
+            const recorded = all.filter((s) => !!info[s.id]?.existing).length;
+            const done = recorded === all.length;
+            return (
+              <p
+                className={`mb-2 rounded-xl px-3 py-2 text-center text-xs font-bold ${
+                  done ? "bg-emerald-50 text-emerald-800" : "bg-plum-50 text-plum-800"
+                }`}
+              >
+                {done ? "✅" : "🧮"} تم تسجيل {ar(recorded)} من {ar(all.length)} طالبة
+                {!done && ` — بقي ${ar(all.length - recorded)}`}
+              </p>
+            );
+          })()}
+
           <div className="grid gap-2">
             {shown.map((g) => (
               <div key={g.key}>
                 {groupKey === "all" && (
-                  <p className="mb-1 mt-2 text-xs font-bold text-plum-700">👩‍🏫 {g.title}</p>
+                  <p className="mb-1 mt-2 text-xs font-bold text-plum-700">
+                    👩‍🏫 {g.title}
+                    <span className="ms-1.5 font-normal text-silver-600">
+                      ({ar(g.list.filter((s) => !!info[s.id]?.existing).length)} من {ar(g.list.length)})
+                    </span>
+                  </p>
                 )}
                 {g.list.map((s) => {
                   const i = info[s.id];
