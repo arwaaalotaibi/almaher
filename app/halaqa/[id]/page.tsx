@@ -72,6 +72,7 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
   const [newName, setNewName] = useState("");
   const [newTeacher, setNewTeacher] = useState("");
   const [showCodes, setShowCodes] = useState(false);
+  const [planOpen, setPlanOpen] = useState(false); // 📅 خطة الفصل مطوية افتراضياً
   const [copied, setCopied] = useState<string | null>(null); // آخر ما نُسخ من الرموز
   const copyText = async (text: string, key: string) => {
     try {
@@ -212,12 +213,28 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
         {studentCountLabel(halaqaStudents.length)}
       </p>
 
-      {/* إعدادات الفصل — تُضبط مرة وتُطبَّق على جدول كل طالبة */}
+      {/* إعدادات الفصل — تُضبط مرة وتُطبَّق على جدول كل طالبة (مطوية افتراضياً) */}
       <div className="card mb-4 rounded-2xl p-4">
-        <p className="mb-3 font-kufi text-sm font-bold text-plum-800">
-          📅 خطة الفصل
-        </p>
-        <div className="grid grid-cols-3 gap-2">
+        <button
+          type="button"
+          onClick={() => setPlanOpen((o) => !o)}
+          className="flex w-full items-center justify-between"
+        >
+          <span className="font-kufi text-sm font-bold text-plum-800">📅 خطة الفصل</span>
+          <span className="text-plum-600">{planOpen ? "▴" : "▾"}</span>
+        </button>
+        {!planOpen && (
+          <p className="mt-1 text-[11px] text-silver-600">
+            {[
+              halaqa.day ? `يوم ${halaqa.day}` : "اليوم غير محدد",
+              halaqa.termStart
+                ? `تبدأ ${new Date(halaqa.termStart + "T00:00:00").toLocaleDateString("ar-u-ca-gregory-nu-arab", { day: "numeric", month: "long" })}`
+                : "بداية الفصل غير محددة",
+              halaqa.termSessions ? `${halaqa.termSessions.toLocaleString("ar-EG")} لقاءً` : "عدد اللقاءات غير محدد",
+            ].join(" · ")}
+          </p>
+        )}
+        <div className={planOpen ? "mt-3 grid grid-cols-3 gap-2" : "hidden"}>
           <label className="block">
             <span className="mb-1 block text-xs font-bold text-plum-700">
               يوم الحلقة
@@ -270,7 +287,7 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
         </div>
 
         {/* المحطتان الذهبيتان بعد اللقاءات — تظهران على درب حفظ كل طالبة مع عدّ تنازلي */}
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className={planOpen ? "mt-3 grid grid-cols-2 gap-2" : "hidden"}>
           <label className="block">
             <span className="mb-1 block text-xs font-bold text-plum-700">
               🎙️ يوم السرد القرآني
@@ -298,10 +315,12 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
             />
           </label>
         </div>
-        <p className="mt-2 text-[11px] text-silver-600">
-          أوجه الحفظ/التثبيت/المراجعة لكل طالبة تُدخل من بيانات الطالبة، ويولّد
-          النظام جدولها تلقائياً.
-        </p>
+        {planOpen && (
+          <p className="mt-2 text-[11px] text-silver-600">
+            أوجه الحفظ/التثبيت/المراجعة لكل طالبة تُدخل من بيانات الطالبة، ويولّد
+            النظام جدولها تلقائياً.
+          </p>
+        )}
       </div>
 
       {/* 📋 التسجيل السريع للقاء كامل */}
