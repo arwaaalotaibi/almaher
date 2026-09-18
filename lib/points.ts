@@ -48,6 +48,7 @@ export function computeRace(
 
   const entries: RaceEntry[] = [];
   for (const st of students) {
+    if (st.plan?.withdrawnAt) continue; // 🚪 منسحبة
     const h = halaqaOf.get(st.halaqaId);
     const mosque = h?.mosque ?? "";
     if (opts.mosque && mosque !== opts.mosque) continue;

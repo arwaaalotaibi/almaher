@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  activeStudents,
   dateKey,
   halaqaTitle,
   isDesc,
@@ -45,7 +46,8 @@ export default function DirectorPage() {
 
 function DirectorInner() {
   const state = useApp();
-  const { students, halaqas, recitations, readingProgress, tajweedResults } = state;
+  const { halaqas, recitations, readingProgress, tajweedResults } = state;
+  const students = useMemo(() => activeStudents(state.students), [state.students]);
   const hydrated = useHydrated();
   const [halaqaId, setHalaqaId] = useState("");
   const [period, setPeriod] = useState<PeriodKey>("term");

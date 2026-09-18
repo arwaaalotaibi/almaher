@@ -178,7 +178,8 @@ Deno.serve(async (req) => {
     let sent = 0;
     let removed = 0;
     for (const s of subs ?? []) {
-      const p = planOf.get(s.student_id) as { hifz?: number; murajaah?: number } | undefined;
+      const p = planOf.get(s.student_id) as { hifz?: number; murajaah?: number; withdrawnAt?: string } | undefined;
+      if (p?.withdrawnAt) continue; // 🚪 منسحبة
       const parts: string[] = [];
       if (p?.hifz) parts.push(`📖 حفظ ${ar(p.hifz)}`);
       if (p?.murajaah) parts.push(`🔁 مراجعة ${ar(p.murajaah)}`);
@@ -227,7 +228,12 @@ Deno.serve(async (req) => {
     }
     let q = admin.from("almaher_push_subs").select("endpoint,p256dh,auth,student_id,halaqa_id");
     if (a.halaqa_id) q = q.eq("halaqa_id", a.halaqa_id);
-    const { data: subs } = await q;
+    const [{ data: subsAll }, { data: withdrawn }] = await Promise.all([
+      q,
+      admin.from("almaher_students").select("id").not("plan->>withdrawnAt", "is", null),
+    ]);
+    const gone = new Set((withdrawn ?? []).map((x) => x.id as string));
+    const subs = (subsAll ?? []).filter((s) => !gone.has(s.student_id)); // 🚪 المنسحبات لا يصلهن الإعلان
     const title = a.type === "important" ? "⚠️ إعلان مهم من الماهر" : a.type === "reminder" ? "⏰ تذكير من الماهر" : "📢 إعلان من الماهر";
     const text = String(a.body ?? "");
     const r = await sendTo(subs ?? [], {

@@ -47,7 +47,7 @@ export function buildReports(s: AppState): StudentReport[] {
   const weekCut = sinceDays(7);
   const today = dateKey(new Date());
 
-  return s.students.map((st) => {
+  return s.students.filter((st) => !st.plan?.withdrawnAt).map((st) => {
     const halaqa = s.halaqas.find((h) => h.id === st.halaqaId);
     const teacher = s.teachers.find((t) => t.id === st.teacherId);
     const mine = s.recitations

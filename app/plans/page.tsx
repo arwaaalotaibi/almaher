@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import {
+  activeStudents,
   halaqaTitle,
   lastPlanIssue,
   planConfirmMark,
@@ -32,7 +33,8 @@ export default function PlansPage() {
 }
 
 function PlansInner() {
-  const { students, halaqas, support } = useApp();
+  const { students: allStudents, halaqas, support } = useApp();
+  const students = useMemo(() => activeStudents(allStudents), [allStudents]);
   const hydrated = useHydrated();
   const [halaqaId, setHalaqaId] = useState("");
   const [selected, setSelected] = useState<Student | null>(null);

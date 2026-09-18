@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { halaqaTitle, useApp, whatsappLink, type Student } from "@/lib/store";
+import {
+  activeStudents, halaqaTitle, useApp, whatsappLink, type Student } from "@/lib/store";
 import { ALLOWED_ABSENCES, termAbsenceDates } from "@/lib/absence";
 import { PageHeader, useHydrated } from "@/components/ui";
 import { RoleOnly } from "@/components/admin-only";
@@ -36,7 +37,8 @@ const TIERS: { n: number; label: string; hint: string; cls: string; chip: string
 ];
 
 function AbsencesInner() {
-  const { students, halaqas, recitations } = useApp();
+  const { students: allStudents, halaqas, recitations } = useApp();
+  const students = useMemo(() => activeStudents(allStudents), [allStudents]);
   const hydrated = useHydrated();
   const [halaqaId, setHalaqaId] = useState("");
   const [selected, setSelected] = useState<Student | null>(null);

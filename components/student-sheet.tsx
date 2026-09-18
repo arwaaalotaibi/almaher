@@ -46,6 +46,8 @@ export function StudentSheet({
   const [halaqaId, setHalaqaId] = useState("");
   const [note, setNote] = useState("");
   const [phone, setPhone] = useState("");
+  const [withdrawing, setWithdrawing] = useState(false); // 🚪 نموذج الانسحاب مفتوح
+  const [withdrawReason, setWithdrawReason] = useState("");
   const [plan, setPlan] = useState<CoursePlan>({ ...EMPTY_PLAN });
   const [copied, setCopied] = useState(false);
   const [msgOpen, setMsgOpen] = useState(false); // ✉️ رسالة خاصة للطالبة
@@ -59,6 +61,8 @@ export function StudentSheet({
       setHalaqaId(student.halaqaId);
       setPlan({ ...EMPTY_PLAN, ...student.plan });
       setNote(student.note ?? "");
+      setWithdrawing(false);
+      setWithdrawReason("");
       setPhone(student.phone ?? "");
     }
   }, [student]);
@@ -590,6 +594,84 @@ export function StudentSheet({
       )}
 
       <PrimaryBtn onClick={save}>حفظ البيانات</PrimaryBtn>
+
+      {/* 🚪 الانسحاب — بدل الحذف: يبقى السجلّ ويمكن الرجوع */}
+      <div className="mt-4 rounded-2xl border border-cream-dark p-3">
+        {student.plan.withdrawnAt ? (
+          <>
+            <p className="text-sm font-bold text-red-800">
+              🚪 منسحبة منذ{" "}
+              {new Date(student.plan.withdrawnAt + "T00:00:00").toLocaleDateString("ar-u-ca-gregory-nu-arab", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
+            </p>
+            {student.plan.withdrawReason && (
+              <p className="mt-1 text-xs text-silver-600">السبب: {student.plan.withdrawReason}</p>
+            )}
+            <p className="mt-1 text-[11px] text-silver-600">
+              لا تظهر في تسجيل اللقاء ولا السباق ولا الإشعارات، وسجلّها محفوظ.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                const { withdrawnAt: _w, withdrawReason: _r, ...rest } = student.plan;
+                void _w;
+                void _r;
+                actions.updateStudent(student.id, { plan: rest });
+                onClose();
+              }}
+              className="mt-2 w-full rounded-xl bg-emerald-500 py-2 text-sm font-bold text-white"
+            >
+              ↩️ إعادة تفعيلها
+            </button>
+          </>
+        ) : !withdrawing ? (
+          <button
+            type="button"
+            onClick={() => setWithdrawing(true)}
+            className="w-full rounded-xl bg-amber-50 py-2 text-sm font-bold text-amber-900 ring-1 ring-amber-300"
+          >
+            🚪 تسجيل انسحاب
+          </button>
+        ) : (
+          <>
+            <p className="mb-1 text-sm font-bold text-amber-900">🚪 سبب الانسحاب (اختياري)</p>
+            <textarea
+              className={`${inputCls} min-h-16`}
+              value={withdrawReason}
+              onChange={(e) => setWithdrawReason(e.target.value)}
+              placeholder="مثال: ظروف دراسية، انتقال، …"
+            />
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setWithdrawing(false)}
+                className="rounded-xl bg-white py-2 text-sm font-bold text-plum-700 ring-1 ring-cream-dark"
+              >
+                رجوع
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  actions.updateStudent(student.id, {
+                    plan: { ...student.plan, withdrawnAt: dateKey(new Date()), withdrawReason: withdrawReason.trim() },
+                  });
+                  onClose();
+                }}
+                className="rounded-xl bg-amber-500 py-2 text-sm font-bold text-white"
+              >
+                تأكيد الانسحاب
+              </button>
+            </div>
+            <p className="mt-2 text-[11px] text-silver-600">
+              تُستثنى من القوائم والسباق والإشعارات، ويبقى سجلّها. يمكن إعادة تفعيلها في أي وقت.
+            </p>
+          </>
+        )}
+      </div>
+
       <div className="mt-2">
         <DangerBtn onClick={remove}>حذف الطالبة</DangerBtn>
       </div>

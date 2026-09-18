@@ -54,6 +54,10 @@ export interface CoursePlan {
   startAyah?: number; // بداية الحفظ: رقم الآية (في النازل: آخر آية تُحفظ أولاً — حافة الحفظ)
   murStartSurah?: string; // بداية المراجعة: السورة
   murStartAyah?: number; // بداية المراجعة: رقم الآية
+  /** 🚪 الانسحاب: تاريخ تسجيله (yyyy-mm-dd) وسببه — تُستثنى المنسحبة من القوائم والسباق
+      والإشعارات، ويبقى سجلّها محفوظاً ويمكن إعادة تفعيلها */
+  withdrawnAt?: string;
+  withdrawReason?: string;
   // تأكيد الفصل من الطالبة (تكتبها الدالة الآمنة almaher_confirm_plan)
   confirmedTerm?: string; // بداية الفصل الذي أكّدت خطته
   confirmedAt?: string;
@@ -417,6 +421,11 @@ export const SUPPORT_KIND_META: Record<SupportKind, { icon: string; label: strin
 export function planIssueBody(termStart: string, note: string): string {
   return `⚠️ خطأ في خطة فصل ${termStart}: ${note.trim()}`;
 }
+
+/** هل الطالبة منسحبة؟ (تُستثنى من القوائم النشطة والسباق والإشعارات) */
+export const isWithdrawn = (s: Pick<Student, "plan">): boolean => !!s.plan?.withdrawnAt;
+/** الطالبات النشطات فقط */
+export const activeStudents = <T extends Pick<Student, "plan">>(list: T[]): T[] => list.filter((s) => !isWithdrawn(s));
 
 /** آخر بلاغ خطأ للطالبة عن خطة هذا الفصل (أو null) */
 export function lastPlanIssue(

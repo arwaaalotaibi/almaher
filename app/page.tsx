@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ALLOWED_ABSENCES, termAbsenceDates } from "@/lib/absence";
-import { planConfirmMark, studentCountLabel, useApp } from "@/lib/store";
+import { isWithdrawn, planConfirmMark, studentCountLabel, useApp } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import { Ribbon, useHydrated } from "@/components/ui";
 import { useRole } from "@/components/auth-gate";
@@ -11,7 +11,8 @@ import { StudentHome } from "@/components/student-home";
 
 export default function Home() {
   const role = useRole();
-  const { halaqas, students, support, recitations } = useApp();
+  const { halaqas, students: allStudents, support, recitations } = useApp();
+  const students = allStudents.filter((s) => !isWithdrawn(s)); // 🚪 المنسحبات خارج العدّ والتنبيهات
   // طالبات بلغن الحدّ المسموح من الغياب (٣) أو تجاوزنه هذا الفصل
   const absenceAlerts = students.filter(
     (s) => termAbsenceDates(recitations, s.id, halaqas.find((h) => h.id === s.halaqaId)?.termStart).length >= ALLOWED_ABSENCES

@@ -22,6 +22,7 @@ import {
   whatsappLink,
   type CoursePlan,
   type Student,
+  isWithdrawn,
 } from "@/lib/store";
 import { computeProgress } from "@/lib/progress";
 import { surahName } from "@/lib/mushaf";
@@ -61,8 +62,13 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
   const hydrated = useHydrated();
 
   const halaqa = halaqas.find((h) => h.id === id);
+  // طالبات الحلقة النشطات (المنسحبات في قسم منفصل أسفل الصفحة)
   const halaqaStudents = useMemo(
-    () => students.filter((s) => s.halaqaId === id),
+    () => students.filter((s) => s.halaqaId === id && !isWithdrawn(s)),
+    [students, id]
+  );
+  const withdrawnStudents = useMemo(
+    () => students.filter((s) => s.halaqaId === id && isWithdrawn(s)),
     [students, id]
   );
   const halaqaTeachers = teachers.filter((t) => t.halaqaIds.includes(id));
@@ -685,6 +691,24 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
       </Sheet>
 
       {/* النسخة الحيّة من الطالبة (بعد الحفظ) لا اللقطة وقت الضغط */}
+      {withdrawnStudents.length > 0 && (
+        <section className="mb-6">
+          <h2 className="mb-2 font-kufi text-sm font-bold text-silver-600">
+            🚪 المنسحبات ({withdrawnStudents.length.toLocaleString("ar-EG")})
+          </h2>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {withdrawnStudents.map((s) => (
+              <NameBox key={s.id} onClick={() => setSelected(s)} className="opacity-60 grayscale">
+                {s.name}
+                <span className="block text-[10px] font-normal text-white/80">
+                  منسحبة{s.plan.withdrawReason ? ` · ${s.plan.withdrawReason}` : ""}
+                </span>
+              </NameBox>
+            ))}
+          </div>
+        </section>
+      )}
+
       <StudentSheet
         student={selected ? (students.find((s) => s.id === selected.id) ?? selected) : null}
         onClose={() => setSelected(null)}

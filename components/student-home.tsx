@@ -166,6 +166,24 @@ export function StudentHome() {
     );
   }
 
+  // 🚪 منسحبة: شاشة توضيح فقط
+  if (me.plan?.withdrawnAt) {
+    return (
+      <main className="mx-auto flex min-h-dvh max-w-2xl flex-col items-center justify-center px-4 py-10 text-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.png" alt="الماهر" className="mb-4 h-16 w-auto" />
+        <h1 className="font-kufi text-xl font-bold text-plum-800">{me.name} 🌸</h1>
+        <p className="mt-3 rounded-2xl bg-cream px-5 py-4 text-sm font-bold text-plum-700">
+          تم تسجيل انسحابكِ من الحلقة. نسأل الله أن يبارك فيكِ وييسّر لكِ العودة.
+          <span className="mt-1 block text-xs font-medium text-silver-600">للعودة تواصلي مع الإدارة</span>
+        </p>
+        <button type="button" onClick={logout} className="mt-5 text-sm font-bold text-plum-700 underline">
+          الدخول برمز آخر
+        </button>
+      </main>
+    );
+  }
+
   // إقرار اللائحة: لا تدخل الطالبة قبل أن تقرّ بجميع البنود
   if (me.agreedVersion !== TERMS_VERSION) {
     return <TermsGate student={me} onLogout={logout} />;

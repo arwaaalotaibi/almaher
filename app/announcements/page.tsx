@@ -3,6 +3,7 @@
 import { confirmDanger } from "@/lib/confirm";
 import { useState } from "react";
 import {
+  isWithdrawn,
   actions,
   formatNotifDate,
   halaqaTitle,
@@ -32,7 +33,8 @@ export default function AnnouncementsPage() {
 }
 
 function AnnouncementsInner() {
-  const { halaqas, announcements, students, notifReads } = useApp();
+  const { halaqas, announcements, students: allStudents, notifReads } = useApp();
+  const students = allStudents.filter((s) => !isWithdrawn(s)); // 🚪 المنسحبات خارج عدد المستلمات
   const hydrated = useHydrated();
   const [body, setBody] = useState("");
   const [target, setTarget] = useState(""); // "" = كل الطالبات
