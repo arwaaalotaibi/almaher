@@ -305,7 +305,7 @@ function HalaqaInner({ params }: { params: Promise<{ id: string }> }) {
       </div>
 
       {/* 📋 التسجيل السريع للقاء كامل */}
-      <QuickSession halaqa={halaqa} groups={groups} />
+      <QuickSession halaqa={halaqa} groups={groups} onOpenStudent={setSelected} />
 
       {/* انتهى الفصل — بدء فصل جديد */}
       {termEnded && (

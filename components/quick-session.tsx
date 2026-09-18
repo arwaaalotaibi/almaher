@@ -74,9 +74,12 @@ function rangePart(r: PosRange | null): RecitePart {
 export function QuickSession({
   halaqa,
   groups,
+  onOpenStudent,
 }: {
   halaqa: Halaqa;
   groups: { key: string; title: string; list: Student[] }[];
+  /** الضغط على اسم الطالبة يفتح ملفها (بطاقتها) */
+  onOpenStudent?: (s: Student) => void;
 }) {
   const { recitations } = useApp();
   const termRows = useMemo(() => buildSchedule(halaqa, EMPTY_PLAN), [halaqa]);
@@ -402,14 +405,20 @@ export function QuickSession({
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="min-w-0 truncate text-sm font-bold text-plum-800">
+                        <button
+                          type="button"
+                          onClick={() => onOpenStudent?.(s)}
+                          disabled={!onOpenStudent}
+                          title="فتح ملف الطالبة"
+                          className="min-w-0 truncate text-start text-sm font-bold text-plum-800 enabled:underline enabled:decoration-plum-300 enabled:decoration-dotted enabled:underline-offset-4"
+                        >
                           {s.name}
                           {i.existing && (
                             <span className="ms-1.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
                               مسجّل ✓
                             </span>
                           )}
-                        </span>
+                        </button>
                         <span className="flex shrink-0 items-center gap-1.5">
                           <button
                             type="button"
