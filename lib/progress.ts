@@ -435,8 +435,12 @@ export function computeProgress(
     .filter((r) => r.studentId === student.id)
     .sort((a, b) => b.date.localeCompare(a.date));
 
+  // إن غيّرت الإدارة بداية الحفظ/المراجعة في تاريخ ما، فالسجلات الأقدم منه لا تحدّد الحافة
+  const hifzLogs = plan.startFrom ? mine.filter((r) => r.date >= plan.startFrom!) : mine;
+  const murLogs = plan.murStartFrom ? mine.filter((r) => r.date >= plan.murStartFrom!) : mine;
+
   // حافة الحفظ (آية) من سجلّ التسميع، وصفحتها
-  const lastTasmi = furthestEnd(mine.map((r) => ({ part: r.tasmi })), hMode);
+  const lastTasmi = furthestEnd(hifzLogs.map((r) => ({ part: r.tasmi })), hMode);
   const currentPage = lastTasmi ? pageOf(lastTasmi.surah, lastTasmi.ayah) : 0;
   // صفحات قُطعت من أوّل المصحف في اتجاهها (نازلاً: من ٦٠٤ هبوطاً)
   const pagesReached = currentPage
@@ -531,7 +535,7 @@ export function computeProgress(
   const nextToPage = nh.toPage;
 
   // المطلوب القادم للمراجعة = من الآية التي تلي (أو تسبق) حافة المراجعة
-  const lastMuraja = furthestEnd(mine.map((r) => ({ part: r.muraja })), mMode);
+  const lastMuraja = furthestEnd(murLogs.map((r) => ({ part: r.muraja })), mMode);
   const perMplan = Math.max(0, Math.round(plan.murajaah || 0));
   const murStartPos: Pos | null = plan.murStartSurah
     ? { surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 }
@@ -617,7 +621,7 @@ export function computeProgress(
     let hFrom: Pos | null = nextHifzFrom;
     let mFrom: Pos | null = nextMurFrom;
     // تثبيت أول لقاء قادم = آخر مقطع سُمّع حفظاً فعلاً
-    const lastTasmiLog = mine.find((r) => r.tasmi.status === "done");
+    const lastTasmiLog = hifzLogs.find((r) => r.tasmi.status === "done");
     let prevHifz = recitePartLabel(lastTasmiLog?.tasmi);
     for (let n = nextIdx; n <= schedule.length; n++) {
       const nh2 = nextLabel(hFrom, perHplan, hMode);

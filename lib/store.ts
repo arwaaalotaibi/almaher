@@ -50,6 +50,10 @@ export interface CoursePlan {
   startAyah?: number; // بداية الحفظ: رقم الآية (في النازل: آخر آية تُحفظ أولاً — حافة الحفظ)
   murStartSurah?: string; // بداية المراجعة: السورة
   murStartAyah?: number; // بداية المراجعة: رقم الآية
+  /** تاريخ آخر تغيير لبداية الحفظ/المراجعة من الإدارة (yyyy-mm-dd): السجلات الأقدم منه
+      لا تُحرّك «المطلوب القادم» — فتُطبَّق البداية الجديدة فعلاً بدل الاستمرار من آخر تسميع */
+  startFrom?: string;
+  murStartFrom?: string;
   // تأكيد الفصل من الطالبة (تكتبها الدالة الآمنة almaher_confirm_plan)
   confirmedTerm?: string; // بداية الفصل الذي أكّدت خطته
   confirmedAt?: string;
