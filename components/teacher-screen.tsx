@@ -74,6 +74,30 @@ export function TeacherScreen({ teacher, onLogout }: { teacher: Teacher; onLogou
         </p>
       </div>
 
+      {/* ❓ دليل مختصر لتسجيل اللقاء */}
+      <details className="mb-5 rounded-2xl bg-white shadow-sm ring-1 ring-cream-dark open:pb-2">
+        <summary className="cursor-pointer list-none px-4 py-3 font-kufi text-base font-bold text-plum-800">
+          ❓ كيف أسجّل تسميع اللقاء؟ <span className="float-start text-plum-500">▾</span>
+        </summary>
+        <ol className="grid gap-2 px-4 pb-2 text-sm leading-relaxed text-ink">
+          {[
+            ["📋", "تحت اسم حلقتكِ بطاقة «تسجيل تسميع اللقاء»، واللقاء الحالي مختار تلقائياً. لتسجيل لقاء آخر غيّريه من قائمة «اللقاء»."],
+            ["✅", "كل طالبة تظهر «حاضرة ✓» وقد سمّعت وردها كاملاً كما في خطتها. من غابت اضغطي الزر ليصير «غائبة ✗»."],
+            ["➖➕", "من سمّعت أقل أو أكثر من المطلوب: زرا − و+ يغيّران عدد الأوجه، و✏️ يحدّد آية النهاية بدقة."],
+            ["🔘", "لم تسمّع قسماً (حفظ أو تثبيت أو مراجعة)؟ اضغطي على القسم نفسه ليُطفأ."],
+            ["📝", "زر 📝 لكتابة ملاحظة على لقاء الطالبة، تراها هي والإدارة."],
+            ["💾", "اضغطي «اعتماد» عند كل طالبة بعد ضبطها، أو «حفظ الجميع» في الأسفل دفعة واحدة. يظهر «تم ✓» وتصير الطالبة «مسجّل ✓»."],
+            ["🔔", "مع كل اعتماد يصل الطالبة إشعار تشجيع أو رسالة غياب، ما دام زر الإشعار مفعّلاً."],
+            ["🔁", "للتصحيح: افتحي اللقاء نفسه، عدّلي، واضغطي «اعتماد» من جديد."],
+          ].map(([icon, text], i) => (
+            <li key={i} className="flex gap-2">
+              <span className="w-8 shrink-0 text-center">{icon}</span>
+              <span>{text}</span>
+            </li>
+          ))}
+        </ol>
+      </details>
+
       {herHalaqas.map((h) => {
         const list = mine(h);
         const extra = orphans(h);
