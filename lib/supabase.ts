@@ -15,7 +15,7 @@ export const ROLE_EMAILS: Record<Exclude<Role, "student">, string> = {
 
 export const ROLE_META: Record<Role, { label: string; icon: string; hint: string }> = {
   admin: { label: "الإدارة", icon: "🗝️", hint: "إدارة الحلقات والمعلّمات والطالبات" },
-  teacher: { label: "المعلّمات", icon: "👩‍🏫", hint: "إدخال بيانات طالباتك وأهدافهن" },
+  teacher: { label: "المعلّمات", icon: "👩‍🏫", hint: "أدخلي رمزك الخاص من الإدارة لتسجيل تسميع طالباتك" },
   student: { label: "الطالبات", icon: "🌸", hint: "أدخلي رمزك الخاص من الإدارة" },
 };
 

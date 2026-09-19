@@ -20,6 +20,8 @@ import {
   Sheet,
 } from "@/components/ui";
 import { GoalDots, StudentSheet } from "@/components/student-sheet";
+import { QuickSession } from "@/components/quick-session";
+import { isWithdrawn } from "@/lib/store";
 
 /** عرض حلقات وطالبات معلّمة — يستخدم في صفحة الإدارة وفي شاشة المعلّمة */
 export function TeacherView({
@@ -55,7 +57,7 @@ export function TeacherView({
   }
 
   const herHalaqas = halaqas.filter((h) => teacher.halaqaIds.includes(h.id));
-  const herStudents = students.filter((s) => s.teacherId === teacherId);
+  const herStudents = students.filter((s) => s.teacherId === teacherId && !isWithdrawn(s));
 
   const openEdit = () => {
     setEditName(teacher.name);
@@ -98,23 +100,37 @@ export function TeacherView({
 
       {herHalaqas.map((h) => {
         const list = herStudents.filter((s) => s.halaqaId === h.id);
+        // طالبات الحلقة بلا معلّمة — تسجّل لهن المعلّمة أيضاً
+        const orphans = students.filter((s) => s.halaqaId === h.id && !s.teacherId && !isWithdrawn(s));
         return (
           <section key={h.id} className="mb-6">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="font-kufi text-base font-bold text-plum-700">
                 🕌 {halaqaTitle(h)}
               </h2>
-              <button
-                type="button"
-                onClick={() => {
-                  setAdding(h.id);
-                  setNewName("");
-                }}
-                className="rounded-full bg-plum-100 px-3 py-1 text-xs font-bold text-plum-700"
-              >
-                + طالبة
-              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdding(h.id);
+                    setNewName("");
+                  }}
+                  className="rounded-full bg-plum-100 px-3 py-1 text-xs font-bold text-plum-700"
+                >
+                  + طالبة
+                </button>
+              )}
             </div>
+            {!isAdmin && (list.length > 0 || orphans.length > 0) && (
+              <QuickSession
+                halaqa={h}
+                groups={[
+                  { key: teacherId, title: `المعلّمة ${teacher.name}`, list },
+                  ...(orphans.length ? [{ key: "none", title: "بدون معلّمة", list: orphans }] : []),
+                ]}
+                onOpenStudent={setSelected}
+              />
+            )}
             {list.length === 0 ? (
               <p className="rounded-xl bg-cream-dark/40 px-4 py-3 text-center text-sm text-silver-600">
                 لا طالبات بعد في هذه الحلقة

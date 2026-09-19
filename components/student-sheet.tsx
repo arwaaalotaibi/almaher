@@ -31,6 +31,7 @@ import { DirectionPicker } from "./direction-picker";
 import { DangerBtn, Field, inputCls, PrimaryBtn, Sheet } from "./ui";
 import { ReciteLogger, SessionVerdictChip, VerdictChip } from "./recite-log";
 import { ProgressSummary } from "./motivation-panel";
+import { useRole } from "./auth-gate";
 
 /** نافذة بيانات الطالبة: الاسم + المعلّمة + بداية الحفظ + خطة الفصل */
 export function StudentSheet({
@@ -41,6 +42,8 @@ export function StudentSheet({
   onClose: () => void;
 }) {
   const { teachers, halaqas, recitations } = useApp();
+  // المعلّمة تطّلع وتسجّل التسميع فقط — تعديل البيانات والخطة للإدارة
+  const readOnly = useRole() !== "admin";
   const [name, setName] = useState("");
   const [teacherId, setTeacherId] = useState("");
   const [halaqaId, setHalaqaId] = useState("");
@@ -166,6 +169,12 @@ export function StudentSheet({
 
   return (
     <Sheet open onClose={onClose} title="بيانات الطالبة">
+      {readOnly && (
+        <p className="mb-3 rounded-xl bg-cream px-3 py-2 text-center text-[11px] font-bold text-silver-600">
+          👀 للاطّلاع — تعديل البيانات والخطة من حساب الإدارة
+        </p>
+      )}
+      <fieldset disabled={readOnly} className="contents">
       <Field label="اسم الطالبة" icon="🌸">
         <input
           className={inputCls}
@@ -463,6 +472,8 @@ export function StudentSheet({
         </div>
       </div>
 
+      </fieldset>
+
       {/* جدول الحفظ المولّد */}
       {schedule ? (
         <div className="mb-3 rounded-2xl border border-cream-dark p-3">
@@ -593,9 +604,10 @@ export function StudentSheet({
         </p>
       )}
 
-      <PrimaryBtn onClick={save}>حفظ البيانات</PrimaryBtn>
+      {!readOnly && <PrimaryBtn onClick={save}>حفظ البيانات</PrimaryBtn>}
 
       {/* 🚪 الانسحاب — بدل الحذف: يبقى السجلّ ويمكن الرجوع */}
+      {!readOnly && (
       <div className="mt-4 rounded-2xl border border-cream-dark p-3">
         {student.plan.withdrawnAt ? (
           <>
@@ -672,9 +684,13 @@ export function StudentSheet({
         )}
       </div>
 
-      <div className="mt-2">
-        <DangerBtn onClick={remove}>حذف الطالبة</DangerBtn>
-      </div>
+      )}
+
+      {!readOnly && (
+        <div className="mt-2">
+          <DangerBtn onClick={remove}>حذف الطالبة</DangerBtn>
+        </div>
+      )}
     </Sheet>
   );
 }

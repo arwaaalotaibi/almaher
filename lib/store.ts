@@ -209,6 +209,36 @@ export interface Teacher {
   id: string;
   name: string;
   halaqaIds: string[];
+  code?: string; // رمز دخولها (٦ أرقام) — لا يصل إلا للإدارة (RLS)
+}
+
+/** مفتاح المعلّمة المربوطة بهذا الجهاز (يُضبط عند الدخول بالرمز) */
+export const TEACHER_PICK_KEY = "almaher-my-teacher-id";
+export const TEACHER_CLAIMED_KEY = "almaher-teacher-claimed";
+
+export function teacherCodeLink(code: string): string {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  return origin ? `${origin}/?teacher=${code}` : "";
+}
+export function teacherCodeMessage(name: string, code: string): string {
+  const link = teacherCodeLink(code);
+  return (
+    `السلام عليكم ورحمة الله 🌷\n` +
+    `حياكِ الله معلّمتنا «${name}» في تطبيق الماهر\n\n` +
+    `🔑 رمز دخولك: ${code}\n` +
+    (link ? `🔗 اضغطي الرابط ويدخلك مباشرة:\n${link}\n\n` : "\n") +
+    `من شاشتك تسجّلين تسميع اللقاء لطالبات حلقتك، وتظهر لك بياناتهن وجداولهن.\n` +
+    `📱 على آيفون: افتحي الرابط في سفاري ثم «مشاركة ← إضافة إلى الشاشة الرئيسية».`
+  );
+}
+/** رمز معلّمة فريد من ٦ خانات */
+export function genTeacherCode(existing: Teacher[]): string {
+  const used = new Set(existing.map((t) => t.code).filter(Boolean));
+  let c = "";
+  do {
+    c = String(Math.floor(100000 + Math.random() * 900000));
+  } while (used.has(c));
+  return c;
 }
 
 export interface Announcement {
@@ -974,7 +1004,7 @@ function run(op: () => PromiseLike<{ error: unknown }>) {
 
 /** جلب كل البيانات من قاعدة البيانات وتحديث العرض */
 export async function pullRemote(): Promise<void> {
-  const [h, t, s, a, b, r, sess, trm, tj, tjr, rdp, sup, codes, setg] = await Promise.all([
+  const [h, t, s, a, b, r, sess, trm, tj, tjr, rdp, sup, codes, setg, tcodes] = await Promise.all([
     supabase
       .from("almaher_halaqas")
       // «*» لا «أعمدة محدّدة»: يعمل قبل إضافة عمودَي السرد/الاختبار وبعدها
@@ -1022,7 +1052,12 @@ export async function pullRemote(): Promise<void> {
     supabase.from("almaher_student_codes").select("student_id,code"),
     // الإعدادات العامة (يقرؤها الجميع، تكتبها الإدارة)
     supabase.from("almaher_settings").select("key,value"),
+    // رموز المعلّمات — للإدارة فقط (قبل تشغيل v12 يعيد خطأ يُتجاهل)
+    supabase.from("almaher_teacher_codes").select("teacher_id,code"),
   ]);
+  const teacherCodeMap = new Map(
+    ((tcodes.data ?? []) as { teacher_id: string; code: string }[]).map((x) => [x.teacher_id, x.code])
+  );
   const normFaces = (v: unknown): RecitationLog["faces"] => {
     const f = (v ?? {}) as Record<string, unknown>;
     return typeof f.tasmi === "number" || typeof f.tathbit === "number" || typeof f.muraja === "number"
@@ -1086,6 +1121,7 @@ export async function pullRemote(): Promise<void> {
       id: row.id as string,
       name: row.name as string,
       halaqaIds: Array.isArray(row.halaqa_ids) ? (row.halaqa_ids as string[]) : [],
+      code: teacherCodeMap.get(row.id as string) ?? "",
     })),
     students: ownStudents,
     announcements: (a.data ?? []).map((row) => ({
@@ -1416,16 +1452,23 @@ export const actions = {
   },
 
   addTeacher(name: string, halaqaIds: string[]) {
-    const teacher: Teacher = { id: uid(), name: name.trim(), halaqaIds };
+    const teacher: Teacher = { id: uid(), name: name.trim(), halaqaIds, code: genTeacherCode(getState().teachers) };
     setState((s) => ({ ...s, teachers: [...s.teachers, teacher] }));
-    run(() =>
-      supabase.from("almaher_teachers").insert({
+    run(async () => {
+      const ins = await supabase.from("almaher_teachers").insert({
         id: teacher.id,
         name: teacher.name,
         halaqa_ids: teacher.halaqaIds,
-      })
-    );
+      });
+      if (ins.error) return ins;
+      return supabase.from("almaher_teacher_codes").upsert({ teacher_id: teacher.id, code: teacher.code });
+    });
     return teacher.id;
+  },
+  /** رمز دخول (جديد) للمعلّمة — يُبطل الرمز السابق */
+  setTeacherCode(id: string, code: string) {
+    setState((s) => ({ ...s, teachers: s.teachers.map((t) => (t.id === id ? { ...t, code } : t)) }));
+    run(() => supabase.from("almaher_teacher_codes").upsert({ teacher_id: id, code }));
   },
   updateTeacher(id: string, patch: Partial<Teacher>) {
     setState((s) => ({

@@ -19,6 +19,8 @@ import {
   pullRemote,
   pushAll,
   STUDENT_PICK_KEY,
+  TEACHER_CLAIMED_KEY,
+  TEACHER_PICK_KEY,
   subscribeRealtime,
 } from "@/lib/store";
 import { inputCls, PrimaryBtn } from "./ui";
@@ -83,12 +85,26 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
-    // دور الدخول من الرابط: ?admin → إدارة، غير ذلك → طالبات
-    if (
-      typeof window !== "undefined" &&
-      new URLSearchParams(window.location.search).has("admin")
-    ) {
-      setRole("admin");
+    // دور الدخول من الرابط: ?admin → إدارة، ?teacher → معلّمة، غير ذلك → طالبات
+    const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    if (params?.has("admin")) setRole("admin");
+    if (params?.has("teacher")) setRole("teacher");
+    // رابط دخول مباشر للمعلّمة: ?teacher=XXXXXX → يُربط الجهاز بها فوراً
+    const teacherCode = params?.get("teacher") || null;
+    if (teacherCode) {
+      window.history.replaceState(null, "", window.location.pathname);
+      claimTeacher(teacherCode).then((err) => {
+        if (!mounted) return;
+        if (err) {
+          setRole("teacher");
+          setError(err);
+          setPassword(teacherCode);
+          setStatus("login");
+        }
+      });
+      return () => {
+        mounted = false;
+      };
     }
     // رابط دخول مباشر: ?code=XXXXXX (من رسالة الرمز) → يُربط الجهاز بالطالبة فوراً
     const linkCode =
@@ -123,10 +139,17 @@ export function AuthGate({ children }: { children: ReactNode }) {
         void init(r);
         return;
       }
-      // هوية مجهولة لجهاز طالبة: هل رُبطت برمز من قبل؟
-      const { data: sid } = await supabase.rpc("almaher_me");
+      // هوية مجهولة: جهاز طالبة أم معلّمة؟
+      const [{ data: sid }, { data: tid }] = await Promise.all([
+        supabase.rpc("almaher_me"),
+        supabase.rpc("almaher_me_teacher"),
+      ]);
       if (!mounted) return;
-      if (typeof sid === "string" && sid) {
+      if (typeof tid === "string" && tid) {
+        window.localStorage.setItem(TEACHER_PICK_KEY, tid);
+        window.localStorage.setItem(TEACHER_CLAIMED_KEY, "1");
+        void init("teacher");
+      } else if (typeof sid === "string" && sid) {
         window.localStorage.setItem(STUDENT_PICK_KEY, sid);
         void init("student");
       } else {
@@ -163,13 +186,34 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return null;
   };
 
+  // المعلّمة: رمزها الخاص — هوية مجهولة تُربط بها عبر almaher_claim_teacher
+  const claimTeacher = async (raw: string): Promise<string | null> => {
+    const code = normalizeDigits(raw).replace(/\D/g, "");
+    if (code.length < 4) return "الرمز غير صحيح";
+    const { data: cur } = await supabase.auth.getSession();
+    if (!cur.session || cur.session.user.email) {
+      if (cur.session) await supabase.auth.signOut();
+      const { error: anonErr } = await supabase.auth.signInAnonymously();
+      if (anonErr) return "تعذّر الاتصال، حاولي لاحقاً";
+    }
+    const { data: tid, error: claimErr } = await supabase.rpc("almaher_claim_teacher", { p_code: code });
+    if (claimErr) return "تعذّر الاتصال، حاولي لاحقاً";
+    if (typeof tid !== "string" || !tid) return "الرمز غير صحيح";
+    window.localStorage.setItem(TEACHER_PICK_KEY, tid);
+    window.localStorage.setItem(TEACHER_CLAIMED_KEY, "1");
+    window.localStorage.removeItem(STUDENT_PICK_KEY);
+    setStatus("loading");
+    void init("teacher");
+    return null;
+  };
+
   const login = async () => {
     if (!password.trim() || busy) return;
     setBusy(true);
     setError("");
 
-    if (role === "student") {
-      const err = await claimStudent(password);
+    if (role === "student" || role === "teacher") {
+      const err = role === "teacher" ? await claimTeacher(password) : await claimStudent(password);
       setBusy(false);
       if (err) setError(err);
       return;
@@ -207,12 +251,14 @@ export function AuthGate({ children }: { children: ReactNode }) {
           <img src="/logo.png" alt="الماهر" className="mx-auto mb-4 h-20 w-auto" />
 
           <h1 className="font-kufi text-xl font-bold text-plum-800">
-            {isAdmin ? "🗝️ دخول الإدارة" : "🌸 دخول الطالبات"}
+            {isAdmin ? "🗝️ دخول الإدارة" : role === "teacher" ? "👩‍🏫 دخول المعلّمات" : "🌸 دخول الطالبات"}
           </h1>
           <p className="mb-4 mt-1 text-sm text-silver-600">
             {isAdmin
               ? "أدخلي كلمة مرور الإدارة"
-              : "أدخلي رمزك الخاص من الإدارة"}
+              : role === "teacher"
+                ? "أدخلي رمز المعلّمة من الإدارة"
+                : "أدخلي رمزك الخاص من الإدارة"}
           </p>
 
           <form
@@ -227,7 +273,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
               className={`${inputCls} mb-3 text-center ${
                 isAdmin ? "" : "tracking-[0.3em] text-lg"
               }`}
-              placeholder={isAdmin ? "كلمة مرور الإدارة" : "رمز الطالبة"}
+              placeholder={isAdmin ? "كلمة مرور الإدارة" : role === "teacher" ? "رمز المعلّمة" : "رمز الطالبة"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />

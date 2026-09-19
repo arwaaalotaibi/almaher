@@ -1,8 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { actions, halaqaTitle, studentCountLabel, useApp } from "@/lib/store";
+import { useEffect, useState } from "react";
+import {
+  actions,
+  genTeacherCode,
+  halaqaTitle,
+  studentCountLabel,
+  teacherCodeLink,
+  teacherCodeMessage,
+  useApp,
+  whatsappLink,
+} from "@/lib/store";
 import {
   Field,
   inputCls,
@@ -28,6 +37,24 @@ function TeachersInner() {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [selectedHalaqas, setSelectedHalaqas] = useState<string[]>([]);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  // معلّمة بلا رمز (أُضيفت قبل نظام الحسابات) — يُولَّد لها رمز تلقائياً
+  useEffect(() => {
+    if (!hydrated) return;
+    for (const t of teachers) if (!t.code) actions.setTeacherCode(t.id, genTeacherCode(teachers));
+  }, [hydrated, teachers]);
+
+  const copy = async (t: { id: string; name: string; code?: string }) => {
+    if (!t.code) return;
+    try {
+      await navigator.clipboard.writeText(teacherCodeMessage(t.name, t.code));
+      setCopied(t.id);
+      setTimeout(() => setCopied(null), 2000);
+    } catch {
+      window.prompt("انسخي الرسالة:", teacherCodeMessage(t.name, t.code));
+    }
+  };
 
   if (!hydrated) return <main className="mx-auto max-w-2xl px-4 pt-10" />;
 
@@ -55,7 +82,7 @@ function TeachersInner() {
             أضيفي المعلّمات وحلقاتهنّ
           </p>
           <p className="mt-1 text-sm text-silver-600">
-            كل معلّمة يظهر لها حلقاتها وطالباتها فقط
+            كل معلّمة لها رمز ورابط دخول خاص، تسجّل به تسميع طالبات حلقاتها
           </p>
         </div>
       ) : (
@@ -64,32 +91,70 @@ function TeachersInner() {
             const count = students.filter((s) => s.teacherId === t.id).length;
             const herHalaqas = halaqas.filter((h) => t.halaqaIds.includes(h.id));
             return (
-              <Link
-                key={t.id}
-                href={`/teacher/${t.id}`}
-                className="card rounded-2xl p-4 transition active:scale-[0.99]"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-kufi text-lg font-bold text-plum-800">
-                    👩‍🏫 المعلّمة {t.name}
-                  </span>
-                  <span className="rounded-full bg-plum-100 px-3 py-1 text-xs font-bold text-plum-700">
-                    {studentCountLabel(count)}
-                  </span>
+              <div key={t.id} className="card rounded-2xl p-4">
+                <Link href={`/teacher/${t.id}`} className="block transition active:scale-[0.99]">
+                  <div className="flex items-center justify-between">
+                    <span className="font-kufi text-lg font-bold text-plum-800">
+                      👩‍🏫 المعلّمة {t.name}
+                    </span>
+                    <span className="rounded-full bg-plum-100 px-3 py-1 text-xs font-bold text-plum-700">
+                      {studentCountLabel(count)}
+                    </span>
+                  </div>
+                  {herHalaqas.length > 0 && (
+                    <p className="mt-2 flex flex-wrap gap-1.5">
+                      {herHalaqas.map((h) => (
+                        <span
+                          key={h.id}
+                          className="rounded-lg bg-cream px-2 py-0.5 text-[11px] font-bold text-silver-600"
+                        >
+                          🕌 {halaqaTitle(h)}
+                        </span>
+                      ))}
+                    </p>
+                  )}
+                </Link>
+
+                {/* 🔑 حساب المعلّمة: رمزها ورابط دخولها */}
+                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-cream/60 px-3 py-2">
+                  <span className="text-[11px] font-bold text-silver-600">🔑 رمز الدخول</span>
+                  <span className="font-mono text-base font-bold tracking-[0.2em] text-plum-800">{t.code || "…"}</span>
+                  <span className="flex-1" />
+                  <button
+                    type="button"
+                    onClick={() => copy(t)}
+                    className="rounded-lg bg-plum-600 px-2.5 py-1.5 text-[11px] font-bold text-white"
+                    title="نسخ رسالة الدخول مع الرابط"
+                  >
+                    {copied === t.id ? "تم النسخ ✓" : "📋 نسخ الرسالة"}
+                  </button>
+                  <a
+                    href={whatsappLink("", t.code ? teacherCodeMessage(t.name, t.code) : "")}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-lg bg-emerald-500 px-2.5 py-1.5 text-[11px] font-bold text-white"
+                    title="إرسال عبر واتساب"
+                  >
+                    📲
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`رمز جديد للمعلّمة «${t.name}»؟ الرمز الحالي سيتوقف.`))
+                        actions.setTeacherCode(t.id, genTeacherCode(teachers));
+                    }}
+                    className="rounded-lg bg-white px-2.5 py-1.5 text-[11px] font-bold text-plum-700 ring-1 ring-cream-dark"
+                    title="توليد رمز جديد"
+                  >
+                    🔄
+                  </button>
+                  {t.code && (
+                    <p className="w-full truncate text-[10px] text-silver-500" dir="ltr">
+                      {teacherCodeLink(t.code)}
+                    </p>
+                  )}
                 </div>
-                {herHalaqas.length > 0 && (
-                  <p className="mt-2 flex flex-wrap gap-1.5">
-                    {herHalaqas.map((h) => (
-                      <span
-                        key={h.id}
-                        className="rounded-lg bg-cream px-2 py-0.5 text-[11px] font-bold text-silver-600"
-                      >
-                        🕌 {halaqaTitle(h)}
-                      </span>
-                    ))}
-                  </p>
-                )}
-              </Link>
+              </div>
             );
           })}
         </div>

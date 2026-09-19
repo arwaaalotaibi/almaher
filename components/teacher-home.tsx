@@ -2,22 +2,36 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { studentCountLabel, useApp } from "@/lib/store";
+import { studentCountLabel, TEACHER_CLAIMED_KEY, TEACHER_PICK_KEY, useApp } from "@/lib/store";
 import { TeacherView } from "./teacher-view";
 import { NotificationsCard } from "./notifications-card";
 
-const PICK_KEY = "almaher-my-teacher-id";
+const PICK_KEY = TEACHER_PICK_KEY;
 
 /** شاشة المعلّمة: تختار اسمها مرة واحدة ثم ترى حلقاتها وطالباتها */
 export function TeacherHome() {
   const { teachers, students } = useApp();
   const [myId, setMyId] = useState<string | null>(null);
+  const [claimed, setClaimed] = useState(false); // دخلت برمزها الخاص (لا تبديل اسم)
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     setMyId(window.localStorage.getItem(PICK_KEY));
+    setClaimed(window.localStorage.getItem(TEACHER_CLAIMED_KEY) === "1");
     setReady(true);
   }, []);
+
+  const logout = async () => {
+    window.localStorage.removeItem(PICK_KEY);
+    window.localStorage.removeItem(TEACHER_CLAIMED_KEY);
+    try {
+      await supabase.rpc("almaher_unclaim_teacher");
+    } catch {
+      /* بلا إنترنت */
+    }
+    await supabase.auth.signOut();
+    window.location.reload();
+  };
 
   if (!ready) return <main className="mx-auto max-w-2xl px-4 pt-10" />;
 
@@ -93,25 +107,24 @@ export function TeacherHome() {
       topExtra={<NotificationsCard halaqaIds={me.halaqaIds} />}
       bottomExtra={
         <>
+          {!claimed && (
+            <button
+              type="button"
+              onClick={() => {
+                window.localStorage.removeItem(PICK_KEY);
+                setMyId(null);
+              }}
+              className="card w-full rounded-xl py-3 font-kufi text-base font-bold text-plum-700"
+            >
+              🔄 تبديل الاسم
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
-              window.localStorage.removeItem(PICK_KEY);
-              setMyId(null);
+              if (window.confirm("تسجيل الخروج من هذا الجهاز؟")) void logout();
             }}
-            className="card w-full rounded-xl py-3 font-kufi text-base font-bold text-plum-700"
-          >
-            🔄 تبديل الاسم
-          </button>
-          <button
-            type="button"
-            onClick={async () => {
-              if (window.confirm("تسجيل الخروج من هذا الجهاز؟")) {
-                await supabase.auth.signOut();
-                window.location.reload();
-              }
-            }}
-            className="card w-24 shrink-0 rounded-xl text-sm font-bold text-plum-700"
+            className={`card rounded-xl py-3 text-sm font-bold text-plum-700 ${claimed ? "w-full font-kufi text-base" : "w-24 shrink-0"}`}
           >
             🚪 خروج
           </button>
