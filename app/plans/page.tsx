@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import {
+  actions,
   activeStudents,
   halaqaTitle,
   lastPlanIssue,
@@ -10,6 +11,7 @@ import {
   whatsappLink,
   type Student,
 } from "@/lib/store";
+import { supabase } from "@/lib/supabase";
 import { PageHeader, useHydrated } from "@/components/ui";
 import { RoleOnly } from "@/components/admin-only";
 import { StudentSheet } from "@/components/student-sheet";
@@ -38,9 +40,23 @@ function PlansInner() {
   const hydrated = useHydrated();
   const [halaqaId, setHalaqaId] = useState("");
   const [selected, setSelected] = useState<Student | null>(null);
+  const [replyFor, setReplyFor] = useState<string | null>(null); // معرّف الرسالة المفتوح ردّها
+  const [replyText, setReplyText] = useState("");
+
+  /** ردّ الإدارة على ملاحظة: الخطة صحيحة كما هي — تصلها رسالة وتُطلب منها إعادة التأكيد */
+  const sendReply = (msgId: string, studentId: string) => {
+    const text = replyText.trim();
+    if (text.length < 2) return;
+    actions.replySupport(msgId, text);
+    void supabase.functions.invoke("almaher-push", {
+      body: { kind: "direct", student_id: studentId, body: `💬 ردّ الإدارة على ملاحظتكِ على الخطة:\n${text}` },
+    });
+    setReplyFor(null);
+    setReplyText("");
+  };
 
   const groups = useMemo(() => {
-    const issue: { st: Student; note: string; at: string }[] = [];
+    const issue: { st: Student; note: string; at: string; msgId: string }[] = [];
     const pending: Student[] = [];
     const ok: { st: Student; at: string }[] = [];
     const noTerm: Student[] = [];
@@ -59,6 +75,7 @@ function PlansInner() {
           st,
           note: (m?.body ?? "").replace(/^⚠️ خطأ في خطة فصل \S+:\s*/, ""),
           at: m?.createdAt ?? "",
+          msgId: m?.id ?? "",
         });
       } else pending.push(st);
     }
@@ -76,7 +93,7 @@ function PlansInner() {
       st: Student | undefined;
       note: string;
       term: string;
-      state: "open" | "edited" | "done";
+      state: "open" | "edited" | "done" | "replied";
     }[] = [];
     for (const m of support) {
       if (m.kind !== "plan_issue" && m.kind !== "plan_edit") continue;
@@ -84,8 +101,9 @@ function PlansInner() {
       if (halaqaId && st && st.halaqaId !== halaqaId) continue;
       const term = m.body.match(/فصل (\S+):/)?.[1] ?? "";
       const note = m.body.replace(/^[^:]*:\s*/, "");
-      let state: "open" | "edited" | "done" = "open";
+      let state: "open" | "edited" | "done" | "replied" = "open";
       if (st?.plan?.confirmedAt && st.plan.confirmedAt > m.createdAt) state = "done";
+      else if (m.status === "done" && m.reply) state = "replied";
       else if (st?.updatedAt && st.updatedAt > m.createdAt) state = "edited";
       else if (!st) state = "done";
       rows.push({ m, st, note, term, state });
@@ -160,7 +178,7 @@ function PlansInner() {
           <p className="rounded-xl bg-cream/60 px-3 py-2.5 text-xs text-silver-600">لا ملاحظات قائمة 🌸</p>
         ) : (
           <div className="grid gap-2.5">
-            {groups.issue.map(({ st, note, at }) => (
+            {groups.issue.map(({ st, note, at, msgId }) => (
               <div key={st.id} className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4">
                 <div className="mb-1 flex items-center justify-between gap-2">
                   <span className="min-w-0 truncate text-sm font-bold text-plum-800">🌸 {st.name}</span>
@@ -189,8 +207,53 @@ function PlansInner() {
                     📲
                   </a>
                 </div>
+                {replyFor === msgId ? (
+                  <div className="mt-2 rounded-xl bg-white p-2.5">
+                    <p className="mb-1 text-[11px] font-bold text-plum-800">💬 ردّكِ عليها (الخطة صحيحة كما هي)</p>
+                    <textarea
+                      className="min-h-20 w-full rounded-lg border border-cream-dark p-2 text-sm"
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      placeholder="مثال: خطتكِ صحيحة، المراجعة ١٠ أوجه كما اتفقنا في اللقاء الأول 🌸"
+                      autoFocus
+                    />
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReplyFor(null);
+                          setReplyText("");
+                        }}
+                        className="rounded-lg bg-cream py-2 text-xs font-bold text-plum-700"
+                      >
+                        رجوع
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => sendReply(msgId, st.id)}
+                        className="rounded-lg bg-emerald-600 py-2 text-xs font-bold text-white"
+                      >
+                        إرسال الردّ ✓
+                      </button>
+                    </div>
+                    <p className="mt-1.5 text-[10px] text-silver-600">
+                      يصلها الردّ إشعاراً وفي صندوقها، وتُطلب منها إعادة تأكيد الخطة نفسها.
+                    </p>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReplyFor(msgId);
+                      setReplyText("");
+                    }}
+                    className="mt-2 w-full rounded-xl bg-white py-2 text-xs font-bold text-emerald-800 ring-1 ring-emerald-300"
+                  >
+                    💬 الخطة صحيحة — اكتبي لها ردّاً
+                  </button>
+                )}
                 <p className="mt-2 text-[10px] text-amber-800">
-                  بعد حفظ التعديل تُطلب منها إعادة التأكيد وتنتقل إلى «لم تؤكّد» حتى تضغط «صحيحة»
+                  «تعديل خطتها» بعد الحفظ تُطلب منها إعادة التأكيد، و«الردّ» يبقي الخطة ويطلب تأكيدها من جديد
                 </p>
               </div>
             ))}
@@ -264,9 +327,11 @@ function PlansInner() {
               const badge =
                 state === "done"
                   ? { t: "✅ عُدّلت وأكّدت", c: "bg-emerald-50 text-emerald-800" }
-                  : state === "edited"
-                    ? { t: "✏️ عُدّلت — بانتظار تأكيدها", c: "bg-plum-50 text-plum-700" }
-                    : { t: "⚠️ قائمة", c: "bg-amber-100 text-amber-900" };
+                  : state === "replied"
+                    ? { t: "💬 رُدّ عليها — بانتظار تأكيدها", c: "bg-emerald-50 text-emerald-800" }
+                    : state === "edited"
+                      ? { t: "✏️ عُدّلت — بانتظار تأكيدها", c: "bg-plum-50 text-plum-700" }
+                      : { t: "⚠️ قائمة", c: "bg-amber-100 text-amber-900" };
               return (
                 <div key={m.id} className="rounded-2xl border border-cream-dark bg-white p-3">
                   <div className="flex items-center justify-between gap-2">
@@ -286,6 +351,7 @@ function PlansInner() {
                     {term ? ` · فصل ${term}` : ""} · {fmtDate(m.createdAt)}
                   </p>
                   <p className="mt-1.5 rounded-xl bg-cream/60 px-3 py-2 text-sm text-ink">{note || "—"}</p>
+                  {m.reply && <p className="mt-1 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-900">💬 ردّكِ: {m.reply}</p>}
                 </div>
               );
             })}

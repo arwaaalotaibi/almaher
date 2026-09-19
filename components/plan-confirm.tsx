@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { actions, isDesc, halaqaTitle, type Halaqa, type Student } from "@/lib/store";
+import { actions, isDesc, halaqaTitle, lastPlanReply, useApp, type Halaqa, type Student } from "@/lib/store";
 import { facesLabel } from "@/lib/arabic";
 import { inputCls, PrimaryBtn } from "./ui";
 
@@ -25,6 +25,8 @@ export function PlanConfirmGate({
   const [reporting, setReporting] = useState(false);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const { support } = useApp();
+  const adminReply = lastPlanReply(support, student.id, termStart);
 
   const termLabel = termStart
     ? new Date(termStart + "T00:00:00").toLocaleDateString("ar-u-ca-gregory-nu-arab", {
@@ -91,6 +93,14 @@ export function PlanConfirmGate({
           راجعي الأرقام والبداية جيداً — عليها يُبنى وردكِ وجدولكِ طوال الفصل
         </p>
       </div>
+
+      {adminReply && (
+        <div className="mt-4 rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4">
+          <p className="text-xs font-bold text-emerald-800">💬 ردّ الإدارة على ملاحظتكِ</p>
+          <p className="mt-1 text-sm font-medium text-ink">{adminReply.reply}</p>
+          <p className="mt-1 text-[11px] text-emerald-700">راجعي الخطة أعلاه ثم أكّديها، أو أرسلي ملاحظة جديدة</p>
+        </div>
+      )}
 
       {!reporting ? (
         <div className="mt-5 grid gap-2">
