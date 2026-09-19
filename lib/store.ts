@@ -466,6 +466,23 @@ export function lastPlanIssue(
   let last: SupportMsg | null = null;
   for (const m of support) {
     if (m.studentId !== studentId || m.kind !== "plan_issue" || !m.body.includes(termStart)) continue;
+    // بلاغ ردّت عليه الإدارة (الخطة صحيحة) = مُعالَج، فلا يبقى «قائماً»
+    if (m.status === "done" && m.reply) continue;
+    if (!last || m.createdAt > last.createdAt) last = m;
+  }
+  return last;
+}
+
+/** آخر ردّ من الإدارة على ملاحظة الطالبة على خطة هذا الفصل (يُعرض لها في شاشة التأكيد) */
+export function lastPlanReply(
+  support: SupportMsg[],
+  studentId: string,
+  termStart: string
+): SupportMsg | null {
+  let last: SupportMsg | null = null;
+  for (const m of support) {
+    if (m.studentId !== studentId || m.kind !== "plan_issue" || !m.body.includes(termStart)) continue;
+    if (!(m.status === "done" && m.reply)) continue;
     if (!last || m.createdAt > last.createdAt) last = m;
   }
   return last;
