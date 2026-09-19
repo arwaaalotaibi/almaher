@@ -171,6 +171,11 @@ export function QuickSession({
   const setRow = (id: string, patch: Partial<RowState>, base: RowState) =>
     setRows((r) => ({ ...r, [id]: { ...base, ...patch } }));
   const [editing, setEditing] = useState<string | null>(null); // "studentId:part" المفتوح للتعديل الدقيق
+  // 🔎 فرز القائمة: الكل / لم يُسجَّل بعد / مسجّل
+  const [filter, setFilter] = useState<"all" | "pending" | "done">("all");
+  const passes = (s: Student) =>
+    filter === "all" ? true : filter === "done" ? !!info[s.id]?.existing : !info[s.id]?.existing;
+  const visible = shown.map((g) => ({ ...g, list: g.list.filter(passes) }));
   const [noteOpen, setNoteOpen] = useState<Record<string, boolean>>({}); // 📝 حقل الملاحظة المفتوح لكل طالبة
 
   /** المقطع الفعلي لقسم: المعدَّل الآن إن وُجد، وإلا المحفوظ في سجلّ هذا اللقاء،
@@ -285,7 +290,7 @@ export function QuickSession({
 
   const saveAll = () => {
     const items: SessionItem[] = [];
-    for (const g of shown) for (const s of g.list) items.push(saveOne(s, true));
+    for (const g of visible) for (const s of g.list) items.push(saveOne(s, true));
     setRows({});
     setSaved(items.length);
     setTimeout(() => setSaved(null), 2500);
@@ -369,6 +374,32 @@ export function QuickSession({
               </button>
             ))}
           </div>
+          {(() => {
+            const all = shown.flatMap((g) => g.list);
+            const done = all.filter((x) => !!info[x.id]?.existing).length;
+            const opts: { k: typeof filter; l: string; n: number }[] = [
+              { k: "all", l: "الكل", n: all.length },
+              { k: "pending", l: "⏳ لم يُسجَّل", n: all.length - done },
+              { k: "done", l: "✓ مسجّل", n: done },
+            ];
+            return (
+              <div className="mb-2 flex items-center gap-1.5 text-xs">
+                <span className="font-bold text-plum-700">عرض:</span>
+                {opts.map((o) => (
+                  <button
+                    key={o.k}
+                    type="button"
+                    onClick={() => setFilter(o.k)}
+                    className={`rounded-full px-3 py-1 font-bold transition ${
+                      filter === o.k ? "bg-plum-600 text-white" : "bg-cream text-plum-700"
+                    }`}
+                  >
+                    {o.l} ({ar(o.n)})
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
 
           <button
             type="button"
@@ -417,9 +448,14 @@ export function QuickSession({
           })()}
 
           <div className="grid gap-2">
-            {shown.map((g) => (
+            {visible.every((g) => g.list.length === 0) && (
+              <p className="rounded-xl bg-cream/60 px-3 py-3 text-center text-xs font-bold text-silver-600">
+                {filter === "pending" ? "الجميع مسجّلات لهذا اللقاء ✅" : filter === "done" ? "لم يُسجَّل أحد بعد لهذا اللقاء" : "لا طالبات"}
+              </p>
+            )}
+            {visible.map((g) => (
               <div key={g.key}>
-                {groupKey === "all" && (
+                {groupKey === "all" && g.list.length > 0 && (
                   <p className="mb-1 mt-2 text-xs font-bold text-plum-700">
                     👩‍🏫 {g.title}
                     <span className="ms-1.5 font-normal text-silver-600">
@@ -635,7 +671,7 @@ export function QuickSession({
             <PrimaryBtn onClick={saveAll}>
               {saved !== null
                 ? `تم حفظ ${ar(saved)} سجلّاً ✓`
-                : `حفظ الجميع — لقاء ${sessionNo ? ar(sessionNo) : ""} لـ ${ar(total)} طالبة`}
+                : `حفظ ${filter === "all" ? "الجميع" : "المعروضات"} — لقاء ${sessionNo ? ar(sessionNo) : ""} لـ ${ar(visible.reduce((n, g) => n + g.list.length, 0))} طالبة`}
             </PrimaryBtn>
             <p className="mt-1.5 text-center text-[10px] text-silver-600">
               «اعتماد*» بعلامة النجمة = صفّ فيه تعديل لم يُحفظ بعد
