@@ -307,7 +307,7 @@ export function QuickSession({
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center justify-between"
       >
-        <span className="font-kufi text-sm font-bold text-plum-800">
+        <span className="font-kufi text-base font-bold text-plum-800">
           📋 تسجيل تسميع اللقاء
         </span>
         <span className="text-plum-600">{open ? "▴" : "▾"}</span>
@@ -437,7 +437,7 @@ export function QuickSession({
             const done = recorded === all.length;
             return (
               <p
-                className={`mb-2 rounded-xl px-3 py-2 text-center text-xs font-bold ${
+                className={`mb-2 rounded-xl px-3 py-2 text-center text-sm font-bold ${
                   done ? "bg-emerald-50 text-emerald-800" : "bg-plum-50 text-plum-800"
                 }`}
               >
@@ -456,7 +456,7 @@ export function QuickSession({
             {visible.map((g) => (
               <div key={g.key}>
                 {groupKey === "all" && g.list.length > 0 && (
-                  <p className="mb-1 mt-2 text-xs font-bold text-plum-700">
+                  <p className="mb-1 mt-2 text-sm font-bold text-plum-700">
                     👩‍🏫 {g.title}
                     <span className="ms-1.5 font-normal text-silver-600">
                       ({ar(g.list.filter((s) => !!info[s.id]?.existing).length)} من {ar(g.list.length)})
@@ -484,11 +484,11 @@ export function QuickSession({
                           onClick={() => onOpenStudent?.(s)}
                           disabled={!onOpenStudent}
                           title="فتح ملف الطالبة"
-                          className="min-w-0 truncate text-start text-sm font-bold text-plum-800 enabled:underline enabled:decoration-plum-300 enabled:decoration-dotted enabled:underline-offset-4"
+                          className="min-w-0 truncate text-start text-base font-bold text-plum-800 enabled:underline enabled:decoration-plum-300 enabled:decoration-dotted enabled:underline-offset-4"
                         >
                           {s.name}
                           {i.existing && (
-                            <span className="ms-1.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                            <span className="ms-1.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-emerald-700">
                               مسجّل ✓
                             </span>
                           )}
@@ -497,7 +497,7 @@ export function QuickSession({
                           <button
                             type="button"
                             onClick={() => setRow(s.id, { attended: !st.attended }, st)}
-                            className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                            className={`rounded-full px-2.5 py-1 text-sm font-bold ${
                               st.attended
                                 ? "bg-emerald-500 text-white"
                                 : "bg-red-500 text-white"
@@ -508,7 +508,7 @@ export function QuickSession({
                           <button
                             type="button"
                             onClick={() => setNoteOpen((o) => ({ ...o, [s.id]: !o[s.id] }))}
-                            className={`rounded-full px-2 py-1 text-[11px] font-bold ${
+                            className={`rounded-full px-2 py-1 text-sm font-bold ${
                               (st.note ?? i.existing?.note) ? "bg-amber-100 text-amber-900" : "bg-cream text-plum-700"
                             }`}
                             title="ملاحظة على هذا اللقاء"
@@ -519,7 +519,7 @@ export function QuickSession({
                           <button
                             type="button"
                             onClick={() => saveOne(s)}
-                            className={`rounded-full px-2.5 py-1 text-[11px] font-bold transition ${
+                            className={`rounded-full px-2.5 py-1 text-sm font-bold transition ${
                               justSaved[s.id]
                                 ? "bg-emerald-600 text-white"
                                 : rows[s.id]
@@ -534,7 +534,7 @@ export function QuickSession({
                       </div>
                       {(noteOpen[s.id] ?? !!i.existing?.note) && (
                         <textarea
-                          className={`${inputCls} mt-1.5 min-h-14 text-[12px]`}
+                          className={`${inputCls} mt-1.5 min-h-14 text-sm`}
                           placeholder="📝 ملاحظة على هذا اللقاء (مثال: سمّعت بداية المقطع من آية أخرى، تحتاج مراجعة، …)"
                           value={st.note ?? i.existing?.note ?? ""}
                           onChange={(e) => setRow(s.id, { note: e.target.value }, st)}
@@ -558,7 +558,7 @@ export function QuickSession({
                                     disabled={!has}
                                     title={labels[p.key] || "لا مطلوب"}
                                     onClick={() => setRow(s.id, { [p.key]: !st[p.key] }, st)}
-                                    className={`min-w-0 flex-1 rounded-lg border px-2 py-1 text-start text-[11px] ${
+                                    className={`min-w-0 flex-1 rounded-lg border px-2 py-1 text-start text-sm ${
                                       !has
                                         ? "border-cream-dark text-silver-400 line-through"
                                         : on
@@ -588,7 +588,7 @@ export function QuickSession({
                                       <button
                                         type="button"
                                         onClick={() => bump(s, p.key, st, -1)}
-                                        className="w-8 rounded-lg bg-cream text-sm font-bold text-plum-700"
+                                        className="w-9 rounded-lg bg-cream text-base font-bold text-plum-700"
                                         aria-label="وجه أقل"
                                       >
                                         −
@@ -596,7 +596,7 @@ export function QuickSession({
                                       <button
                                         type="button"
                                         onClick={() => bump(s, p.key, st, +1)}
-                                        className="w-8 rounded-lg bg-cream text-sm font-bold text-plum-700"
+                                        className="w-9 rounded-lg bg-cream text-base font-bold text-plum-700"
                                         aria-label="وجه أكثر"
                                       >
                                         +
@@ -604,7 +604,7 @@ export function QuickSession({
                                       <button
                                         type="button"
                                         onClick={() => setEditing(isEditing ? null : ek)}
-                                        className={`w-8 rounded-lg text-sm ${isEditing ? "bg-plum-600 text-white" : "bg-cream text-plum-700"}`}
+                                        className={`w-9 rounded-lg text-base ${isEditing ? "bg-plum-600 text-white" : "bg-cream text-plum-700"}`}
                                         aria-label="تعديل آية النهاية"
                                       >
                                         ✏️
@@ -619,12 +619,12 @@ export function QuickSession({
                                   const mov = toAnchored ? r.from : r.to;
                                   const edge: "from" | "to" = toAnchored ? "from" : "to";
                                   return (
-                                  <div className="mt-1 grid grid-cols-[1fr_auto_auto] items-center gap-1.5 rounded-lg bg-cream/60 px-2 py-1.5 text-[11px]">
+                                  <div className="mt-1 grid grid-cols-[1fr_auto_auto] items-center gap-1.5 rounded-lg bg-cream/60 px-2 py-1.5 text-sm">
                                     <span className="font-bold text-plum-700">
                                       {`من ${surahName(fixed.surah)} ${ar(fixed.ayah)} — إلى:`}
                                     </span>
                                     <select
-                                      className={`${inputCls} py-1 text-[11px]`}
+                                      className={`${inputCls} py-1 text-sm`}
                                       value={surahName(mov.surah)}
                                       onChange={(e) =>
                                         setEdge(s, p.key, st, edge, {
@@ -640,7 +640,7 @@ export function QuickSession({
                                       ))}
                                     </select>
                                     <select
-                                      className={`${inputCls} py-1 text-[11px]`}
+                                      className={`${inputCls} py-1 text-sm`}
                                       value={mov.ayah}
                                       onChange={(e) =>
                                         setEdge(s, p.key, st, edge, { surah: mov.surah, ayah: Number(e.target.value) })
