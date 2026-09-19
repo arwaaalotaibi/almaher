@@ -321,7 +321,7 @@ export function QuickSession({
         </p>
       ) : (
         <div className="mt-3">
-          <div className="mb-3 grid grid-cols-2 gap-2">
+          <div className={`mb-3 grid gap-2 ${groups.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
             <label className="block">
               <span className="mb-1 block text-xs font-bold text-plum-700">اللقاء</span>
               <select
@@ -339,7 +339,7 @@ export function QuickSession({
                 ))}
               </select>
             </label>
-            <label className="block">
+            <label className={groups.length > 1 ? "block" : "hidden"}>
               <span className="mb-1 block text-xs font-bold text-plum-700">المعلّمة</span>
               <select
                 className={inputCls}

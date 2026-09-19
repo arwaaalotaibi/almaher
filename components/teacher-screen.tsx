@@ -25,9 +25,12 @@ export function TeacherScreen({ teacher, onLogout }: { teacher: Teacher; onLogou
   const { halaqas, students, recitations } = useApp();
   const [selected, setSelected] = useState<Student | null>(null);
 
-  const herHalaqas = halaqas.filter((h) => teacher.halaqaIds.includes(h.id));
+  const assigned = halaqas.filter((h) => teacher.halaqaIds.includes(h.id));
   const mine = (h: Halaqa) =>
     students.filter((s) => s.halaqaId === h.id && s.teacherId === teacher.id && !isWithdrawn(s));
+  // الحلقات التي لها فيها طالبات فقط (وإن لم يكن لها طالبات بعد تظهر حلقاتها المسندة)
+  const withStudents = assigned.filter((h) => mine(h).length > 0);
+  const herHalaqas = withStudents.length ? withStudents : assigned;
   const orphans = (h: Halaqa) =>
     students.filter((s) => s.halaqaId === h.id && !s.teacherId && !isWithdrawn(s));
   const total = herHalaqas.reduce((n, h) => n + mine(h).length, 0);
@@ -65,7 +68,9 @@ export function TeacherScreen({ teacher, onLogout }: { teacher: Teacher; onLogou
         <p className="mt-2 text-sm text-white/90">
           {herHalaqas.length === 0
             ? "لم تُسند لكِ حلقة بعد — تواصلي مع الإدارة"
-            : `${ar(total)} طالبة في ${herHalaqas.map(halaqaTitle).join(" و")}`}
+            : herHalaqas.length > 2
+              ? `${ar(total)} طالبة في ${ar(herHalaqas.length)} حلقات`
+              : `${ar(total)} طالبة في ${herHalaqas.map(halaqaTitle).join(" و")}`}
         </p>
       </div>
 
