@@ -552,6 +552,8 @@ export interface AppState {
   readingProgress: ReadingProgress[];
   support: SupportMsg[];
   settings: AppSettings;
+  /** هل جدول رموز المعلّمات موجود (v12 مُشغَّل)؟ قبل ذلك لا نحاول الكتابة فيه */
+  teacherCodesReady?: boolean;
 }
 
 export const EMPTY_GOALS: Goals = {};
@@ -1213,6 +1215,7 @@ export async function pullRemote(): Promise<void> {
       repliedAt: (row.replied_at as string) ?? undefined,
     })),
     settings,
+    teacherCodesReady: !tcodes.error,
   });
 }
 

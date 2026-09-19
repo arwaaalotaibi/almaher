@@ -32,7 +32,7 @@ export default function TeachersPage() {
 }
 
 function TeachersInner() {
-  const { teachers, halaqas, students } = useApp();
+  const { teachers, halaqas, students, teacherCodesReady } = useApp();
   const hydrated = useHydrated();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
@@ -41,9 +41,9 @@ function TeachersInner() {
 
   // معلّمة بلا رمز (أُضيفت قبل نظام الحسابات) — يُولَّد لها رمز تلقائياً
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || !teacherCodesReady) return;
     for (const t of teachers) if (!t.code) actions.setTeacherCode(t.id, genTeacherCode(teachers));
-  }, [hydrated, teachers]);
+  }, [hydrated, teacherCodesReady, teachers]);
 
   const copy = async (t: { id: string; name: string; code?: string }) => {
     if (!t.code) return;
@@ -74,6 +74,13 @@ function TeachersInner() {
   return (
     <main className="mx-auto max-w-2xl px-4 pb-40 pt-8">
       <PageHeader title="المعلّمات" back="/" />
+      {!teacherCodesReady && (
+        <p className="mb-4 rounded-xl bg-amber-50 px-3 py-2.5 text-xs font-bold text-amber-900">
+          ⚠️ حسابات المعلّمات غير مفعّلة بعد في قاعدة البيانات — شغّلي ملف
+          <span className="mx-1 font-mono" dir="ltr">schema-v12-teacher-accounts.sql</span>
+          في محرر SQL ثم أعيدي فتح هذه الصفحة لتظهر الرموز.
+        </p>
+      )}
 
       {teachers.length === 0 ? (
         <div className="card rounded-2xl p-8 text-center">
@@ -116,6 +123,7 @@ function TeachersInner() {
                 </Link>
 
                 {/* 🔑 حساب المعلّمة: رمزها ورابط دخولها */}
+                {teacherCodesReady && (
                 <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-cream/60 px-3 py-2">
                   <span className="text-[11px] font-bold text-silver-600">🔑 رمز الدخول</span>
                   <span className="font-mono text-base font-bold tracking-[0.2em] text-plum-800">{t.code || "…"}</span>
@@ -154,6 +162,7 @@ function TeachersInner() {
                     </p>
                   )}
                 </div>
+                )}
               </div>
             );
           })}
