@@ -77,15 +77,18 @@ export function QuickSession({
   halaqa,
   groups,
   onOpenStudent,
+  defaultOpen = false,
 }: {
   halaqa: Halaqa;
   groups: { key: string; title: string; list: Student[] }[];
   /** الضغط على اسم الطالبة يفتح ملفها (بطاقتها) */
   onOpenStudent?: (s: Student) => void;
+  /** مفتوحة من البداية (شاشة المعلّمة) */
+  defaultOpen?: boolean;
 }) {
   const { recitations } = useApp();
   const termRows = useMemo(() => buildSchedule(halaqa, EMPTY_PLAN), [halaqa]);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [groupKey, setGroupKey] = useState<string>("all");
   // الافتراضي: آخر لقاء وقع فعلاً (التسجيل بعد اللقاء لا قبله)
   const [date, setDate] = useState<string>(() => {

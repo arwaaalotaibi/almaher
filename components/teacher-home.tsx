@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { studentCountLabel, TEACHER_CLAIMED_KEY, TEACHER_PICK_KEY, useApp } from "@/lib/store";
-import { TeacherView } from "./teacher-view";
-import { NotificationsCard } from "./notifications-card";
+import { TeacherScreen } from "./teacher-screen";
 
 const PICK_KEY = TEACHER_PICK_KEY;
 
@@ -101,35 +100,17 @@ export function TeacherHome() {
   }
 
   return (
-    <TeacherView
-      teacherId={me.id}
-      isAdmin={false}
-      topExtra={<NotificationsCard halaqaIds={me.halaqaIds} />}
-      bottomExtra={
-        <>
-          {!claimed && (
-            <button
-              type="button"
-              onClick={() => {
-                window.localStorage.removeItem(PICK_KEY);
-                setMyId(null);
-              }}
-              className="card w-full rounded-xl py-3 font-kufi text-base font-bold text-plum-700"
-            >
-              🔄 تبديل الاسم
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              if (window.confirm("تسجيل الخروج من هذا الجهاز؟")) void logout();
-            }}
-            className={`card rounded-xl py-3 text-sm font-bold text-plum-700 ${claimed ? "w-full font-kufi text-base" : "w-24 shrink-0"}`}
-          >
-            🚪 خروج
-          </button>
-        </>
-      }
+    <TeacherScreen
+      teacher={me}
+      onLogout={() => {
+        if (!claimed) {
+          // الحساب المشترك القديم: تبديل الاسم بدل الخروج الكامل
+          window.localStorage.removeItem(PICK_KEY);
+          setMyId(null);
+          return;
+        }
+        void logout();
+      }}
     />
   );
 }
