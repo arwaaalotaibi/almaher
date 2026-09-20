@@ -21,11 +21,13 @@ import {
   logFaces,
   murMode,
   partFaces,
+  partVerdict,
   rangeForFaces,
   type PathMode,
   type PosRange,
 } from "@/lib/progress";
-import { surahName, surahNumber } from "@/lib/mushaf";
+import { pageOf, surahName, surahNumber } from "@/lib/mushaf";
+import { descPathIndex } from "@/lib/hifz-path";
 import { ayahCount, SURAHS } from "@/lib/surahs";
 import { PrimaryBtn, inputCls } from "./ui";
 import { supabase } from "@/lib/supabase";
@@ -199,10 +201,20 @@ export function QuickSession({
   /** زيادة/نقصان وجه: يُعاد حساب النهاية من البداية نفسها */
   // المراجعة النازلة بالصفحات تُبنى من طرفها الأعلى («إلى») نزولاً؛ البقية من «من»
   const anchorIsTo = (s: Student, key: PartKey) => modeOf(s, key) === "pageDesc";
+  /** امتداد المقطع بالصفحات (لا الأوجه المكتملة): حتى يزيد «+» صفحة كاملة دائماً
+      ولو كانت النهاية الحالية في منتصف صفحة */
+  const spanOf = (s: Student, key: PartKey, r: PosRange): number => {
+    const mode = modeOf(s, key);
+    if (mode === "surahDesc") return Math.max(1, descPathIndex(r.from, r.to));
+    return Math.abs(pageOf(r.to.surah, r.to.ayah) - pageOf(r.from.surah, r.from.ayah)) + 1;
+  };
+  /** هل انتهى المقطع في منتصف وجه (يُعرض «+ جزء»)؟ */
+  const partialOf = (s: Student, key: PartKey, r: PosRange | null): boolean =>
+    !!r && (partVerdict(rangePart(r), 0, modeOf(s, key) !== "asc", key === "muraja" ? "muraja" : "hifz")?.partialFace ?? false);
   const bump = (s: Student, key: PartKey, st: RowState, delta: number) => {
     const cur = rangeOf(s, key, st);
     if (!cur) return;
-    const k = Math.max(1, facesOf(s, key, cur) + delta);
+    const k = Math.max(1, spanOf(s, key, cur) + delta);
     const next = rangeForFaces(anchorIsTo(s, key) ? cur.to : cur.from, k, modeOf(s, key));
     if (next) setRow(s.id, { edit: { ...st.edit, [key]: next } }, st);
   };
@@ -508,6 +520,26 @@ export function QuickSession({
                           >
                             {st.attended ? "حاضرة ✓" : "غائبة ✗"}
                           </button>
+                          {i.existing && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm(`إرجاع «${s.name}» إلى «غير مسجّلة» لهذا اللقاء؟\nيُحذف سجلّها لهذا اللقاء فقط، وتسجّلينه لاحقاً بعد التأكد.`)) {
+                                  actions.removeRecitation(i.existing!.id);
+                                  setRows((r) => {
+                                    const next = { ...r };
+                                    delete next[s.id];
+                                    return next;
+                                  });
+                                }
+                              }}
+                              className="rounded-full bg-cream px-2 py-1 text-sm font-bold text-red-700"
+                              title="إلغاء التسجيل — تعود غير مسجّلة"
+                              aria-label="إلغاء التسجيل"
+                            >
+                              ↩️
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => setNoteOpen((o) => ({ ...o, [s.id]: !o[s.id] }))}
@@ -575,7 +607,8 @@ export function QuickSession({
                                       {p.icon} {p.label}
                                       {has && (
                                         <span className={`ms-1 font-normal ${on ? "text-white/85" : ""}`}>
-                                          ({ar(n)} {n === 1 ? "وجه" : n === 2 ? "وجهان" : "أوجه"})
+                                          ({ar(n)} {n === 1 ? "وجه" : n === 2 ? "وجهان" : "أوجه"}
+                                          {partialOf(s, p.key, r) ? " + جزء" : ""})
                                           {edited && " ✏️"}
                                         </span>
                                       )}
