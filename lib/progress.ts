@@ -244,15 +244,17 @@ function facesInfo(
   const fromAyah = part.fromAyah ?? 1;
   const a = pageOf(fromSurah, fromAyah);
   const endPage = partEndPage(part);
-  // نازلاً بالسور: مقطع يختم سورة ويبدأ التي قبلها («الحجرات ١٥ ← الفتح ٩»)
-  // = ما بقي من الأولى (حتى آخرها) + من أوّل الثانية إلى «إلى»
+  // نازلاً بالسور: مقطع يختم سورة (أو سوراً) ويدخل التي قبلها («الحجرات ١٥ ← الفتح ٩»،
+  // «الناس ١ ← الأعلى ١٩») = عدد الأوجه على المسار نفسه الذي يُبنى به «المطلوب»
+  // (كل سورة بصفحاتها، ولو تشاركت السور القصيرة صفحة واحدة)، ناقص وجهاً إن وقفت
+  // النهاية في منتصف وجه
   if (mode === "surahDesc" && part.toSurah && surahNumber(part.toSurah) < fromSurah) {
-    const first = facesInfo(
-      { ...part, toSurah: part.fromSurah, toAyah: surahLastAyah(fromSurah) },
-      mode
-    );
-    const second = facesInfo({ ...part, fromSurah: part.toSurah, fromAyah: 1 }, mode);
-    return { done: first.done + second.done, partial: second.partial };
+    const to = { surah: surahNumber(part.toSurah), ayah: part.toAyah ?? 1 };
+    const idx = descPathIndex({ surah: fromSurah, ayah: fromAyah }, to);
+    const pe = pageEnd(pageOf(to.surah, to.ayah));
+    const reachedEnd =
+      to.ayah >= surahLastAyah(to.surah) || (to.surah === pe.surah && to.ayah >= pe.ayah);
+    return { done: Math.max(0, reachedEnd ? idx : idx - 1), partial: !reachedEnd };
   }
   if (mode === "pageDesc") {
     // الحافة النازلة هي «من»: هل بلغت أوّل آية في صفحتها؟
