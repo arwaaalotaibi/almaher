@@ -113,6 +113,16 @@ export function descRangeLabel(from: Pos, to: Pos): string {
   return parts.join(" ثم ");
 }
 
+/** الطرف الأعلى للمراجعة النازلة: «الناس ١» (أي من أوّل السورة) يعني السورة كاملة،
+    فالحافة الفعلية آخر آية فيها. حافة داخل السورة تبقى كما هي (استئناف من لقاء سابق) */
+export function normalizeTopEdge(p: Pos): Pos {
+  return p.ayah === 1 ? { surah: p.surah, ayah: lastAyah(p.surah) } : p;
+}
+/** نصّ الطرف الأعلى: السورة الكاملة تُكتب من آيتها الأولى «الناس ١» */
+export function topEdgeLabel(p: Pos): string {
+  return p.ayah >= lastAyah(p.surah) ? refLabel(p.surah, 1) : refLabel(p.surah, p.ayah);
+}
+
 /* ================== الصياغة ================== */
 const arNum = (n: number) => n.toLocaleString("ar-EG");
 const FRAC: Record<string, string> = { "0.25": "ربع", "0.5": "نصف", "0.75": "ثلاثة أرباع" };

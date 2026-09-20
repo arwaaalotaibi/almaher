@@ -1,4 +1,4 @@
-import { advanceByFaces, descRangeLabel, rangeFaces } from "./faces";
+import { advanceByFaces, descRangeLabel, normalizeTopEdge, rangeFaces, topEdgeLabel } from "./faces";
 import {
   MUSHAF_PAGES,
   pageEnd,
@@ -121,19 +121,21 @@ function nextLabel(
   next?: Pos | null; // موضع بداية المقطع التالي
 } {
   if (!from || perH <= 0) return { label: "", fromPage: 0, toPage: 0, range: null };
-  const r = advanceByFaces(from, perH, mode);
   if (mode === "pageDesc") {
-    // المراجعة النازلة: «من» هو الطرف الأعلى، والمقطع يُخزَّن من الأدنى إلى الأعلى
-    const a = refLabel(from.surah, from.ayah);
+    // المراجعة النازلة: «من» هو الطرف الأعلى («الناس ١» = السورة كاملة)، والمقطع يُخزَّن من الأدنى إلى الأعلى
+    const top = normalizeTopEdge(from);
+    const r = advanceByFaces(top, perH, mode);
+    const a = topEdgeLabel(top);
     const b = refLabel(r.end.surah, r.end.ayah);
     return {
       label: a === b ? a : `${a} ← ${b}`,
       fromPage: pageOf(r.end.surah, r.end.ayah),
-      toPage: pageOf(from.surah, from.ayah),
-      range: { from: r.end, to: from },
+      toPage: pageOf(top.surah, top.ayah),
+      range: { from: r.end, to: top },
       next: r.next,
     };
   }
+  const r = advanceByFaces(from, perH, mode);
   const label =
     mode === "surahDesc"
       ? descRangeLabel(from, r.end)

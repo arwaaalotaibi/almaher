@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 import { ALLOWED_ABSENCES, absenceMessage } from "./absence";
 import { supabase } from "./supabase";
 import { ayahCount } from "./surahs";
-import { advanceByFaces, descRangeLabel, facesText } from "./faces";
+import { advanceByFaces, descRangeLabel, facesText, normalizeTopEdge, topEdgeLabel } from "./faces";
 import {
   hifzRangeLabel,
   MUSHAF_PAGES,
@@ -384,7 +384,7 @@ export function recitePartLabel(part?: RecitePart, reverse = false): string {
   const topAyah = part.toAyah ?? part.fromAyah ?? 1;
   const sn = surahNumber(topSurah);
   const top =
-    sn > 0 && topAyah === ayahCount(topSurah) && pageOf(sn, 1) === pageOf(sn, topAyah)
+    sn > 0 && topAyah >= ayahCount(topSurah)
       ? `${topSurah} ${(1).toLocaleString("ar-EG")}`
       : b;
   return `${top} ← ${a}`;
@@ -706,7 +706,7 @@ export function buildSchedule(
       ? normalizeDescStart({ surah: surahNumber(plan.startSurah), ayah: plan.startAyah || 1 })
       : { surah: surahNumber(plan.startSurah), ayah: plan.startAyah || 1 }
     : null;
-  let mPosCur: PathPos | null = mStartPos;
+  let mPosCur: PathPos | null = mStartPos && mDesc ? normalizeTopEdge(mStartPos) : mStartPos;
   const hMode: "asc" | "surahDesc" = hDesc ? "surahDesc" : "asc";
   const mMode: "asc" | "pageDesc" = mDesc ? "pageDesc" : "asc";
   const posLabel = (a: PathPos, b: PathPos) => {
@@ -745,7 +745,7 @@ export function buildSchedule(
     let mCount = perM;
     if (mPosCur && perM > 0) {
       const r = advanceByFaces(mPosCur, perM, mMode);
-      mLabel = posLabel(mPosCur, r.end);
+      mLabel = mDesc ? `${topEdgeLabel(mPosCur)} ← ${refLabel(r.end.surah, r.end.ayah)}` : posLabel(mPosCur, r.end);
       mCount = r.faces;
       mPosCur = r.next;
     } else if (plan.murStartSurah) {
