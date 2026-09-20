@@ -26,7 +26,7 @@ import {
   type PosRange,
 } from "@/lib/progress";
 import { surahName, surahNumber } from "@/lib/mushaf";
-import { facesText, topEdgeLabel } from "@/lib/faces";
+import { facesText } from "@/lib/faces";
 import { ayahCount, SURAHS } from "@/lib/surahs";
 import { PrimaryBtn, inputCls } from "./ui";
 import { supabase } from "@/lib/supabase";
@@ -646,7 +646,7 @@ export function QuickSession({
                                   return (
                                   <div className="mt-1 grid grid-cols-[1fr_auto_auto] items-center gap-1.5 rounded-lg bg-cream/60 px-2 py-1.5 text-sm">
                                     <span className="font-bold text-plum-700">
-                                      {`من ${toAnchored ? topEdgeLabel(fixed) : `${surahName(fixed.surah)} ${ar(fixed.ayah)}`} — إلى:`}
+                                      {`من ${surahName(fixed.surah)} ${ar(fixed.ayah)} — إلى:`}
                                     </span>
                                     <select
                                       className={`${inputCls} py-1 text-sm`}

@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 import { ALLOWED_ABSENCES, absenceMessage } from "./absence";
 import { supabase } from "./supabase";
 import { ayahCount } from "./surahs";
-import { advanceByFaces, descRangeLabel, facesText, normalizeTopEdge, topEdgeLabel } from "./faces";
+import { advanceByFaces, descRangeLabel, facesText } from "./faces";
 import {
   hifzRangeLabel,
   MUSHAF_PAGES,
@@ -706,9 +706,9 @@ export function buildSchedule(
       ? normalizeDescStart({ surah: surahNumber(plan.startSurah), ayah: plan.startAyah || 1 })
       : { surah: surahNumber(plan.startSurah), ayah: plan.startAyah || 1 }
     : null;
-  let mPosCur: PathPos | null = mStartPos && mDesc ? normalizeTopEdge(mStartPos) : mStartPos;
+  let mPosCur: PathPos | null = mStartPos;
   const hMode: "asc" | "surahDesc" = hDesc ? "surahDesc" : "asc";
-  const mMode: "asc" | "pageDesc" = mDesc ? "pageDesc" : "asc";
+  const mMode: "asc" | "surahDesc" = mDesc ? "surahDesc" : "asc"; // المراجعة النازلة بالسور كالحفظ
   const posLabel = (a: PathPos, b: PathPos) => {
     const x = refLabel(a.surah, a.ayah);
     const y = refLabel(b.surah, b.ayah);
@@ -745,7 +745,7 @@ export function buildSchedule(
     let mCount = perM;
     if (mPosCur && perM > 0) {
       const r = advanceByFaces(mPosCur, perM, mMode);
-      mLabel = mDesc ? `${topEdgeLabel(mPosCur)} ← ${refLabel(r.end.surah, r.end.ayah)}` : posLabel(mPosCur, r.end);
+      mLabel = posLabel(mPosCur, r.end); // نازلاً: «الناس ١ ← الملك ٣٠»
       mCount = r.faces;
       mPosCur = r.next;
     } else if (plan.murStartSurah) {

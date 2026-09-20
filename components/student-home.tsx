@@ -633,7 +633,7 @@ export function StudentHome() {
                   const tasmiLabel = log ? recitePartLabel(log.tasmi) : "";
                   const thLabel = log ? recitePartLabel(log.tathbit) : "";
                   const md = isMurDesc(me.plan);
-                  const murLabel = log ? recitePartLabel(log.muraja, md) : "";
+                  const murLabel = log ? recitePartLabel(log.muraja) : "";
                   // اللقاءات القادمة: المقطع مُسقَط من الموضع الفعلي (كالبطاقة)
                   const pj = !log ? prog.projected[s.n] : undefined;
                   const hifzPlan = pj?.hifzLabel || s.hifzLabel;

@@ -498,7 +498,7 @@ export function StudentSheet({
               const tasmiLabel = log ? recitePartLabel(log.tasmi) : "";
               const thLabel = log ? recitePartLabel(log.tathbit) : "";
               const md = isMurDesc(plan);
-              const murLabel = log ? recitePartLabel(log.muraja, md) : "";
+              const murLabel = log ? recitePartLabel(log.muraja) : "";
               // حكم كل قسم: أنجزت / زادت / ناقص — مقارنةً بمطلوب اللقاء
               const d = isDesc(plan);
               const vH = att && log ? partVerdict(log.tasmi, s.hifz, d) : null;

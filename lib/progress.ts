@@ -47,9 +47,11 @@ export const hifzMode = (plan?: Pick<CoursePlan, "direction"> | null): PathMode 
   isDesc(plan) ? "surahDesc" : "asc";
 export const murMode = (
   plan?: Pick<CoursePlan, "direction" | "murDirection"> | null
-): PathMode => (isMurDesc(plan) ? "pageDesc" : "asc");
-const modeOf = (desc: boolean, kind: "hifz" | "muraja"): PathMode =>
-  desc ? (kind === "muraja" ? "pageDesc" : "surahDesc") : "asc";
+): PathMode => (isMurDesc(plan) ? "surahDesc" : "asc"); // المراجعة النازلة بالسور كالحفظ: السورة كاملة ثم التي قبلها
+const modeOf = (desc: boolean, kind: "hifz" | "muraja"): PathMode => {
+  void kind; // الحفظ والمراجعة النازلان بمسار واحد (بالسور)
+  return desc ? "surahDesc" : "asc";
+};
 
 /** الآية التي تلي موضعاً معيّناً (تنتقل للسورة التالية عند نهاية السورة) */
 function ayahAfter(p: Pos): Pos {
@@ -136,8 +138,9 @@ function nextLabel(
     };
   }
   const r = advanceByFaces(from, perH, mode);
+  // نازلاً بالسور: «فصلت ٤٧ ← ٥٤ ثم غافر ١ ← ٨» عند عبور سورة واحدة، وإلا مختصر «الناس ١ ← الملك ٣٠»
   const label =
-    mode === "surahDesc"
+    mode === "surahDesc" && from.surah - r.end.surah <= 1
       ? descRangeLabel(from, r.end)
       : (() => {
           const a = refLabel(from.surah, from.ayah);
