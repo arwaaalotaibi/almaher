@@ -4,6 +4,7 @@ import { useSyncExternalStore } from "react";
 import { ALLOWED_ABSENCES, absenceMessage } from "./absence";
 import { supabase } from "./supabase";
 import { ayahCount } from "./surahs";
+import { advanceByFaces, descRangeLabel, facesText } from "./faces";
 import {
   hifzRangeLabel,
   MUSHAF_PAGES,
@@ -688,63 +689,32 @@ export function buildSchedule(
   while (first.getDay() !== dow) first.setDate(first.getDate() + 1);
 
   // «أوجه الحفظ» و«أوجه المراجعة» = كمية كل لقاء (تتراكم عبر المصحف)
-  const perH = Math.max(0, Math.round(plan.hifz || 0));
-  const perM = Math.max(0, Math.round(plan.murajaah || 0));
+  const perH = Math.max(0, Math.round((plan.hifz || 0) * 4) / 4); // بدقة الربع
+  const perM = Math.max(0, Math.round((plan.murajaah || 0) * 4) / 4);
 
-  const hPage0 = plan.startSurah
-    ? pageOf(surahNumber(plan.startSurah), plan.startAyah || 1)
-    : 0;
-  // الحفظ النازل «بالسور»: موضع البداية (آخر آية في السورة = لم تبدأ بعد)
-  let hPos: PathPos | null = plan.startSurah
-    ? normalizeDescStart({ surah: surahNumber(plan.startSurah), ayah: plan.startAyah || 1 })
-    : null;
-  const mPage0 = plan.murStartSurah
-    ? pageOf(surahNumber(plan.murStartSurah), plan.murStartAyah || 1)
-    : 0;
-  // بداية المراجعة النازلة كما أدخلتها الإدارة (الطرف الأعلى للمقطع الأول): «الناس ١»
+  // بداية المراجعة كما أدخلتها الإدارة (نازلاً: الطرف الأعلى للمقطع الأول): «الناس ١»
   const mStartPos: PathPos | null = plan.murStartSurah
     ? { surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 }
     : null;
-  /** نصّ مقطع المراجعة: نازلاً يُكتب من الطرف الأعلى (بداية الإدارة في المقطع الأول،
-      ثم آخر آية في الصفحة) إلى أوّل آية في الصفحة الدنيا؛ صاعداً كالحفظ */
-  const murLabel = (rng: Rng, first: boolean): string => {
-    if (!mDesc) return hifzRangeLabel(rng.from, rng.to);
-    const top = first && mStartPos ? mStartPos : pageEnd(rng.to);
-    const bottom = pageStart(rng.from);
-    const a = refLabel(top.surah, top.ayah);
-    const b = refLabel(bottom.surah, bottom.ayah);
-    return a === b ? a : `${a} ← ${b}`;
-  };
-
-  type Rng = { from: number; to: number };
-  const empty: Rng = { from: 0, to: 0 };
   const hDesc = isDesc(plan);
   const mDesc = isMurDesc(plan);
 
-  /** المقطع التالي بمقدار k صفحة من المؤشّر — صاعداً أو نازلاً.
-      يعيد المقطع (من الأدنى إلى الأعلى دائماً — يُقرأ بترتيب المصحف)
-      والمؤشّر الجديد، أو null إن انتهى المصحف. */
-  const step = (
-    cur: number,
-    k: number,
-    desc: boolean
-  ): { rng: Rng; next: number } | null => {
-    if (k <= 0) return null;
-    if (desc) {
-      if (cur < 1) return null;
-      const from = Math.max(1, cur - k + 1);
-      return { rng: { from, to: cur }, next: from - 1 };
-    }
-    if (cur > MUSHAF_PAGES) return null;
-    const to = Math.min(MUSHAF_PAGES, cur + k - 1);
-    return { rng: { from: cur, to }, next: to + 1 };
-  };
-
   const rows: ScheduleRow[] = [];
-  let hCur = hPage0; // مؤشّر صفحة الحفظ التالية
-  let mCur = mPage0; // مؤشّر صفحة المراجعة التالية
-  let prevH: Rng = empty; // حفظ اللقاء السابق (= تثبيت اللقاء الحالي)
-  let prevHLabel = ""; // نصّ حفظ اللقاء السابق (للنازل بالسور)
+  // مؤشّرات المواضع (آية): الحفظ من بدايته، والمراجعة من بدايتها (نازلاً: الطرف الأعلى)
+  let hPosCur: PathPos | null = plan.startSurah
+    ? hDesc
+      ? normalizeDescStart({ surah: surahNumber(plan.startSurah), ayah: plan.startAyah || 1 })
+      : { surah: surahNumber(plan.startSurah), ayah: plan.startAyah || 1 }
+    : null;
+  let mPosCur: PathPos | null = mStartPos;
+  const hMode: "asc" | "surahDesc" = hDesc ? "surahDesc" : "asc";
+  const mMode: "asc" | "pageDesc" = mDesc ? "pageDesc" : "asc";
+  const posLabel = (a: PathPos, b: PathPos) => {
+    const x = refLabel(a.surah, a.ayah);
+    const y = refLabel(b.surah, b.ayah);
+    return x === y ? x : `${x} ← ${y}`;
+  };
+  let prevHLabel = "";
   let prevHCount = 0;
   let ch = 0,
     ct = 0,
@@ -754,48 +724,32 @@ export function buildSchedule(
     const date = new Date(first);
     date.setDate(first.getDate() + i * 7);
 
-    // مقطع الحفظ الجديد لهذا اللقاء
-    let hRange: Rng = empty;
+    // مقطع الحفظ الجديد لهذا اللقاء — بمقدار perH وجه بدقة الربع على المسار
     let hLabel = "";
     let hCount = perH;
-    if (hPage0 && hDesc) {
-      // نازل بالسور: السورة من أوّلها إلى آخرها ثم السورة التي قبلها
-      if (hPos && perH > 0) {
-        const r = descSegments(hPos, perH);
-        hLabel = r.label;
-        hCount = r.pages;
-        hPos = r.next;
-      } else {
-        hCount = 0; // انتهى المصحف
-      }
-    } else if (hPage0) {
-      const s = step(hCur, perH, false);
-      if (s) {
-        hRange = s.rng;
-        hLabel = hifzRangeLabel(hRange.from, hRange.to);
-        hCount = hRange.to - hRange.from + 1;
-        hCur = s.next;
-      } else {
-        hCount = 0; // انتهى المصحف
-      }
+    if (hPosCur && perH > 0) {
+      const r = advanceByFaces(hPosCur, perH, hMode);
+      hLabel = hMode === "surahDesc" ? descRangeLabel(hPosCur, r.end) : posLabel(hPosCur, r.end);
+      hCount = r.faces;
+      hPosCur = r.next;
+    } else if (plan.startSurah) {
+      hCount = 0; // انتهى المصحف
     }
 
     // التثبيت = مقطع حفظ اللقاء السابق
     const tLabel = prevHLabel;
     const tCount = prevHCount;
 
-    // مقطع المراجعة (إن حُدّدت بدايتها)
-    let mRange: Rng = empty;
+    // مقطع المراجعة (إن حُدّدت بدايتها): نازلاً يُكتب من الطرف الأعلى إلى الأدنى
+    let mLabel = "";
     let mCount = perM;
-    if (mPage0) {
-      const s = step(mCur, perM, mDesc);
-      if (s) {
-        mRange = s.rng;
-        mCount = mRange.to - mRange.from + 1;
-        mCur = s.next;
-      } else {
-        mCount = 0;
-      }
+    if (mPosCur && perM > 0) {
+      const r = advanceByFaces(mPosCur, perM, mMode);
+      mLabel = posLabel(mPosCur, r.end);
+      mCount = r.faces;
+      mPosCur = r.next;
+    } else if (plan.murStartSurah) {
+      mCount = 0;
     }
 
     ch += hCount;
@@ -809,12 +763,11 @@ export function buildSchedule(
       murajaah: mCount,
       hifzLabel: hLabel,
       tathbitLabel: tLabel,
-      murajaahLabel: mRange.from ? murLabel(mRange, i === 0) : "",
+      murajaahLabel: mLabel,
       cumHifz: ch,
       cumTathbit: ct,
       cumMurajaah: cm,
     });
-    prevH = hRange;
     prevHLabel = hLabel;
     prevHCount = hCount;
   }
@@ -2443,9 +2396,9 @@ export function autoNotifsFor(
     if (r.attended) {
       const f = r.faces ?? { tasmi: 0, tathbit: 0, muraja: 0 };
       const parts: string[] = [];
-      if (f.tasmi) parts.push(`📖 حفظ ${f.tasmi.toLocaleString("ar-EG")}`);
-      if (f.tathbit) parts.push(`📌 تثبيت ${f.tathbit.toLocaleString("ar-EG")}`);
-      if (f.muraja) parts.push(`🔁 مراجعة ${f.muraja.toLocaleString("ar-EG")}`);
+      if (f.tasmi) parts.push(`📖 حفظ ${facesText(f.tasmi)}`);
+      if (f.tathbit) parts.push(`📌 تثبيت ${facesText(f.tathbit)}`);
+      if (f.muraja) parts.push(`🔁 مراجعة ${facesText(f.muraja)}`);
       const praise = PRAISE[(r.date.replace(/-/g, "").length + r.id.charCodeAt(0)) % PRAISE.length];
       out.push({
         id: `auto:session:${r.id}:ok`,

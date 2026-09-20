@@ -104,6 +104,16 @@ function tomorrowKuwait(): { iso: string; weekday: number } {
 }
 
 
+/** «وجه»، «وجه ونصف»، «وجهان وربع»، «٣ أوجه» — نسخة مطابقة لـ lib/faces.ts */
+function facesText(n: number): string {
+  const q = Math.round(Math.max(0, n) * 4) / 4;
+  const whole = Math.floor(q);
+  const frac = ({ "0.25": "ربع", "0.5": "نصف", "0.75": "ثلاثة أرباع" } as Record<string, string>)[String(q - whole)] ?? "";
+  if (whole === 0) return frac ? `${frac} وجه` : "٠ وجه";
+  const base = whole === 1 ? "وجه" : whole === 2 ? "وجهان" : whole <= 10 ? `${ar(whole)} أوجه` : `${ar(whole)} وجهاً`;
+  return frac ? `${base} و${frac}` : base;
+}
+
 /** لائحة الغياب: المسموح ٣ غيابات في الفصل — نسخة مطابقة لـ lib/absence.ts في التطبيق */
 const ALLOWED_ABSENCES = 3;
 const ORD = ["", "الأول", "الثاني", "الثالث", "الرابع", "الخامس", "السادس"];
@@ -307,9 +317,9 @@ Deno.serve(async (req) => {
       let text: string;
       if (it.attended) {
         const parts: string[] = [];
-        if (it.hifz) parts.push(`📖 حفظ ${ar(it.hifz)}`);
-        if (it.tathbit) parts.push(`📌 تثبيت ${ar(it.tathbit)}`);
-        if (it.muraja) parts.push(`🔁 مراجعة ${ar(it.muraja)}`);
+        if (it.hifz) parts.push(`📖 حفظ ${facesText(it.hifz)}`);
+        if (it.tathbit) parts.push(`📌 تثبيت ${facesText(it.tathbit)}`);
+        if (it.muraja) parts.push(`🔁 مراجعة ${facesText(it.muraja)}`);
         const praise = PRAISE[(seed + it.student_id.charCodeAt(0)) % PRAISE.length];
         title = name ? `أحسنتِ يا ${name} ✅` : "أحسنتِ ✅";
         text = (parts.length ? `سمّعتِ اليوم: ${parts.join(" · ")}

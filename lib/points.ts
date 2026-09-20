@@ -60,8 +60,9 @@ export function computeRace(
     // التسميع: حضور ١٠ + ٥ لكل مقرر مكتمل (حفظ / تثبيت / مراجعة).
     // المقرر = أوجه الخطة لكل لقاء، ومقرر التثبيت = حفظ اللقاء السابق الحاضر.
     // نمرّ على اللقاءات الحاضرة بترتيب التاريخ لمعرفة حفظ اللقاء السابق (ولو قبل الفترة).
-    const reqH = Math.max(0, Math.round(st.plan?.hifz || 0));
-    const reqM = Math.max(0, Math.round(st.plan?.murajaah || 0));
+    // المقرر بدقة الربع (١٫٥ وجه مثلاً)
+    const reqH = Math.max(0, Math.round((st.plan?.hifz || 0) * 4) / 4);
+    const reqM = Math.max(0, Math.round((st.plan?.murajaah || 0) * 4) / 4);
     const d = isDesc(st.plan);
     const md = isMurDesc(st.plan);
     const mine = recitations

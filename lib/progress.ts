@@ -1,3 +1,4 @@
+import { advanceByFaces, descRangeLabel, rangeFaces } from "./faces";
 import {
   MUSHAF_PAGES,
   pageEnd,
@@ -117,45 +118,36 @@ function nextLabel(
   fromPage: number;
   toPage: number;
   range: PosRange | null;
-  next?: Pos | null; // (نازل بالسور) موضع بداية المقطع التالي
+  next?: Pos | null; // موضع بداية المقطع التالي
 } {
   if (!from || perH <= 0) return { label: "", fromPage: 0, toPage: 0, range: null };
-  if (mode === "surahDesc") {
-    const r = descSegments(from, perH);
-    const last = r.segs[r.segs.length - 1];
-    if (!last) return { label: "", fromPage: 0, toPage: 0, range: null, next: null };
+  const r = advanceByFaces(from, perH, mode);
+  if (mode === "pageDesc") {
+    // المراجعة النازلة: «من» هو الطرف الأعلى، والمقطع يُخزَّن من الأدنى إلى الأعلى
+    const a = refLabel(from.surah, from.ayah);
+    const b = refLabel(r.end.surah, r.end.ayah);
     return {
-      label: r.label,
-      fromPage: r.segs[0].fromPage,
-      toPage: last.toPage,
-      range: { from, to: last.to },
+      label: a === b ? a : `${a} ← ${b}`,
+      fromPage: pageOf(r.end.surah, r.end.ayah),
+      toPage: pageOf(from.surah, from.ayah),
+      range: { from: r.end, to: from },
       next: r.next,
     };
   }
-  if (mode === "pageDesc") {
-    const toPage = pageOf(from.surah, from.ayah);
-    const fromPage = Math.max(1, toPage - perH + 1);
-    const start = pageStart(fromPage);
-    // المراجعة النازلة تُكتب من حيث تبدأ الطالبة فعلاً: «الناس ١ ← الملك ٣٠»
-    const a = refLabel(from.surah, from.ayah);
-    const b = refLabel(start.surah, start.ayah);
-    return {
-      label: a === b ? a : `${a} ← ${b}`,
-      fromPage,
-      toPage,
-      range: { from: start, to: from },
-    };
-  }
-  const fromPage = pageOf(from.surah, from.ayah);
-  const toPage = Math.min(MUSHAF_PAGES, fromPage + perH - 1);
-  const end = pageEnd(toPage);
-  const a = refLabel(from.surah, from.ayah);
-  const b = refLabel(end.surah, end.ayah);
+  const label =
+    mode === "surahDesc"
+      ? descRangeLabel(from, r.end)
+      : (() => {
+          const a = refLabel(from.surah, from.ayah);
+          const b = refLabel(r.end.surah, r.end.ayah);
+          return a === b ? a : `${a} ← ${b}`;
+        })();
   return {
-    label: a === b ? a : `${a} ← ${b}`,
-    fromPage,
-    toPage,
-    range: { from, to: end },
+    label,
+    fromPage: pageOf(from.surah, from.ayah),
+    toPage: pageOf(r.end.surah, r.end.ayah),
+    range: { from, to: r.end },
+    next: r.next,
   };
 }
 
@@ -240,42 +232,14 @@ function facesInfo(
 ): { done: number; partial: boolean } {
   if (!part || part.status !== "done" || !part.fromSurah)
     return { done: 0, partial: false };
-  const fromSurah = surahNumber(part.fromSurah);
-  const fromAyah = part.fromAyah ?? 1;
-  const a = pageOf(fromSurah, fromAyah);
-  const endPage = partEndPage(part);
-  // نازلاً بالسور: مقطع يختم سورة ويبدأ التي قبلها («الحجرات ١٥ ← الفتح ٩»)
-  // = ما بقي من الأولى (حتى آخرها) + من أوّل الثانية إلى «إلى»
-  if (mode === "surahDesc" && part.toSurah && surahNumber(part.toSurah) < fromSurah) {
-    const first = facesInfo(
-      { ...part, toSurah: part.fromSurah, toAyah: surahLastAyah(fromSurah) },
-      mode
-    );
-    const second = facesInfo({ ...part, fromSurah: part.toSurah, fromAyah: 1 }, mode);
-    return { done: first.done + second.done, partial: second.partial };
-  }
-  if (mode === "pageDesc") {
-    // الحافة النازلة هي «من»: هل بلغت أوّل آية في صفحتها؟
-    const ps = pageStart(a);
-    const reachedStart =
-      fromSurah < ps.surah || (fromSurah === ps.surah && fromAyah <= ps.ayah);
-    const completed = reachedStart ? a : a + 1;
-    return { done: Math.max(0, endPage - completed + 1), partial: !reachedStart };
-  }
-  const pe = pageEnd(endPage);
-  const toSurah = surahNumber(part.toSurah || part.fromSurah);
-  const toAyah = part.toAyah ?? part.fromAyah ?? 1;
-  const reachedEnd =
-    toSurah > pe.surah ||
-    (toSurah === pe.surah && toAyah >= pe.ayah) ||
-    // نازلاً بالسور: ختم السورة يُتمّ وجهها الأخير
-    (mode === "surahDesc" && toAyah >= surahLastAyah(toSurah));
-  const completed = reachedEnd ? endPage : endPage - 1;
-  return {
-    done: Math.max(0, completed - a + 1),
-    // بدأت وجهاً آخر ولم تبلغي آخر آيةٍ فيه
-    partial: !reachedEnd,
+  const from = { surah: surahNumber(part.fromSurah), ayah: part.fromAyah ?? 1 };
+  const to = {
+    surah: surahNumber(part.toSurah || part.fromSurah),
+    ayah: part.toAyah ?? part.fromAyah ?? 1,
   };
+  // عدّ دقيق بربع الوجه (lib/faces): نصيب المقطع من كل صفحة بآياتها
+  const done = rangeFaces(from, to, mode);
+  return { done, partial: done % 1 !== 0 };
 }
 
 function faces(part?: RecitePart, mode: PathMode = "asc"): number {
@@ -322,7 +286,7 @@ export function partVerdict(
   // لا حكم إلا على قسم سُمّع فعلاً (وإن لم يكتمل منه وجه واحد)
   if (!part || part.status !== "done" || !part.fromSurah) return null;
   const { done, partial } = facesInfo(part, modeOf(desc, kind));
-  const req = Math.max(0, Math.round(required || 0));
+  const req = Math.max(0, Math.round((required || 0) * 4) / 4);
   const diff = done - req;
   return {
     done,
@@ -499,7 +463,7 @@ export function computeProgress(
     d ? expected - completedPageOf(edge, "pageDesc") : completedPageOf(edge) - expected;
 
   // المطلوب القادم للحفظ = من الآية التي تلي (أو تسبق) حافة الحفظ، بمقدار أوجه الخطة
-  const perHplan = Math.max(0, Math.round(plan.hifz || 0));
+  const perHplan = Math.max(0, Math.round((plan.hifz || 0) * 4) / 4);
   const hifzStartPos: Pos | null = plan.startSurah
     ? hMode === "surahDesc"
       ? normalizeDescStart({ surah: surahNumber(plan.startSurah), ayah: plan.startAyah || 1 })
@@ -533,7 +497,7 @@ export function computeProgress(
 
   // المطلوب القادم للمراجعة = من الآية التي تلي (أو تسبق) حافة المراجعة
   const lastMuraja = furthestEnd(mine.map((r) => ({ part: r.muraja })), mMode);
-  const perMplan = Math.max(0, Math.round(plan.murajaah || 0));
+  const perMplan = Math.max(0, Math.round((plan.murajaah || 0) * 4) / 4);
   const murStartPos: Pos | null = plan.murStartSurah
     ? { surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 }
     : null;

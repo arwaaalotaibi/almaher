@@ -1,3 +1,5 @@
+import { facesText } from "./faces";
+
 const ar = (n: number) => n.toLocaleString("ar-EG");
 
 /** صيغة عربية سليمة للمعدود: مفرد / مثنى / جمع (٣–١٠) / تمييز مفرد (١١+) */
@@ -11,17 +13,17 @@ export function countLabel(
   return `${ar(n)} ${forms.many}`;
 }
 
-/** أوجه: «وجه واحد، وجهين، ٣ أوجه، ١١ وجهاً» */
+/** أوجه: «وجه واحد، وجهين، ٣ أوجه، ١١ وجهاً» — وبالكسور: «وجه ونصف، وجهين وربع» */
 export const facesLabel = (n: number) =>
-  countLabel(n, { one: "وجه واحد", two: "وجهين", few: "أوجه", many: "وجهاً" });
+  facesText(n, { one: "وجه واحد", two: "وجهين", few: "أوجه", many: "وجهاً" });
 
 /** أوجه بعد فعل (نصب): «زدتِ وجهاً، وجهين، ٣ أوجه…» */
 export const facesAcc = (n: number) =>
-  countLabel(n, { one: "وجهاً", two: "وجهين", few: "أوجه", many: "وجهاً" });
+  facesText(n, { one: "وجهاً", two: "وجهين", few: "أوجه", many: "وجهاً" });
 
 /** أوجه بعد «ناقص/باقي»: «ناقص وجه، وجهين، ٣ أوجه…» */
 export const facesPlain = (n: number) =>
-  countLabel(n, { one: "وجه", two: "وجهين", few: "أوجه", many: "وجهاً" });
+  facesText(n, { one: "وجه", two: "وجهين", few: "أوجه", many: "وجهاً" });
 
 /** لقاءات: «لقاء واحد، لقاءين، ٣ لقاءات، ١١ لقاءً» */
 export const meetingsLabel = (n: number) =>
