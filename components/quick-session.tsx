@@ -44,6 +44,8 @@ interface RowState {
   edit?: Partial<Record<PartKey, PosRange>>;
   // 📝 ملاحظة اللقاء (undefined = كما هي في السجلّ المحفوظ)
   note?: string;
+  // 🔢 عدد أوجه يدوي لقسم — يغلب الحساب التلقائي (يُحفظ مع السجلّ ويُبنى عليه السباق)
+  faces?: Partial<Record<PartKey, number>>;
 }
 
 const PARTS: { key: PartKey; icon: string; label: string }[] = [
@@ -211,12 +213,19 @@ export function QuickSession({
   /** هل انتهى المقطع في منتصف وجه (يُعرض «+ جزء»)؟ */
   const partialOf = (s: Student, key: PartKey, r: PosRange | null): boolean =>
     !!r && (partVerdict(rangePart(r), 0, modeOf(s, key) !== "asc", key === "muraja" ? "muraja" : "hifz")?.partialFace ?? false);
+  /** عدد الأوجه المعروض/المحفوظ لقسم: اليدوي إن أُدخل، وإلا المحفوظ في السجلّ (إن لم يُعدَّل المقطع)، وإلا الحساب التلقائي */
+  const countOf = (s: Student, key: PartKey, st: RowState, r: PosRange | null): number => {
+    if (st.faces?.[key] !== undefined) return st.faces[key]!;
+    const saved = info[s.id]?.existing?.faces?.[key];
+    if (!st.edit?.[key] && saved !== undefined) return saved;
+    return facesOf(s, key, r);
+  };
   const bump = (s: Student, key: PartKey, st: RowState, delta: number) => {
     const cur = rangeOf(s, key, st);
     if (!cur) return;
     const k = Math.max(1, spanOf(s, key, cur) + delta);
     const next = rangeForFaces(anchorIsTo(s, key) ? cur.to : cur.from, k, modeOf(s, key));
-    if (next) setRow(s.id, { edit: { ...st.edit, [key]: next } }, st);
+    if (next) setRow(s.id, { edit: { ...st.edit, [key]: next }, faces: { ...st.faces, [key]: undefined } }, st);
   };
   /** تعديل أي طرف من المقطع بدقة الآية: «من» أو «إلى» (بترتيب المصحف) */
   const setEdge = (
@@ -228,7 +237,7 @@ export function QuickSession({
   ) => {
     const cur = rangeOf(s, key, st);
     if (!cur) return;
-    setRow(s.id, { edit: { ...st.edit, [key]: { ...cur, [edge]: pos } } }, st);
+    setRow(s.id, { edit: { ...st.edit, [key]: { ...cur, [edge]: pos } }, faces: { ...st.faces, [key]: undefined } }, st);
   };
 
   const sessionNo = termRows?.find((r) => dateKey(r.date) === date)?.n;
@@ -247,7 +256,18 @@ export function QuickSession({
         st.attended && st.tathbit ? rangePart(rangeOf(s, "tathbit", st)) : { status: "none" },
       note: st.note ?? i.existing?.note ?? "",
     };
-    data.faces = logFaces(data, s.plan);
+    const auto = logFaces(data, s.plan);
+    const manual = Object.fromEntries(
+      Object.entries(st.faces ?? {}).filter(([, v]) => typeof v === "number" && !Number.isNaN(v))
+    ) as Partial<Record<PartKey, number>>;
+    // سجلّ قائم بلا تعديل مقطع: نُبقي أوجهه المحفوظة (قد تكون مُدخلة يدوياً)
+    const keep = (k: PartKey) =>
+      !st.edit?.[k] && i.existing?.faces?.[k] !== undefined ? i.existing.faces[k] : auto[k];
+    data.faces = {
+      tasmi: manual.tasmi ?? keep("tasmi"),
+      tathbit: manual.tathbit ?? keep("tathbit"),
+      muraja: manual.muraja ?? keep("muraja"),
+    };
     if (i.existing) actions.updateRecitation(i.existing.id, data);
     else actions.addRecitation(data);
     // نُفرغ تعديلات هذا الصف فقط — يُعرض بعدها من سجلّه المحفوظ
@@ -584,7 +604,8 @@ export function QuickSession({
                             const edited = !!st.edit?.[p.key];
                             const ek = `${s.id}:${p.key}`;
                             const isEditing = editing === ek;
-                            const n = has ? facesOf(s, p.key, r) : 0;
+                            const n = has ? countOf(s, p.key, st, r) : 0;
+                            const manual = st.faces?.[p.key] !== undefined;
                             return (
                               <div key={p.key}>
                                 <div className="flex items-stretch gap-1">
@@ -608,8 +629,8 @@ export function QuickSession({
                                       {has && (
                                         <span className={`ms-1 font-normal ${on ? "text-white/85" : ""}`}>
                                           ({ar(n)} {n === 1 ? "وجه" : n === 2 ? "وجهان" : "أوجه"}
-                                          {partialOf(s, p.key, r) ? " + جزء" : ""})
-                                          {edited && " ✏️"}
+                                          {!manual && partialOf(s, p.key, r) ? " + جزء" : ""})
+                                          {(edited || manual) && " ✏️"}
                                         </span>
                                       )}
                                     </span>
@@ -691,6 +712,25 @@ export function QuickSession({
                                   </div>
                                   );
                                 })()}
+                                {has && on && isEditing && r && (
+                                  <div className="mt-1 grid grid-cols-[1fr_auto] items-center gap-1.5 rounded-lg bg-cream/60 px-2 py-1.5 text-sm">
+                                    <span className="font-bold text-plum-700">
+                                      🔢 عدد الأوجه
+                                      <span className="block text-[10px] font-normal text-silver-600">اكتبيه إن اختلف عن الحساب التلقائي</span>
+                                    </span>
+                                    <input
+                                      type="number"
+                                      inputMode="decimal"
+                                      step="0.5"
+                                      min="0"
+                                      className={`${inputCls} w-24 py-1 text-center text-base font-bold`}
+                                      value={countOf(s, p.key, st, r)}
+                                      onChange={(e) =>
+                                        setRow(s.id, { faces: { ...st.faces, [p.key]: Number(e.target.value) } }, st)
+                                      }
+                                    />
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
