@@ -246,8 +246,8 @@ export function QuickSession({
       delete next[s.id];
       return next;
     });
+    // يبقى الزر أخضر «تم الاعتماد» حتى يُعدَّل الصف من جديد
     setJustSaved((j) => ({ ...j, [s.id]: Date.now() }));
-    setTimeout(() => setJustSaved((j) => (j[s.id] ? { ...j, [s.id]: 0 } : j)), 2500);
     const item = itemOf(s, st, data);
     if (!batch) pushSession([item]);
     return item;
@@ -545,15 +545,21 @@ export function QuickSession({
                             type="button"
                             onClick={() => saveOne(s)}
                             className={`rounded-full px-2.5 py-1 text-sm font-bold transition ${
-                              justSaved[s.id]
-                                ? "bg-emerald-600 text-white"
-                                : rows[s.id]
-                                  ? "bg-amber-500 text-white"
+                              rows[s.id]
+                                ? "bg-amber-500 text-white"
+                                : justSaved[s.id] || i.existing
+                                  ? "bg-emerald-600 text-white"
                                   : "bg-plum-600 text-white"
                             }`}
-                            title="اعتماد سجلّ هذه الطالبة وحدها"
+                            title={
+                              rows[s.id]
+                                ? "اعتماد سجلّ هذه الطالبة وحدها"
+                                : justSaved[s.id] || i.existing
+                                  ? "تم اعتماد سجلّ هذه الطالبة — عدّلي ثم اضغطي من جديد للتصحيح"
+                                  : "اعتماد سجلّ هذه الطالبة وحدها"
+                            }
                           >
-                            {justSaved[s.id] ? "تم ✓" : rows[s.id] ? "💾 اعتماد*" : "💾 اعتماد"}
+                            {rows[s.id] ? "💾 اعتماد*" : justSaved[s.id] || i.existing ? "✓ تم الاعتماد" : "💾 اعتماد"}
                           </button>
                         </span>
                       </div>
@@ -699,7 +705,7 @@ export function QuickSession({
                 : `حفظ ${filter === "all" ? "الجميع" : "المعروضات"} — لقاء ${sessionNo ? ar(sessionNo) : ""} لـ ${ar(visible.reduce((n, g) => n + g.list.length, 0))} طالبة`}
             </PrimaryBtn>
             <p className="mt-1.5 text-center text-[10px] text-silver-600">
-              «اعتماد*» بعلامة النجمة = صفّ فيه تعديل لم يُحفظ بعد
+              «اعتماد*» بعلامة النجمة = صفّ فيه تعديل لم يُحفظ بعد · الأخضر «تم الاعتماد» = محفوظ
             </p>
           </div>
         </div>
