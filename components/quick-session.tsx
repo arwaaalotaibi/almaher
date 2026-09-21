@@ -521,6 +521,12 @@ export function QuickSession({
                                     delete next[s.id];
                                     return next;
                                   });
+                                  // يعود الزر إلى «اعتماد» فوراً لا بعد تحديث الصفحة
+                                  setJustSaved((j) => {
+                                    const next = { ...j };
+                                    delete next[s.id];
+                                    return next;
+                                  });
                                 }
                               }}
                               className="rounded-full bg-cream px-2 py-1 text-sm font-bold text-red-700"
