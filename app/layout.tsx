@@ -38,6 +38,14 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl" className={`${amiri.variable} ${naskh.variable}`}>
       <body className="pattern-bg font-body antialiased">
+        {/* سكربت طوارئ بصيغة قديمة يعمل على أي متصفح: إن بقيت شاشة «جاري التحميل»
+            ٢٠ ثانية (كود التطبيق لم يشتغل أو الاتصال معلّق) يُظهر رسالة وزر إعادة التحميل */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "setTimeout(function(){var b=document.getElementById('almaher-boot');var s=document.getElementById('almaher-boot-slow');if(b&&s){s.hidden=false;}},20000);",
+          }}
+        />
         <AuthGate>{children}</AuthGate>
       </body>
     </html>

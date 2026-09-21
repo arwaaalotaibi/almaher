@@ -35,6 +35,9 @@ export function useRole(): Role {
 
 type Status = "loading" | "login" | "ready";
 
+/** أقصى انتظار للإقلاع قبل اللجوء إلى النسخة المحفوظة أو شاشة الدخول */
+const BOOT_TIMEOUT_MS = 15000;
+
 /** بوابة الدخول: ثلاث شاشات — إدارة، معلّمات، طالبات */
 export function AuthGate({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
@@ -77,7 +80,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
           }
         }
       }
-      subscribeRealtime();
+      try {
+        subscribeRealtime();
+      } catch {
+        /* المزامنة الحيّة كماليّة — لا توقف الدخول */
+      }
     }
     setActiveRole(r);
     setStatus("ready");
@@ -93,15 +100,17 @@ export function AuthGate({ children }: { children: ReactNode }) {
     const teacherCode = params?.get("teacher") || null;
     if (teacherCode) {
       window.history.replaceState(null, "", window.location.pathname);
-      claimTeacher(teacherCode).then((err) => {
-        if (!mounted) return;
-        if (err) {
-          setRole("teacher");
-          setError(err);
-          setPassword(teacherCode);
-          setStatus("login");
-        }
-      });
+      claimTeacher(teacherCode)
+        .catch(() => "تعذّر الاتصال، حاولي لاحقاً")
+        .then((err) => {
+          if (!mounted) return;
+          if (err) {
+            setRole("teacher");
+            setError(err);
+            setPassword(teacherCode);
+            setStatus("login");
+          }
+        });
       return () => {
         mounted = false;
       };
@@ -114,28 +123,49 @@ export function AuthGate({ children }: { children: ReactNode }) {
     if (linkCode) {
       // إزالة الرمز من شريط العنوان حتى لا يبقى في السجل
       window.history.replaceState(null, "", window.location.pathname);
-      claimStudent(linkCode).then((err) => {
-        if (!mounted) return;
-        if (err) {
-          setError(err);
-          setPassword(linkCode);
-          setStatus("login");
-        }
-      });
+      claimStudent(linkCode)
+        .catch(() => "تعذّر الاتصال، حاولي لاحقاً")
+        .then((err) => {
+          if (!mounted) return;
+          if (err) {
+            setError(err);
+            setPassword(linkCode);
+            setStatus("login");
+          }
+        });
       return () => {
         mounted = false;
       };
     }
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!mounted) return;
+    // إقلاع محمي: أي خطأ أو تأخّر طويل لا يترك الطالبة على «جاري التحميل» إلى الأبد
+    let settled = false;
+    const fallback = () => {
+      if (!mounted || settled) return;
+      settled = true;
+      // جهاز سبق ربطه بطالبة/معلّمة: نفتح النسخة المحفوظة على الجهاز
+      const claimedTeacher = window.localStorage.getItem(TEACHER_CLAIMED_KEY) === "1";
+      const pickedStudent = !!window.localStorage.getItem(STUDENT_PICK_KEY);
+      if (claimedTeacher) void init("teacher");
+      else if (pickedStudent) void init("student");
+      else {
+        setError("تعذّر الاتصال — تحققي من الإنترنت ثم أعيدي المحاولة");
+        setStatus("login");
+      }
+    };
+    const bootTimer = window.setTimeout(fallback, BOOT_TIMEOUT_MS);
+    const boot = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!mounted || settled) return;
       const user = data.session?.user;
       if (!user) {
+        settled = true;
         setStatus("login");
         return;
       }
       // إدارة/معلّمة: حساب بريدي
       const r = roleFromEmail(user.email);
       if (r) {
+        settled = true;
         void init(r);
         return;
       }
@@ -144,7 +174,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
         supabase.rpc("almaher_me"),
         supabase.rpc("almaher_me_teacher"),
       ]);
-      if (!mounted) return;
+      if (!mounted || settled) return;
+      settled = true;
       if (typeof tid === "string" && tid) {
         window.localStorage.setItem(TEACHER_PICK_KEY, tid);
         window.localStorage.setItem(TEACHER_CLAIMED_KEY, "1");
@@ -155,9 +186,16 @@ export function AuthGate({ children }: { children: ReactNode }) {
       } else {
         setStatus("login");
       }
-    });
+    };
+    boot()
+      .catch(() => {
+        // خطأ غير متوقّع (شبكة/تخزين): نلجأ إلى المسار الاحتياطي فوراً
+        fallback();
+      })
+      .finally(() => window.clearTimeout(bootTimer));
     return () => {
       mounted = false;
+      window.clearTimeout(bootTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -213,7 +251,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
     setError("");
 
     if (role === "student" || role === "teacher") {
-      const err = role === "teacher" ? await claimTeacher(password) : await claimStudent(password);
+      const err = await (role === "teacher" ? claimTeacher(password) : claimStudent(password)).catch(
+        () => "تعذّر الاتصال، حاولي لاحقاً"
+      );
       setBusy(false);
       if (err) setError(err);
       return;
@@ -233,11 +273,22 @@ export function AuthGate({ children }: { children: ReactNode }) {
   };
 
   if (status === "loading") {
+    // id يقرؤه سكربت الطوارئ في layout: إن بقيت هذه الشاشة طويلاً (حتى لو لم يشتغل
+    // كود التطبيق أصلاً على متصفح قديم) يعرض رسالة وزر إعادة التحميل
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-4">
+      <div id="almaher-boot" className="flex min-h-dvh flex-col items-center justify-center gap-4 px-6 text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.png" alt="الماهر" className="h-16 w-auto opacity-80" />
         <p className="text-sm font-bold text-silver-600">جاري التحميل…</p>
+        <div id="almaher-boot-slow" hidden className="text-sm text-plum-800">
+          <p className="mb-2">يطول التحميل… تأكدي من الإنترنت ثم أعيدي التحميل.</p>
+          <p className="mb-3 text-xs text-silver-600">
+            إن تكرّر: افتحي الرابط من Safari أو Chrome بدل واتساب، وحدّثي نظام الجوال إن كان قديماً.
+          </p>
+          <a href="/" className="inline-block rounded-full bg-plum-600 px-5 py-2 text-sm font-bold text-white">
+            🔄 إعادة التحميل
+          </a>
+        </div>
       </div>
     );
   }
