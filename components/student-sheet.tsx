@@ -76,24 +76,40 @@ export function StudentSheet({
 
   if (!student) return null;
 
+  /** هل تغيّرت بداية المراجعة أو اتجاهها عن الخطة المحفوظة؟ */
+  const murStartChanged = (a: CoursePlan, b: CoursePlan) =>
+    isMurDesc(a) !== isMurDesc(b) ||
+    (a.murStartSurah ?? "") !== (b.murStartSurah ?? "") ||
+    (a.murStartAyah ?? 1) !== (b.murStartAyah ?? 1);
+  /** سجلات مراجعة مسجّلة قبل اليوم — تغيير البداية بعدها يعني «من اليوم فصاعداً» لا تعديلها */
+  const hasOlderMurLogs = () => {
+    const today = dateKey(new Date());
+    return recitations.some(
+      (r) => r.studentId === student.id && r.attended && r.muraja.status === "done" && r.date < today
+    );
+  };
+
   const save = () => {
     if (!name.trim()) return;
     // بداية الحفظ/المراجعة تحدّد مقطع أوّل لقاء في الفصل فقط؛ وكل لقاء بعده يكمل من سابقه.
-    // فإن كان أوّل لقاء مسجّلاً بالفعل، يُضبط طرفُ بدايته على البداية الجديدة (وتُعاد أوجهه)
+    // فإن كان أوّل لقاء مسجّلاً بالفعل، يُضبط طرفُ بدايته على البداية الجديدة (وتُعاد أوجهه).
+    // أمّا تغيير بداية/اتجاه المراجعة بعد لقاءات سابقة فيسري من اليوم (murSince) وتبقى السجلات كما هي
+    const resetMur = murStartChanged(student.plan, plan) && hasOlderMurLogs();
+    const nextPlan: CoursePlan = resetMur ? { ...plan, murSince: dateKey(new Date()) } : plan;
     actions.updateStudent(student.id, {
       name: name.trim(),
       teacherId,
       halaqaId,
-      plan,
+      plan: nextPlan,
       note: note.trim(),
       phone: phone.trim(),
     });
-    alignFirstSession(plan);
+    alignFirstSession(nextPlan, !resetMur);
     onClose();
   };
 
-  /** أوّل لقاء مسجّل هذا الفصل يبدأ دائماً من بداية الخطة — حفظاً ومراجعةً */
-  const alignFirstSession = (p: CoursePlan) => {
+  /** أوّل لقاء مسجّل هذا الفصل يبدأ دائماً من بداية الخطة — حفظاً، ومراجعةً ما لم تُغيَّر بدايتها بعد لقاءات سابقة */
+  const alignFirstSession = (p: CoursePlan, alignMur = true) => {
     const termStart = halaqas.find((h) => h.id === halaqaId)?.termStart ?? "";
     const first = recitations
       .filter((r) => r.studentId === student.id && r.attended && (!termStart || r.date >= termStart))
@@ -110,7 +126,7 @@ export function StudentSheet({
       }
     }
     const muraja = { ...first.muraja };
-    if (muraja.status === "done" && p.murStartSurah) {
+    if (alignMur && muraja.status === "done" && p.murStartSurah) {
       const a = p.murStartAyah || 1;
       if (isMurDesc(p)) {
         // المراجعة النازلة بالصفحات: بداية الخطة هي الطرف الأعلى («إلى»)

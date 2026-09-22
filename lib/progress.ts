@@ -501,8 +501,10 @@ export function computeProgress(
   const nextFromPage = nh.fromPage;
   const nextToPage = nh.toPage;
 
-  // المطلوب القادم للمراجعة = من الآية التي تلي (أو تسبق) حافة المراجعة
-  const lastMuraja = furthestEnd(mine.map((r) => ({ part: r.muraja })), mMode);
+  // المطلوب القادم للمراجعة = من الآية التي تلي (أو تسبق) حافة المراجعة.
+  // إن غُيّرت بداية/اتجاه المراجعة بعد تسجيل لقاءات (murSince) فالسجلات الأقدم لا تحدّد الموضع
+  const murLogs = plan.murSince ? mine.filter((r) => r.date >= plan.murSince!) : mine;
+  const lastMuraja = furthestEnd(murLogs.map((r) => ({ part: r.muraja })), mMode);
   const perMplan = Math.max(0, Math.round((plan.murajaah || 0) * 4) / 4);
   const murStartPos: Pos | null = plan.murStartSurah
     ? { surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 }
