@@ -18,6 +18,8 @@ import {
   normalizeDigits,
   PLAN_FIELDS,
   recitePartLabel,
+  TATHBIT_SPANS,
+  tathbitSpan,
   useApp,
   type Student,
 } from "@/lib/store";
@@ -449,8 +451,8 @@ export function StudentSheet({
           📋 أوجه كل لقاء
         </p>
         <p className="mb-2 text-[11px] text-silver-600">
-          كمية كل لقاء — يحسب النظام مقطعها عبر المصحف، والتثبيت تلقائياً (= حفظ
-          اللقاء السابق)
+          كمية كل لقاء — يحسب النظام مقطعها عبر المصحف، والتثبيت تلقائياً (= حفظ{" "}
+          {TATHBIT_SPANS.find((t) => t.key === tathbitSpan(plan))?.label ?? "آخر لقاء"})
         </p>
         <div className="grid grid-cols-2 gap-2">
           {PLAN_FIELDS.map(({ key, label, icon }) => (
@@ -469,6 +471,33 @@ export function StudentSheet({
               />
             </label>
           ))}
+        </div>
+
+        {/* 📌 مدى التثبيت: حفظ آخر لقاء (الافتراضي) أو لقاءين أو ثلاثة */}
+        <div className="mt-3">
+          <span className="mb-1 block text-xs font-bold text-plum-700">📌 التثبيت = حفظ</span>
+          <div className="grid grid-cols-3 gap-2">
+            {TATHBIT_SPANS.map((t) => {
+              const on = tathbitSpan(plan) === t.key;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setPlan({ ...plan, tathbitSessions: t.key })}
+                  className={`rounded-xl border px-2 py-2 text-center transition ${
+                    on ? "border-plum-600 bg-plum-600 text-white" : "border-cream-dark bg-white text-plum-800"
+                  }`}
+                  title={t.hint}
+                >
+                  <span className="block text-sm font-bold">{t.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1 text-[11px] text-silver-600">
+            الافتراضي «آخر لقاء». عند «لقاءين» أو «٣» تُدمج مقاطع الحفظ السابقة في مقطع تثبيت واحد
+            في الجدول وشاشة التسميع والسباق.
+          </p>
         </div>
       </div>
 

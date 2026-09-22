@@ -100,6 +100,15 @@ export function advanceByFaces(from: Pos, k: number, mode: PathMode): { end: Pos
   return { end, next: stepPos(end, mode), faces: roundQuarter(acc) };
 }
 
+/** نصّ مقطع ممتدّ من موضع إلى موضع على المسار — نازلاً بالسور يُفصَّل إن عبر سورة واحدة فقط،
+    وإلا مختصر «من ← إلى» (يُستخدم لدمج حفظ عدّة لقاءات في مقطع تثبيت واحد) */
+export function spanLabel(from: Pos, to: Pos, mode: PathMode): string {
+  if (mode === "surahDesc" && from.surah - to.surah <= 1) return descRangeLabel(from, to);
+  const a = refLabel(from.surah, from.ayah);
+  const b = refLabel(to.surah, to.ayah);
+  return a === b ? a : `${a} ← ${b}`;
+}
+
 /** نصّ مقطع الحفظ النازل بالسور: «فصلت ٤٧ ← ٥٤ ثم غافر ١ ← ٨» */
 export function descRangeLabel(from: Pos, to: Pos): string {
   const parts: string[] = [];

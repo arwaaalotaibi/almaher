@@ -8,7 +8,9 @@ import {
   dateKey,
   EMPTY_PLAN,
   formatSchedDate,
+  mergeReciteParts,
   recitePartLabel,
+  tathbitSpan,
   useApp,
   type Halaqa,
   type RecitationLog,
@@ -127,7 +129,7 @@ export function QuickSession({
     return gs.map((g) => ({ ...g, list: [...g.list].sort((a, b) => a.name.localeCompare(b.name, "ar")) }));
   }, [groups, groupKey, alpha]);
 
-  // لكل طالبة: سجلّ هذا التاريخ إن وُجد، والمطلوب القادم، وآخر مقطع حفظ (= التثبيت)
+  // لكل طالبة: سجلّ هذا التاريخ إن وُجد، والمطلوب القادم، وحفظ آخر لقاء/لقاءين/ثلاثة مدمجاً (= التثبيت)
   const info = useMemo(() => {
     const map: Record<
       string,
@@ -147,7 +149,13 @@ export function QuickSession({
         // المطلوب القادم يُحسب من السجلات قبل هذا التاريخ (حتى لا يقفز بعد الحفظ)
         const before = mine.filter((r) => r.date < date);
         const p = computeProgress(s, before, halaqa);
-        const lastTasmi = before.find((r) => r.tasmi.status === "done")?.tasmi ?? null;
+        const lastTasmi = mergeReciteParts(
+          before
+            .filter((r) => r.tasmi.status === "done")
+            .slice(0, tathbitSpan(s.plan))
+            .reverse()
+            .map((r) => r.tasmi)
+        );
         map[s.id] = { existing, hifz: p.nextHifzRange, mur: p.nextMurRange, tathbit: lastTasmi };
       }
     return map;

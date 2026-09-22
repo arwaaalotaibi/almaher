@@ -2,6 +2,7 @@ import { partFaces } from "./progress";
 import {
   isDesc,
   isMurDesc,
+  tathbitSpan,
   type Halaqa,
   type ReadingProgress,
   type RecitationLog,
@@ -58,8 +59,8 @@ export function computeRace(
     let attends = 0;
 
     // التسميع: حضور ١٠ + ٥ لكل مقرر مكتمل (حفظ / تثبيت / مراجعة).
-    // المقرر = أوجه الخطة لكل لقاء، ومقرر التثبيت = حفظ اللقاء السابق الحاضر.
-    // نمرّ على اللقاءات الحاضرة بترتيب التاريخ لمعرفة حفظ اللقاء السابق (ولو قبل الفترة).
+    // المقرر = أوجه الخطة لكل لقاء، ومقرر التثبيت = حفظ آخر لقاء حاضر (أو لقاءين/ثلاثة بحسب الخطة).
+    // نمرّ على اللقاءات الحاضرة بترتيب التاريخ لمعرفة حفظ اللقاءات السابقة (ولو قبل الفترة).
     // المقرر بدقة الربع (١٫٥ وجه مثلاً)
     const reqH = Math.max(0, Math.round((st.plan?.hifz || 0) * 4) / 4);
     const reqM = Math.max(0, Math.round((st.plan?.murajaah || 0) * 4) / 4);
@@ -70,8 +71,10 @@ export function computeRace(
       .sort((a, b) =>
         a.date < b.date ? -1 : a.date > b.date ? 1 : (a.createdAt ?? "") < (b.createdAt ?? "") ? -1 : 1
       );
-    let prevTasmi = 0;
+    const kT = tathbitSpan(st.plan);
+    const recentTasmi: number[] = []; // أوجه حفظ آخر k لقاء حاضر
     for (const r of mine) {
+      const prevTasmi = recentTasmi.reduce((n, x) => n + x, 0);
       // الأوجه المحفوظة رقماً مع السجلّ (سجلات الزميلات تصل بها فقط)، وإلا من المقاطع
       const fH = r.faces?.tasmi ?? partFaces(r.tasmi, d);
       const fT = r.faces?.tathbit ?? partFaces(r.tathbit, d);
@@ -86,7 +89,8 @@ export function computeRace(
         if (fM > 0 && fM >= reqM) points += 5;
         if (reqH > 0 && fH > reqH) points += 5; // زيادة عن المقرر — مرة واحدة في اللقاء
       }
-      prevTasmi = fH;
+      recentTasmi.push(fH);
+      if (recentTasmi.length > kT) recentTasmi.shift();
     }
 
     // القراءة والاختبارات لا تدخل في النقاط حالياً (قرار الإدارة ١٢ سبتمبر ٢٠٢٦)

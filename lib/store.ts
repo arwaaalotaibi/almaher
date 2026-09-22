@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 import { ALLOWED_ABSENCES, absenceMessage } from "./absence";
 import { supabase } from "./supabase";
 import { ayahCount } from "./surahs";
-import { advanceByFaces, descRangeLabel, facesText } from "./faces";
+import { advanceByFaces, descRangeLabel, facesText, spanLabel } from "./faces";
 import {
   hifzRangeLabel,
   MUSHAF_PAGES,
@@ -48,6 +48,8 @@ export interface CoursePlan {
   hifz: number; // أوجه الحفظ
   tathbit: number; // أوجه التثبيت
   murajaah: number; // أوجه المراجعة لكل لقاء
+  /** 📌 التثبيت = حفظ آخر كم لقاء؟ ١ (الافتراضي) أو ٢ أو ٣ — تُدمج مقاطعها في مقطع واحد */
+  tathbitSessions?: number;
   start?: string; // (قديم — نص حر)
   direction?: HifzDirection; // اتجاه الحفظ (الافتراضي: صاعد)
   murDirection?: HifzDirection; // اتجاه المراجعة (الافتراضي: كاتجاه الحفظ)
@@ -79,6 +81,35 @@ export const EMPTY_PLAN: CoursePlan = {
   murStartSurah: "",
   murStartAyah: 1,
 };
+
+/** خيارات مدى التثبيت: حفظ آخر لقاء (الافتراضي) أو لقاءين أو ثلاثة */
+export const TATHBIT_SPANS: { key: 1 | 2 | 3; label: string; hint: string }[] = [
+  { key: 1, label: "آخر لقاء", hint: "حفظ اللقاء السابق فقط" },
+  { key: 2, label: "آخر لقاءين", hint: "حفظ اللقاءين السابقين معاً" },
+  { key: 3, label: "آخر ٣ لقاءات", hint: "حفظ اللقاءات الثلاثة السابقة معاً" },
+];
+
+/** مدى التثبيت الفعلي للخطة (١ إن لم يُحدَّد أو كانت القيمة غير صالحة) */
+export function tathbitSpan(plan?: Pick<CoursePlan, "tathbitSessions"> | null): 1 | 2 | 3 {
+  const n = plan?.tathbitSessions;
+  return n === 2 || n === 3 ? n : 1;
+}
+
+/** دمج مقاطع حفظ متتالية (من الأقدم إلى الأحدث) في مقطع واحد: من بداية الأقدم إلى نهاية الأحدث.
+    يعيد null إن لم يكن فيها مقطع مكتمل */
+export function mergeReciteParts(parts: (RecitePart | null | undefined)[]): RecitePart | null {
+  const done = parts.filter((p): p is RecitePart => !!p && p.status === "done" && !!p.fromSurah);
+  if (done.length === 0) return null;
+  const first = done[0];
+  const last = done[done.length - 1];
+  return {
+    status: "done",
+    fromSurah: first.fromSurah,
+    fromAyah: first.fromAyah ?? 1,
+    toSurah: last.toSurah || last.fromSurah,
+    toAyah: last.toAyah ?? last.fromAyah ?? 1,
+  };
+}
 
 /** نص بداية الحفظ للعرض */
 export function hifzStartLabel(plan?: CoursePlan): string {
@@ -633,7 +664,7 @@ export function sessionKindMeta(k: string) {
   return SESSION_KINDS.find((x) => x.key === k) ?? SESSION_KINDS[0];
 }
 
-/* أوجه كل لقاء — التثبيت يُحسب تلقائياً (= حفظ اللقاء السابق) */
+/* أوجه كل لقاء — التثبيت يُحسب تلقائياً (= حفظ آخر لقاء/لقاءين/٣ لقاءات بحسب الخطة) */
 export const PLAN_FIELDS = [
   { key: "hifz", label: "أوجه الحفظ", icon: "📖" },
   { key: "murajaah", label: "أوجه المراجعة", icon: "🔁" },
@@ -650,7 +681,7 @@ export interface ScheduleRow {
   tathbit: number;
   murajaah: number;
   hifzLabel: string; // مقطع الحفظ الجديد (سورة/آية) — إن عُرفت بداية الحفظ
-  tathbitLabel: string; // مقطع التثبيت (= حفظ اللقاء الفائت)
+  tathbitLabel: string; // مقطع التثبيت (= حفظ آخر لقاء أو لقاءين أو ثلاثة بحسب الخطة)
   murajaahLabel: string; // مقطع المراجعة — إن عُرفت بداية المراجعة
   cumHifz: number; // التراكمي حتى هذا اللقاء
   cumTathbit: number;
@@ -716,8 +747,9 @@ export function buildSchedule(
     const y = refLabel(b.surah, b.ayah);
     return x === y ? x : `${x} ← ${y}`;
   };
-  let prevHLabel = "";
-  let prevHCount = 0;
+  // حفظ اللقاءات السابقة (الأحدث آخراً) — التثبيت يدمج آخر k منها
+  const kT = tathbitSpan(plan);
+  const recentH: { start: PathPos | null; end: PathPos | null; count: number; label: string }[] = [];
   let ch = 0,
     ct = 0,
     cm = 0;
@@ -729,18 +761,30 @@ export function buildSchedule(
     // مقطع الحفظ الجديد لهذا اللقاء — بمقدار perH وجه بدقة الربع على المسار
     let hLabel = "";
     let hCount = perH;
+    let hStart: PathPos | null = null;
+    let hEnd: PathPos | null = null;
     if (hPosCur && perH > 0) {
       const r = advanceByFaces(hPosCur, perH, hMode);
       hLabel = hMode === "surahDesc" ? descRangeLabel(hPosCur, r.end) : posLabel(hPosCur, r.end);
       hCount = r.faces;
+      hStart = hPosCur;
+      hEnd = r.end;
       hPosCur = r.next;
     } else if (plan.startSurah) {
       hCount = 0; // انتهى المصحف
     }
 
-    // التثبيت = مقطع حفظ اللقاء السابق
-    const tLabel = prevHLabel;
-    const tCount = prevHCount;
+    // التثبيت = حفظ آخر لقاء (الافتراضي) أو آخر لقاءين/ثلاثة مدمجاً من بداية الأقدم إلى نهاية الأحدث
+    const span = recentH.slice(-kT);
+    const tCount = span.reduce((n, x) => n + x.count, 0);
+    const oldest = span[0];
+    const newest = span[span.length - 1];
+    const tLabel =
+      span.length <= 1
+        ? (newest?.label ?? "")
+        : oldest.start && newest.end
+          ? spanLabel(oldest.start, newest.end, hMode)
+          : newest.label;
 
     // مقطع المراجعة (إن حُدّدت بدايتها): نازلاً يُكتب من الطرف الأعلى إلى الأدنى
     let mLabel = "";
@@ -770,8 +814,8 @@ export function buildSchedule(
       cumTathbit: ct,
       cumMurajaah: cm,
     });
-    prevHLabel = hLabel;
-    prevHCount = hCount;
+    recentH.push({ start: hStart, end: hEnd, count: hCount, label: hLabel });
+    if (recentH.length > kT) recentH.shift();
   }
   return rows;
 }

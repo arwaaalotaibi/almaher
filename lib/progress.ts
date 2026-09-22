@@ -1,4 +1,4 @@
-import { advanceByFaces, descRangeLabel, normalizeTopEdge, rangeFaces, topEdgeLabel } from "./faces";
+import { advanceByFaces, descRangeLabel, normalizeTopEdge, rangeFaces, spanLabel, topEdgeLabel } from "./faces";
 import {
   MUSHAF_PAGES,
   pageEnd,
@@ -22,6 +22,7 @@ import {
   isDesc,
   isMurDesc,
   recitePartLabel,
+  tathbitSpan,
   type CoursePlan,
   type Halaqa,
   type RecitationLog,
@@ -586,20 +587,45 @@ export function computeProgress(
   if (schedule && nextIdx > 0) {
     let hFrom: Pos | null = nextHifzFrom;
     let mFrom: Pos | null = nextMurFrom;
-    // تثبيت أول لقاء قادم = آخر مقطع سُمّع حفظاً فعلاً
-    const lastTasmiLog = mine.find((r) => r.tasmi.status === "done");
-    let prevHifz = recitePartLabel(lastTasmiLog?.tasmi);
+    // تثبيت أول لقاء قادم = حفظ آخر لقاء (أو لقاءين/ثلاثة بحسب الخطة) سُمّع فعلاً،
+    // ثم تتقدّم النافذة مع كل لقاء مُسقَط
+    const kT = tathbitSpan(plan);
+    const toRange = (p: RecitePart): PosRange | null =>
+      p.status === "done" && p.fromSurah
+        ? {
+            from: { surah: surahNumber(p.fromSurah), ayah: p.fromAyah ?? 1 },
+            to: { surah: surahNumber(p.toSurah || p.fromSurah), ayah: p.toAyah ?? p.fromAyah ?? 1 },
+          }
+        : null;
+    const recent: { range: PosRange | null; label: string }[] = mine
+      .filter((r) => r.tasmi.status === "done")
+      .slice(0, kT)
+      .reverse()
+      .map((r) => ({ range: toRange(r.tasmi), label: recitePartLabel(r.tasmi) }));
+    const tathbitOf = (): string => {
+      const span = recent.slice(-kT);
+      if (span.length === 0) return "";
+      const oldest = span[0];
+      const newest = span[span.length - 1];
+      if (span.length === 1) return newest.label;
+      return oldest.range && newest.range
+        ? spanLabel(oldest.range.from, newest.range.to, hMode)
+        : newest.label;
+    };
     for (let n = nextIdx; n <= schedule.length; n++) {
       const nh2 = nextLabel(hFrom, perHplan, hMode);
       const nm2 = nextLabel(mFrom, perMplan, mMode);
       projected[n] = {
         hifzLabel: nh2.label,
-        tathbitLabel: prevHifz,
+        tathbitLabel: tathbitOf(),
         murajaahLabel: nm2.label,
       };
       hFrom = nh2.fromPage ? edgeAfter(nh2, hMode) : null;
       mFrom = nm2.fromPage ? edgeAfter(nm2, mMode) : null;
-      prevHifz = nh2.label || prevHifz;
+      if (nh2.label) {
+        recent.push({ range: nh2.range, label: nh2.label });
+        if (recent.length > kT) recent.shift();
+      }
     }
   }
 
