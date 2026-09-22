@@ -177,9 +177,9 @@ function edgeAfter(
 }
 
 /* ================== إعادة ضبط سجلات الفصل على بداية الخطة ==================
-   أي تعديل في بداية الحفظ/المراجعة أو اتجاهها يسري من اللقاء الأول: إن كان أوّل لقاء
-   مسجّل لا يبدأ من بداية الخطة، يُعاد بناء مقاطع اللقاءات المسجّلة متسلسلةً من البداية
-   الجديدة، كلٌّ بمقدار أوجهه المسجّل نفسه (لا يتغيّر ما سُمّع كمّاً، بل موضعه فقط). */
+   أي تعديل في الخطة يسري من اللقاء الأول حتى لو كان مسجّلاً: عند حفظ الخطة تُبنى مقاطع
+   اللقاءات المسجّلة متسلسلةً من بداية الخطة، كلٌّ بمقدار أوجهه المسجّل نفسه (لا يتغيّر
+   ما سُمّع كمّاً، بل موضعه فقط)، ولا يُكتب إلا السجل الذي اختلف موضعه فعلاً. */
 
 const partOf = (r: PosRange): RecitePart => ({
   status: "done",
@@ -194,16 +194,8 @@ const samePart = (a: RecitePart, b: RecitePart) =>
   (a.toSurah || a.fromSurah) === (b.toSurah || b.fromSurah) &&
   (a.toAyah ?? a.fromAyah ?? 1) === (b.toAyah ?? b.fromAyah ?? 1);
 
-/** الطرف الذي «تبدأ» منه الطالبة في مقطع مسجّل، بحسب المسار */
-function startEdgeOf(p: RecitePart, mode: PathMode): Pos | null {
-  if (p.status !== "done" || !p.fromSurah) return null;
-  if (mode === "pageDesc")
-    return { surah: surahNumber(p.toSurah || p.fromSurah), ayah: p.toAyah ?? p.fromAyah ?? 1 };
-  return { surah: surahNumber(p.fromSurah), ayah: p.fromAyah ?? 1 };
-}
-
 /** سلسلة مقاطع لقسم واحد (حفظ أو مراجعة) من بداية الخطة، كلٌّ بأوجه سجلّه — يعيد المقاطع الجديدة
-    لكل سجلّ (null = لا تغيير). لا يفعل شيئاً إن كان أوّل سجلّ يبدأ من بداية الخطة أصلاً */
+    لكل سجلّ (null = لا تغيير في موضعه) */
 function realignPart(
   logs: RecitationLog[],
   key: "tasmi" | "muraja",
@@ -213,16 +205,6 @@ function realignPart(
 ): (RecitePart | null)[] {
   const none = logs.map(() => null);
   if (!start) return none;
-  const firstIdx = logs.findIndex((r) => r[key].status === "done" && !!r[key].fromSurah);
-  if (firstIdx < 0) return none;
-  const firstEdge = startEdgeOf(logs[firstIdx][key], mode);
-  const planEdge = mode === "pageDesc" ? normalizeTopEdge(start) : start;
-  const sameEdge =
-    !!firstEdge &&
-    (firstEdge.surah === planEdge.surah && firstEdge.ayah === planEdge.ayah ||
-      // «الناس ١» و«الناس ٦» طرف أعلى واحد
-      (mode === "pageDesc" && normalizeTopEdge(firstEdge).surah === planEdge.surah && normalizeTopEdge(firstEdge).ayah === planEdge.ayah));
-  if (sameEdge) return none;
   const out: (RecitePart | null)[] = [];
   let from: Pos | null = start;
   for (const r of logs) {
