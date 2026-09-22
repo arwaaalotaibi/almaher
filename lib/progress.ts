@@ -5,6 +5,7 @@ import {
   pageOf,
   pageStart,
   refLabel,
+  surahName,
   surahNumber,
 } from "./mushaf";
 import { SURAH_AYAHS } from "./surahs";
@@ -21,6 +22,7 @@ import {
   currentSessionIndex,
   isDesc,
   isMurDesc,
+  mergeReciteParts,
   recitePartLabel,
   tathbitSpan,
   type CoursePlan,
@@ -172,6 +174,131 @@ function edgeAfter(
   return nl.toPage > 0 && nl.toPage < MUSHAF_PAGES
     ? ayahAfter(pageEnd(nl.toPage))
     : null;
+}
+
+/* ================== إعادة ضبط سجلات الفصل على بداية الخطة ==================
+   أي تعديل في بداية الحفظ/المراجعة أو اتجاهها يسري من اللقاء الأول: إن كان أوّل لقاء
+   مسجّل لا يبدأ من بداية الخطة، يُعاد بناء مقاطع اللقاءات المسجّلة متسلسلةً من البداية
+   الجديدة، كلٌّ بمقدار أوجهه المسجّل نفسه (لا يتغيّر ما سُمّع كمّاً، بل موضعه فقط). */
+
+const partOf = (r: PosRange): RecitePart => ({
+  status: "done",
+  fromSurah: surahName(r.from.surah),
+  fromAyah: r.from.ayah,
+  toSurah: surahName(r.to.surah),
+  toAyah: r.to.ayah,
+});
+const samePart = (a: RecitePart, b: RecitePart) =>
+  a.fromSurah === b.fromSurah &&
+  (a.fromAyah ?? 1) === (b.fromAyah ?? 1) &&
+  (a.toSurah || a.fromSurah) === (b.toSurah || b.fromSurah) &&
+  (a.toAyah ?? a.fromAyah ?? 1) === (b.toAyah ?? b.fromAyah ?? 1);
+
+/** الطرف الذي «تبدأ» منه الطالبة في مقطع مسجّل، بحسب المسار */
+function startEdgeOf(p: RecitePart, mode: PathMode): Pos | null {
+  if (p.status !== "done" || !p.fromSurah) return null;
+  if (mode === "pageDesc")
+    return { surah: surahNumber(p.toSurah || p.fromSurah), ayah: p.toAyah ?? p.fromAyah ?? 1 };
+  return { surah: surahNumber(p.fromSurah), ayah: p.fromAyah ?? 1 };
+}
+
+/** سلسلة مقاطع لقسم واحد (حفظ أو مراجعة) من بداية الخطة، كلٌّ بأوجه سجلّه — يعيد المقاطع الجديدة
+    لكل سجلّ (null = لا تغيير). لا يفعل شيئاً إن كان أوّل سجلّ يبدأ من بداية الخطة أصلاً */
+function realignPart(
+  logs: RecitationLog[],
+  key: "tasmi" | "muraja",
+  start: Pos | null,
+  mode: PathMode,
+  desc: boolean
+): (RecitePart | null)[] {
+  const none = logs.map(() => null);
+  if (!start) return none;
+  const firstIdx = logs.findIndex((r) => r[key].status === "done" && !!r[key].fromSurah);
+  if (firstIdx < 0) return none;
+  const firstEdge = startEdgeOf(logs[firstIdx][key], mode);
+  const planEdge = mode === "pageDesc" ? normalizeTopEdge(start) : start;
+  const sameEdge =
+    !!firstEdge &&
+    (firstEdge.surah === planEdge.surah && firstEdge.ayah === planEdge.ayah ||
+      // «الناس ١» و«الناس ٦» طرف أعلى واحد
+      (mode === "pageDesc" && normalizeTopEdge(firstEdge).surah === planEdge.surah && normalizeTopEdge(firstEdge).ayah === planEdge.ayah));
+  if (sameEdge) return none;
+  const out: (RecitePart | null)[] = [];
+  let from: Pos | null = start;
+  for (const r of logs) {
+    const p = r[key];
+    if (p.status !== "done" || !p.fromSurah) {
+      out.push(null);
+      continue;
+    }
+    const k = r.faces?.[key] ?? partFaces(p, desc, key === "muraja" ? "muraja" : "hifz");
+    const nl: ReturnType<typeof nextLabel> | null = from && k > 0 ? nextLabel(from, k, mode) : null;
+    if (!nl?.range) {
+      out.push(null);
+      continue;
+    }
+    const np = partOf(nl.range);
+    out.push(samePart(np, p) ? null : np);
+    from = nl.fromPage ? edgeAfter(nl, mode) : null;
+  }
+  return out;
+}
+
+/** التعديلات اللازمة على سجلات الفصل (الحاضرة، من بداية الفصل، بترتيب التاريخ) لتبدأ من بداية الخطة
+    حفظاً ومراجعةً — يعيد لكل سجلّ يتغيّر بياناته الجديدة مع أوجهه */
+export function realignTermLogs(
+  logs: RecitationLog[],
+  plan: CoursePlan,
+  termStart: string
+): { id: string; data: Omit<RecitationLog, "id" | "createdAt"> }[] {
+  const mine = logs
+    .filter((r) => r.attended && (!termStart || r.date >= termStart))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (!mine.length) return [];
+  const hMode = hifzMode(plan);
+  const mMode = murMode(plan);
+  const hStart: Pos | null = plan.startSurah
+    ? isDesc(plan)
+      ? normalizeDescStart({ surah: surahNumber(plan.startSurah), ayah: plan.startAyah || 1 })
+      : { surah: surahNumber(plan.startSurah), ayah: plan.startAyah || 1 }
+    : null;
+  const mStart: Pos | null = plan.murStartSurah
+    ? { surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 }
+    : null;
+  const nh = realignPart(mine, "tasmi", hStart, hMode, isDesc(plan));
+  const nm = realignPart(mine, "muraja", mStart, mMode, isMurDesc(plan));
+  // التثبيت = حفظ اللقاءات السابقة: إن كان مطابقاً لها قبل الضبط يتبعها بعده
+  const kT = tathbitSpan(plan);
+  const prevTasmi = (i: number, list: RecitePart[]) =>
+    mergeReciteParts(
+      list
+        .slice(0, i)
+        .filter((p) => p.status === "done")
+        .slice(-kT)
+    );
+  const oldTasmi = mine.map((r) => r.tasmi);
+  const newTasmi = mine.map((r, i) => nh[i] ?? r.tasmi);
+  const out: { id: string; data: Omit<RecitationLog, "id" | "createdAt"> }[] = [];
+  mine.forEach((r, i) => {
+    let tathbit = r.tathbit;
+    if (nh.some(Boolean) && r.tathbit.status === "done") {
+      const was = prevTasmi(i, oldTasmi);
+      const now = prevTasmi(i, newTasmi);
+      if (was && now && samePart(r.tathbit, was) && !samePart(r.tathbit, now)) tathbit = now;
+    }
+    if (!nh[i] && !nm[i] && tathbit === r.tathbit) return;
+    const data = {
+      studentId: r.studentId,
+      date: r.date,
+      attended: r.attended,
+      tasmi: nh[i] ?? r.tasmi,
+      tathbit,
+      muraja: nm[i] ?? r.muraja,
+      note: r.note ?? "",
+    };
+    out.push({ id: r.id, data: { ...data, faces: logFaces(data, plan) } });
+  });
+  return out;
 }
 
 /* ================== خريطة الأجزاء ================== */
@@ -501,10 +628,8 @@ export function computeProgress(
   const nextFromPage = nh.fromPage;
   const nextToPage = nh.toPage;
 
-  // المطلوب القادم للمراجعة = من الآية التي تلي (أو تسبق) حافة المراجعة.
-  // إن غُيّرت بداية/اتجاه المراجعة بعد تسجيل لقاءات (murSince) فالسجلات الأقدم لا تحدّد الموضع
-  const murLogs = plan.murSince ? mine.filter((r) => r.date >= plan.murSince!) : mine;
-  const lastMuraja = furthestEnd(murLogs.map((r) => ({ part: r.muraja })), mMode);
+  // المطلوب القادم للمراجعة = من الآية التي تلي (أو تسبق) حافة المراجعة
+  const lastMuraja = furthestEnd(mine.map((r) => ({ part: r.muraja })), mMode);
   const perMplan = Math.max(0, Math.round((plan.murajaah || 0) * 4) / 4);
   const murStartPos: Pos | null = plan.murStartSurah
     ? { surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 }

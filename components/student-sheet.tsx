@@ -26,7 +26,7 @@ import {
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 import { ayahCount, SURAHS } from "@/lib/surahs";
-import { computeProgress, logFaces, partVerdict, sessionVerdict } from "@/lib/progress";
+import { computeProgress, logFaces, partVerdict, realignTermLogs, sessionVerdict } from "@/lib/progress";
 import { facesLabel } from "@/lib/arabic";
 import { printHifzSchedule } from "@/lib/print-schedule";
 import { DirectionPicker } from "./direction-picker";
@@ -76,82 +76,27 @@ export function StudentSheet({
 
   if (!student) return null;
 
-  /** هل تغيّرت بداية المراجعة أو اتجاهها عن الخطة المحفوظة؟ */
-  const murStartChanged = (a: CoursePlan, b: CoursePlan) =>
-    isMurDesc(a) !== isMurDesc(b) ||
-    (a.murStartSurah ?? "") !== (b.murStartSurah ?? "") ||
-    (a.murStartAyah ?? 1) !== (b.murStartAyah ?? 1);
-  /** سجلات مراجعة مسجّلة قبل اليوم — تغيير البداية بعدها يعني «من اليوم فصاعداً» لا تعديلها */
-  const hasOlderMurLogs = () => {
-    const today = dateKey(new Date());
-    return recitations.some(
-      (r) => r.studentId === student.id && r.attended && r.muraja.status === "done" && r.date < today
-    );
-  };
-
   const save = () => {
     if (!name.trim()) return;
-    // بداية الحفظ/المراجعة تحدّد مقطع أوّل لقاء في الفصل فقط؛ وكل لقاء بعده يكمل من سابقه.
-    // فإن كان أوّل لقاء مسجّلاً بالفعل، يُضبط طرفُ بدايته على البداية الجديدة (وتُعاد أوجهه).
-    // أمّا تغيير بداية/اتجاه المراجعة بعد لقاءات سابقة فيسري من اليوم (murSince) وتبقى السجلات كما هي
-    const resetMur = murStartChanged(student.plan, plan) && hasOlderMurLogs();
-    const nextPlan: CoursePlan = resetMur ? { ...plan, murSince: dateKey(new Date()) } : plan;
+    // أي تعديل في بداية الحفظ/المراجعة أو اتجاهها يسري من اللقاء الأول: إن كان أوّل لقاء مسجّلاً
+    // لا يبدأ من البداية الجديدة، تُعاد مقاطع لقاءات الفصل متسلسلةً من البداية الجديدة بأوجهها نفسها
     actions.updateStudent(student.id, {
       name: name.trim(),
       teacherId,
       halaqaId,
-      plan: nextPlan,
+      plan,
       note: note.trim(),
       phone: phone.trim(),
     });
-    alignFirstSession(nextPlan, !resetMur);
+    alignFromFirstSession(plan);
     onClose();
   };
 
-  /** أوّل لقاء مسجّل هذا الفصل يبدأ دائماً من بداية الخطة — حفظاً، ومراجعةً ما لم تُغيَّر بدايتها بعد لقاءات سابقة */
-  const alignFirstSession = (p: CoursePlan, alignMur = true) => {
+  /** لقاءات هذا الفصل تبدأ دائماً من بداية الخطة — حفظاً ومراجعةً — وتتسلسل بأوجهها المسجّلة */
+  const alignFromFirstSession = (p: CoursePlan) => {
     const termStart = halaqas.find((h) => h.id === halaqaId)?.termStart ?? "";
-    const first = recitations
-      .filter((r) => r.studentId === student.id && r.attended && (!termStart || r.date >= termStart))
-      .sort((a, b) => a.date.localeCompare(b.date))[0];
-    if (!first) return;
-    let changed = false;
-    const tasmi = { ...first.tasmi };
-    if (tasmi.status === "done" && p.startSurah) {
-      const a = p.startAyah || 1;
-      if (tasmi.fromSurah !== p.startSurah || (tasmi.fromAyah ?? 1) !== a) {
-        tasmi.fromSurah = p.startSurah;
-        tasmi.fromAyah = a;
-        changed = true;
-      }
-    }
-    const muraja = { ...first.muraja };
-    if (alignMur && muraja.status === "done" && p.murStartSurah) {
-      const a = p.murStartAyah || 1;
-      if (isMurDesc(p)) {
-        // المراجعة النازلة بالصفحات: بداية الخطة هي الطرف الأعلى («إلى»)
-        if ((muraja.toSurah || muraja.fromSurah) !== p.murStartSurah || (muraja.toAyah ?? muraja.fromAyah ?? 1) !== a) {
-          muraja.toSurah = p.murStartSurah;
-          muraja.toAyah = a;
-          changed = true;
-        }
-      } else if (muraja.fromSurah !== p.murStartSurah || (muraja.fromAyah ?? 1) !== a) {
-        muraja.fromSurah = p.murStartSurah;
-        muraja.fromAyah = a;
-        changed = true;
-      }
-    }
-    if (!changed) return;
-    const data = {
-      studentId: first.studentId,
-      date: first.date,
-      attended: first.attended,
-      tasmi,
-      tathbit: first.tathbit,
-      muraja,
-      note: first.note ?? "",
-    };
-    actions.updateRecitation(first.id, { ...data, faces: logFaces(data, p) });
+    const mine = recitations.filter((r) => r.studentId === student.id);
+    for (const u of realignTermLogs(mine, p, termStart)) actions.updateRecitation(u.id, u.data);
   };
 
   const remove = () => {
