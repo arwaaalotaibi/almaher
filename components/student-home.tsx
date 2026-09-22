@@ -193,7 +193,8 @@ export function StudentHome() {
   const teacher = teachers.find((t) => t.id === me.teacherId);
 
   // تأكيد خطة الفصل: مرة في بداية كل فصل (بعد اللائحة وقبل الدخول)
-  if (halaqa && needsPlanConfirm(me, halaqa, support)) {
+  // الإدارة قد تخفيها من الإعدادات (👀 تبويبات الطالبة)
+  if (!settings.hidePlanConfirm && halaqa && needsPlanConfirm(me, halaqa, support)) {
     return <PlanConfirmGate student={me} halaqa={halaqa} onLogout={logout} />;
   }
   const schedule = halaqa ? buildSchedule(halaqa, me.plan) : null;

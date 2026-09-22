@@ -548,12 +548,14 @@ export interface AppSettings {
   studentRecite: boolean; // هل تسجّل الطالبة تسميعها بنفسها؟ الافتراضي: لا — الإدارة/المعلّمات فقط
   hideReading: boolean; // إخفاء تبويب القراءة عند الطالبة مؤقتاً
   hideTajweed: boolean; // إخفاء تبويب التجويد عند الطالبة مؤقتاً
+  hidePlanConfirm: boolean; // إخفاء شاشة «تأكيد الخطة» عند الطالبة (تبقى علاماتها للإدارة)
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
   studentRecite: false,
   hideReading: false,
   hideTajweed: false,
+  hidePlanConfirm: false,
 };
 
 export interface AppState {
@@ -1052,6 +1054,7 @@ export async function pullRemote(): Promise<void> {
       ? {
           hideReading: tabsRow.value?.hideReading === true,
           hideTajweed: tabsRow.value?.hideTajweed === true,
+          hidePlanConfirm: tabsRow.value?.hidePlanConfirm === true,
         }
       : {}),
   };
@@ -1332,11 +1335,12 @@ export const actions = {
     );
   },
   /** إظهار/إخفاء تبويبي القراءة والتجويد عند الطالبة (مؤقتاً حتى لا تتشتت) */
-  setStudentTabs(patch: Partial<Pick<AppSettings, "hideReading" | "hideTajweed">>) {
+  setStudentTabs(patch: Partial<Pick<AppSettings, "hideReading" | "hideTajweed" | "hidePlanConfirm">>) {
     const cur = getState().settings;
     const next = {
       hideReading: patch.hideReading ?? cur.hideReading,
       hideTajweed: patch.hideTajweed ?? cur.hideTajweed,
+      hidePlanConfirm: patch.hidePlanConfirm ?? cur.hidePlanConfirm,
     };
     setState((s) => ({ ...s, settings: { ...s.settings, ...next } }));
     run(() =>

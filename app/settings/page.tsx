@@ -159,6 +159,7 @@ function SettingsInner() {
             [
               { key: "hideReading", icon: "📚", label: "تبويب القراءة" },
               { key: "hideTajweed", icon: "📿", label: "تبويب التجويد" },
+              { key: "hidePlanConfirm", icon: "📋", label: "شاشة «تأكيد الخطة» عند الدخول" },
             ] as const
           ).map((t) => {
             const hidden = settings[t.key];
