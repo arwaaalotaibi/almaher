@@ -587,38 +587,51 @@ export function ReciteLogger({
                     </div>
                   </div>
 
-                  {done && (
-                    <div className="grid gap-2">
-                      <div>
-                        <span className="mb-1 block text-[11px] font-bold text-plum-700">
-                          من
-                        </span>
-                        <SurahAyah
-                          surah={pf.fromSurah}
-                          ayah={pf.fromAyah}
-                          onSurah={(v) =>
-                            setPart(p.key, {
-                              fromSurah: v,
-                              fromAyah: 1,
-                              toSurah: pf.toSurah || v,
-                            })
-                          }
-                          onAyah={(v) => setPart(p.key, { fromAyah: v })}
-                        />
+                  {done && (() => {
+                    // المراجعة النازلة بالصفحات تُخزَّن من الطرف الأدنى إلى الأعلى («البقرة… ← الناس»)،
+                    // لكن الطالبة تبدأ من الأعلى — فنعرض «من» = الطرف الأعلى (إلى المخزّن) و«إلى» = الأدنى
+                    const swap = p.key === "muraja" && isMurDesc(student.plan);
+                    const fromField = (
+                      <SurahAyah
+                        surah={pf.fromSurah}
+                        ayah={pf.fromAyah}
+                        onSurah={(v) =>
+                          setPart(p.key, {
+                            fromSurah: v,
+                            fromAyah: 1,
+                            toSurah: pf.toSurah || v,
+                          })
+                        }
+                        onAyah={(v) => setPart(p.key, { fromAyah: v })}
+                      />
+                    );
+                    const toField = (
+                      <SurahAyah
+                        surah={pf.toSurah}
+                        ayah={pf.toAyah}
+                        onSurah={(v) =>
+                          setPart(p.key, { toSurah: v, toAyah: 1, fromSurah: pf.fromSurah || v })
+                        }
+                        onAyah={(v) => setPart(p.key, { toAyah: v })}
+                      />
+                    );
+                    return (
+                      <div className="grid gap-2">
+                        <div>
+                          <span className="mb-1 block text-[11px] font-bold text-plum-700">
+                            {swap ? "من (تبدأ من الأعلى نزولاً)" : "من"}
+                          </span>
+                          {swap ? toField : fromField}
+                        </div>
+                        <div>
+                          <span className="mb-1 block text-[11px] font-bold text-plum-700">
+                            {swap ? "إلى (الطرف الأدنى الذي تنتهي عنده)" : "إلى"}
+                          </span>
+                          {swap ? fromField : toField}
+                        </div>
                       </div>
-                      <div>
-                        <span className="mb-1 block text-[11px] font-bold text-plum-700">
-                          إلى
-                        </span>
-                        <SurahAyah
-                          surah={pf.toSurah}
-                          ayah={pf.toAyah}
-                          onSurah={(v) => setPart(p.key, { toSurah: v, toAyah: 1 })}
-                          onAyah={(v) => setPart(p.key, { toAyah: v })}
-                        />
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               );
             })}
