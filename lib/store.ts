@@ -725,12 +725,14 @@ export function buildSchedule(
   const perH = Math.max(0, Math.round((plan.hifz || 0) * 4) / 4); // بدقة الربع
   const perM = Math.max(0, Math.round((plan.murajaah || 0) * 4) / 4);
 
-  // بداية المراجعة كما أدخلتها الإدارة (نازلاً: الطرف الأعلى للمقطع الأول): «الناس ١»
-  const mStartPos: PathPos | null = plan.murStartSurah
-    ? { surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 }
-    : null;
   const hDesc = isDesc(plan);
   const mDesc = isMurDesc(plan);
+  // بداية المراجعة كما أدخلتها الإدارة — نازلاً بالسور: «الناس ٦» (آخر آية) تعني السورة من أوّلها، كالحفظ
+  const mStartPos: PathPos | null = plan.murStartSurah
+    ? mDesc
+      ? normalizeDescStart({ surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 })
+      : { surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 }
+    : null;
 
   const rows: ScheduleRow[] = [];
   // مؤشّرات المواضع (آية): الحفظ من بدايته، والمراجعة من بدايتها (نازلاً: الطرف الأعلى)

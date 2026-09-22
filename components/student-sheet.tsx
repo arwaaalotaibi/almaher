@@ -26,7 +26,15 @@ import {
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 import { ayahCount, SURAHS } from "@/lib/surahs";
-import { computeProgress, logFaces, partVerdict, realignTermLogs, sessionVerdict } from "@/lib/progress";
+import {
+  computeProgress,
+  hifzStartChanged,
+  logFaces,
+  murStartChanged,
+  partVerdict,
+  realignTermLogs,
+  sessionVerdict,
+} from "@/lib/progress";
 import { facesLabel } from "@/lib/arabic";
 import { printHifzSchedule } from "@/lib/print-schedule";
 import { DirectionPicker } from "./direction-picker";
@@ -78,8 +86,9 @@ export function StudentSheet({
 
   const save = () => {
     if (!name.trim()) return;
-    // أي تعديل في بداية الحفظ/المراجعة أو اتجاهها يسري من اللقاء الأول: إن كان أوّل لقاء مسجّلاً
-    // لا يبدأ من البداية الجديدة، تُعاد مقاطع لقاءات الفصل متسلسلةً من البداية الجديدة بأوجهها نفسها
+    // تعديل بداية الحفظ/المراجعة أو اتجاهها يسري من اللقاء الأول حتى لو كان مسجّلاً:
+    // تُعاد مقاطع لقاءات الفصل للقسم الذي تغيّرت بدايته متسلسلةً من البداية الجديدة بأوجهها نفسها.
+    // أما حفظ الخطة بلا تغيير في البداية (أوجه، اسم، ملاحظة…) فلا يمسّ أي سجل
     actions.updateStudent(student.id, {
       name: name.trim(),
       teacherId,
@@ -92,11 +101,13 @@ export function StudentSheet({
     onClose();
   };
 
-  /** لقاءات هذا الفصل تبدأ دائماً من بداية الخطة — حفظاً ومراجعةً — وتتسلسل بأوجهها المسجّلة */
+  /** عند تغيير بداية الحفظ/المراجعة: لقاءات هذا الفصل تبدأ من البداية الجديدة وتتسلسل بأوجهها المسجّلة */
   const alignFromFirstSession = (p: CoursePlan) => {
+    const which = { hifz: hifzStartChanged(student.plan, p), muraja: murStartChanged(student.plan, p) };
+    if (!which.hifz && !which.muraja) return;
     const termStart = halaqas.find((h) => h.id === halaqaId)?.termStart ?? "";
     const mine = recitations.filter((r) => r.studentId === student.id);
-    for (const u of realignTermLogs(mine, p, termStart)) actions.updateRecitation(u.id, u.data);
+    for (const u of realignTermLogs(mine, p, termStart, which)) actions.updateRecitation(u.id, u.data);
   };
 
   const remove = () => {

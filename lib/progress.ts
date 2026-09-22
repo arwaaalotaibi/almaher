@@ -177,9 +177,10 @@ function edgeAfter(
 }
 
 /* ================== إعادة ضبط سجلات الفصل على بداية الخطة ==================
-   أي تعديل في الخطة يسري من اللقاء الأول حتى لو كان مسجّلاً: عند حفظ الخطة تُبنى مقاطع
-   اللقاءات المسجّلة متسلسلةً من بداية الخطة، كلٌّ بمقدار أوجهه المسجّل نفسه (لا يتغيّر
-   ما سُمّع كمّاً، بل موضعه فقط)، ولا يُكتب إلا السجل الذي اختلف موضعه فعلاً. */
+   تعديل بداية الحفظ/المراجعة أو اتجاهها يسري من اللقاء الأول حتى لو كان مسجّلاً: تُبنى مقاطع
+   اللقاءات المسجّلة للقسم الذي تغيّرت بدايته متسلسلةً من البداية الجديدة، كلٌّ بمقدار أوجهه
+   المسجّل نفسه (لا يتغيّر ما سُمّع كمّاً، بل موضعه فقط). القسم الذي لم تتغيّر بدايته لا يُمسّ
+   إطلاقاً — فإعادة البناء من الأوجه تقريبية ولا تطابق ما سجّلته المعلّمة آيةً آية. */
 
 const partOf = (r: PosRange): RecitePart => ({
   status: "done",
@@ -228,25 +229,48 @@ function realignPart(
 
 /** التعديلات اللازمة على سجلات الفصل (الحاضرة، من بداية الفصل، بترتيب التاريخ) لتبدأ من بداية الخطة
     حفظاً ومراجعةً — يعيد لكل سجلّ يتغيّر بياناته الجديدة مع أوجهه */
+/** هل تغيّرت بداية الحفظ أو اتجاهه بين خطتين؟ */
+export function hifzStartChanged(a: CoursePlan | undefined, b: CoursePlan): boolean {
+  return (
+    isDesc(a) !== isDesc(b) ||
+    (a?.startSurah ?? "") !== (b.startSurah ?? "") ||
+    (a?.startAyah ?? 1) !== (b.startAyah ?? 1)
+  );
+}
+/** هل تغيّرت بداية المراجعة أو اتجاهها بين خطتين؟ */
+export function murStartChanged(a: CoursePlan | undefined, b: CoursePlan): boolean {
+  return (
+    isMurDesc(a) !== isMurDesc(b) ||
+    (a?.murStartSurah ?? "") !== (b.murStartSurah ?? "") ||
+    (a?.murStartAyah ?? 1) !== (b.murStartAyah ?? 1)
+  );
+}
+
 export function realignTermLogs(
   logs: RecitationLog[],
   plan: CoursePlan,
-  termStart: string
+  termStart: string,
+  which: { hifz: boolean; muraja: boolean }
 ): { id: string; data: Omit<RecitationLog, "id" | "createdAt"> }[] {
+  if (!which.hifz && !which.muraja) return [];
   const mine = logs
     .filter((r) => r.attended && (!termStart || r.date >= termStart))
     .sort((a, b) => a.date.localeCompare(b.date));
   if (!mine.length) return [];
   const hMode = hifzMode(plan);
   const mMode = murMode(plan);
-  const hStart: Pos | null = plan.startSurah
-    ? isDesc(plan)
-      ? normalizeDescStart({ surah: surahNumber(plan.startSurah), ayah: plan.startAyah || 1 })
-      : { surah: surahNumber(plan.startSurah), ayah: plan.startAyah || 1 }
-    : null;
-  const mStart: Pos | null = plan.murStartSurah
-    ? { surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 }
-    : null;
+  const hStart: Pos | null =
+    which.hifz && plan.startSurah
+      ? isDesc(plan)
+        ? normalizeDescStart({ surah: surahNumber(plan.startSurah), ayah: plan.startAyah || 1 })
+        : { surah: surahNumber(plan.startSurah), ayah: plan.startAyah || 1 }
+      : null;
+  const mStart: Pos | null =
+    which.muraja && plan.murStartSurah
+      ? isMurDesc(plan)
+        ? normalizeDescStart({ surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 })
+        : { surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 }
+      : null;
   const nh = realignPart(mine, "tasmi", hStart, hMode, isDesc(plan));
   const nm = realignPart(mine, "muraja", mStart, mMode, isMurDesc(plan));
   // التثبيت = حفظ اللقاءات السابقة: إن كان مطابقاً لها قبل الضبط يتبعها بعده
@@ -613,8 +637,11 @@ export function computeProgress(
   // المطلوب القادم للمراجعة = من الآية التي تلي (أو تسبق) حافة المراجعة
   const lastMuraja = furthestEnd(mine.map((r) => ({ part: r.muraja })), mMode);
   const perMplan = Math.max(0, Math.round((plan.murajaah || 0) * 4) / 4);
+  // نازلاً بالسور: «الناس ٦» (آخر آية) تعني السورة من أوّلها، كبداية الحفظ
   const murStartPos: Pos | null = plan.murStartSurah
-    ? { surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 }
+    ? mdesc
+      ? normalizeDescStart({ surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 })
+      : { surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 }
     : null;
   const nextMurFrom = lastMuraja ? stepPos(lastMuraja, mMode) : murStartPos;
   const nm = nextLabel(nextMurFrom, perMplan, mMode);
