@@ -17,6 +17,7 @@ import {
   halaqaTitle,
   hifzStartLabel,
   PLAN_FIELDS,
+  partOn,
   segDateLabel,
   STUDENT_PICK_KEY,
   todaySegment,
@@ -216,7 +217,9 @@ export function StudentHome() {
     : 0;
   const passed = schedule ? (curIdx > 0 ? curIdx - 1 : schedule.length) : 0;
   const totalFaces =
-    (me.plan?.hifz ?? 0) + (me.plan?.tathbit ?? 0) + (me.plan?.murajaah ?? 0);
+    (partOn(me.plan, "hifz") ? (me.plan?.hifz ?? 0) : 0) +
+    (me.plan?.tathbit ?? 0) +
+    (partOn(me.plan, "murajaah") ? (me.plan?.murajaah ?? 0) : 0);
   const updatedLabel = me.updatedAt
     ? new Date(me.updatedAt).toLocaleDateString("ar-u-ca-gregory-nu-arab", {
         day: "numeric",
@@ -499,6 +502,7 @@ export function StudentHome() {
                         لقاء {ar(s.n)} · {formatSchedDate(s.date)}
                       </span>
                     </div>
+                    {partOn(me.plan, "hifz") && (
                     <div className="mt-3 rounded-xl bg-white p-3 text-center shadow-sm">
                       <p className="text-[11px] font-bold text-silver-600">
                         📖 الحفظ الجديد (من حيث وصلتِ فعلاً)
@@ -514,6 +518,8 @@ export function StudentHome() {
                         </p>
                       )}
                     </div>
+                    )}
+                    {partOn(me.plan, "murajaah") && (
                     <div className="mt-2 rounded-xl bg-white p-3 text-center">
                       <p className="text-[11px] font-bold text-silver-600">
                         🔁 المراجعة (من حيث وصلتِ فعلاً)
@@ -529,6 +535,7 @@ export function StudentHome() {
                         </p>
                       )}
                     </div>
+                    )}
                   </div>
                 );
               })()
@@ -610,12 +617,12 @@ export function StudentHome() {
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-center">
                   {[
-                    { l: "حفظ", v: me.plan.hifz, i: "📖" },
-                    { l: "مراجعة", v: me.plan.murajaah, i: "🔁" },
+                    { l: "حفظ", v: me.plan.hifz, i: "📖", on: partOn(me.plan, "hifz") },
+                    { l: "مراجعة", v: me.plan.murajaah, i: "🔁", on: partOn(me.plan, "murajaah") },
                   ].map((x) => (
                     <div key={x.l} className="rounded-xl bg-plum-50 py-2">
                       <p className="text-lg font-bold text-plum-800">
-                        {ar(x.v ?? 0)}
+                        {x.on ? ar(x.v ?? 0) : "—"}
                       </p>
                       <p className="text-[11px] font-bold text-silver-600">
                         {x.i} {x.l} (وجه)
@@ -677,6 +684,7 @@ export function StudentHome() {
                         </p>
                       ) : (
                         <>
+                          {(partOn(me.plan, "hifz") || tasmiLabel) && (
                           <p
                             className={`mt-0.5 font-kufi text-sm font-bold ${
                               isCur ? "text-white" : "text-plum-800"
@@ -689,6 +697,7 @@ export function StudentHome() {
                                 (s.hifz ? facesLabel(s.hifz) : "—")}{" "}
                             <VerdictChip v={vH} />
                           </p>
+                          )}
                           {(s.tathbit > 0 || thLabel || tathbitPlan) && (
                             <p
                               className={`text-[11px] ${
@@ -703,6 +712,7 @@ export function StudentHome() {
                               <VerdictChip v={vT} />
                             </p>
                           )}
+                          {(partOn(me.plan, "murajaah") || murLabel) && (
                           <p
                             className={`text-[11px] ${
                               isCur ? "text-white/85" : "text-silver-600"
@@ -715,6 +725,7 @@ export function StudentHome() {
                                 (s.murajaah ? facesLabel(s.murajaah) : "—")}{" "}
                             <VerdictChip v={vM} />
                           </p>
+                          )}
                         </>
                       )}
                       {log?.note && (
@@ -733,7 +744,7 @@ export function StudentHome() {
                   {PLAN_FIELDS.map((f) => (
                     <div key={f.key} className="rounded-xl bg-plum-50 py-2">
                       <p className="text-lg font-bold text-plum-800">
-                        {ar(me.plan[f.key] ?? 0)}
+                        {partOn(me.plan, f.key) ? ar(me.plan[f.key] ?? 0) : "—"}
                       </p>
                       <p className="text-[11px] font-bold text-silver-600">
                         {f.icon} {f.label.replace("أوجه ", "")}

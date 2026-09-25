@@ -50,6 +50,9 @@ export interface CoursePlan {
   murajaah: number; // أوجه المراجعة لكل لقاء
   /** 📌 التثبيت = حفظ آخر كم لقاء؟ ١ (الافتراضي) أو ٢ أو ٣ — تُدمج مقاطعها في مقطع واحد */
   tathbitSessions?: number;
+  /** 🚫 أقسام أُلغيت عن الطالبة هذا الفصل — تختفي من الجدول وشاشة التسميع والمطلوب،
+      وتُحتسب نقاطها في السباق تلقائياً عند الحضور. إلغاء الحفظ يُلغي التثبيت معه */
+  off?: Partial<Record<PlanPart, boolean>>;
   start?: string; // (قديم — نص حر)
   direction?: HifzDirection; // اتجاه الحفظ (الافتراضي: صاعد)
   murDirection?: HifzDirection; // اتجاه المراجعة (الافتراضي: كاتجاه الحفظ)
@@ -88,6 +91,26 @@ export const TATHBIT_SPANS: { key: 1 | 2 | 3; label: string; hint: string }[] = 
   { key: 2, label: "آخر لقاءين", hint: "حفظ اللقاءين السابقين معاً" },
   { key: 3, label: "آخر ٣ لقاءات", hint: "حفظ اللقاءات الثلاثة السابقة معاً" },
 ];
+
+/** أقسام الخطة الثلاثة */
+export type PlanPart = "hifz" | "tathbit" | "murajaah";
+
+export const PLAN_PARTS: { key: PlanPart; label: string; icon: string }[] = [
+  { key: "hifz", label: "الحفظ", icon: "📖" },
+  { key: "tathbit", label: "التثبيت", icon: "📌" },
+  { key: "murajaah", label: "المراجعة", icon: "🔁" },
+];
+
+/** هل القسم مفعّل للطالبة؟ (التثبيت = حفظ سابق، فيُلغى بإلغاء الحفظ) */
+export function partOn(plan: Pick<CoursePlan, "off"> | null | undefined, part: PlanPart): boolean {
+  const off = plan?.off;
+  if (!off) return true;
+  if (part === "tathbit") return !off.tathbit && !off.hifz;
+  return !off[part];
+}
+
+/** مفتاح قسم السجلّ (tasmi/tathbit/muraja) ← قسم الخطة */
+export const RECITE_TO_PLAN = { tasmi: "hifz", tathbit: "tathbit", muraja: "murajaah" } as const;
 
 /** مدى التثبيت الفعلي للخطة (١ إن لم يُحدَّد أو كانت القيمة غير صالحة) */
 export function tathbitSpan(plan?: Pick<CoursePlan, "tathbitSessions"> | null): 1 | 2 | 3 {
@@ -529,7 +552,11 @@ export function needsPlanConfirm(
   const termStart = halaqa?.termStart ?? "";
   if (!termStart) return false;
   const p = student.plan;
-  if (!p || (p.hifz ?? 0) + (p.murajaah ?? 0) + (p.tathbit ?? 0) <= 0) return false;
+  if (
+    !p ||
+    (partOn(p, "hifz") ? (p.hifz ?? 0) : 0) + (partOn(p, "murajaah") ? (p.murajaah ?? 0) : 0) <= 0
+  )
+    return false;
   if (p.confirmedTerm === termStart) return false;
   const issue = lastPlanIssue(support, student.id, termStart);
   // بلاغ قائم لم تعدّل الإدارة بعده ⇒ لا نزعجها بالشاشة
@@ -722,8 +749,10 @@ export function buildSchedule(
   while (first.getDay() !== dow) first.setDate(first.getDate() + 1);
 
   // «أوجه الحفظ» و«أوجه المراجعة» = كمية كل لقاء (تتراكم عبر المصحف)
-  const perH = Math.max(0, Math.round((plan.hifz || 0) * 4) / 4); // بدقة الربع
-  const perM = Math.max(0, Math.round((plan.murajaah || 0) * 4) / 4);
+  // القسم الملغى عن الطالبة (🚫) = صفر في كل لقاء
+  const perH = partOn(plan, "hifz") ? Math.max(0, Math.round((plan.hifz || 0) * 4) / 4) : 0; // بدقة الربع
+  const perM = partOn(plan, "murajaah") ? Math.max(0, Math.round((plan.murajaah || 0) * 4) / 4) : 0;
+  const tOn = partOn(plan, "tathbit");
 
   const hDesc = isDesc(plan);
   const mDesc = isMurDesc(plan);
@@ -777,7 +806,7 @@ export function buildSchedule(
     }
 
     // التثبيت = حفظ آخر لقاء (الافتراضي) أو آخر لقاءين/ثلاثة مدمجاً من بداية الأقدم إلى نهاية الأحدث
-    const span = recentH.slice(-kT);
+    const span = tOn ? recentH.slice(-kT) : [];
     const tCount = span.reduce((n, x) => n + x.count, 0);
     const oldest = span[0];
     const newest = span[span.length - 1];

@@ -11,6 +11,8 @@ import {
   mergeReciteParts,
   recitePartLabel,
   tathbitSpan,
+  partOn,
+  RECITE_TO_PLAN,
   useApp,
   type Halaqa,
   type RecitationLog,
@@ -156,7 +158,9 @@ export function QuickSession({
             .reverse()
             .map((r) => r.tasmi)
         );
-        map[s.id] = { existing, hifz: p.nextHifzRange, mur: p.nextMurRange, tathbit: lastTasmi };
+        // 🚫 التثبيت الملغى عن الطالبة لا يُقترح (الحفظ والمراجعة الملغيان بلا مطلوب أصلاً)
+        const tathbit = partOn(s.plan, "tathbit") ? lastTasmi : null;
+        map[s.id] = { existing, hifz: p.nextHifzRange, mur: p.nextMurRange, tathbit };
       }
     return map;
   }, [shown, recitations, date, halaqa]);
@@ -587,7 +591,20 @@ export function QuickSession({
                       )}
                       {st.attended && (
                         <div className="mt-1.5 grid gap-1.5">
-                          {PARTS.map((p) => {
+                          {PARTS.some((p) => !partOn(s.plan, RECITE_TO_PLAN[p.key])) && (
+                            <p className="text-xs font-bold text-silver-600">
+                              🚫 لا يوجد هذا الفصل:{" "}
+                              {PARTS.filter((p) => !partOn(s.plan, RECITE_TO_PLAN[p.key]))
+                                .map((p) => p.label)
+                                .join(" · ")}
+                            </p>
+                          )}
+                          {PARTS.filter(
+                            // 🚫 القسم الملغى يختفي — إلا إن كان مسجّلاً في هذا اللقاء من قبل
+                            (p) =>
+                              partOn(s.plan, RECITE_TO_PLAN[p.key]) ||
+                              i.existing?.[p.key].status === "done"
+                          ).map((p) => {
                             const has = !!labels[p.key];
                             const on = has && st[p.key];
                             const r = rangeOf(s, p.key, st);

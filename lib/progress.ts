@@ -25,6 +25,7 @@ import {
   mergeReciteParts,
   recitePartLabel,
   tathbitSpan,
+  partOn,
   type CoursePlan,
   type Halaqa,
   type RecitationLog,
@@ -602,7 +603,7 @@ export function computeProgress(
     d ? expected - completedPageOf(edge, "pageDesc") : completedPageOf(edge) - expected;
 
   // المطلوب القادم للحفظ = من الآية التي تلي (أو تسبق) حافة الحفظ، بمقدار أوجه الخطة
-  const perHplan = Math.max(0, Math.round((plan.hifz || 0) * 4) / 4);
+  const perHplan = partOn(plan, "hifz") ? Math.max(0, Math.round((plan.hifz || 0) * 4) / 4) : 0; // 🚫 ملغى ⇒ لا مطلوب
   const hifzStartPos: Pos | null = plan.startSurah
     ? hMode === "surahDesc"
       ? normalizeDescStart({ surah: surahNumber(plan.startSurah), ayah: plan.startAyah || 1 })
@@ -636,7 +637,7 @@ export function computeProgress(
 
   // المطلوب القادم للمراجعة = من الآية التي تلي (أو تسبق) حافة المراجعة
   const lastMuraja = furthestEnd(mine.map((r) => ({ part: r.muraja })), mMode);
-  const perMplan = Math.max(0, Math.round((plan.murajaah || 0) * 4) / 4);
+  const perMplan = partOn(plan, "murajaah") ? Math.max(0, Math.round((plan.murajaah || 0) * 4) / 4) : 0;
   // نازلاً بالسور: «الناس ٦» (آخر آية) تعني السورة من أوّلها، كبداية الحفظ
   const murStartPos: Pos | null = plan.murStartSurah
     ? mdesc
@@ -739,6 +740,7 @@ export function computeProgress(
       .reverse()
       .map((r) => ({ range: toRange(r.tasmi), label: recitePartLabel(r.tasmi) }));
     const tathbitOf = (): string => {
+      if (!partOn(plan, "tathbit")) return "";
       const span = recent.slice(-kT);
       if (span.length === 0) return "";
       const oldest = span[0];
@@ -774,7 +776,7 @@ export function computeProgress(
             tasmiLogs.length
         )
       : 0;
-  const facesPerSession = Math.max(1, plan.hifz || avg || 1);
+  const facesPerSession = Math.max(1, perHplan || avg || 1);
   const boostFaces = facesPerSession + 2;
   const sessionsToJuzEnd = pagesToJuzEnd
     ? Math.ceil(pagesToJuzEnd / facesPerSession)

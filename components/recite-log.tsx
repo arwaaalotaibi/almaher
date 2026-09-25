@@ -8,6 +8,8 @@ import {
   dateKey,
   formatSchedDate,
   RECITE_PARTS,
+  RECITE_TO_PLAN,
+  partOn,
   isDesc,
   isMurDesc,
   recitePartLabel,
@@ -550,7 +552,10 @@ export function ReciteLogger({
           </div>
 
           {attended &&
-            RECITE_PARTS.map((p) => {
+            RECITE_PARTS.filter(
+              // 🚫 القسم الملغى عن الطالبة يختفي — إلا إن كان مسجّلاً في هذا السجلّ
+              (p) => partOn(student.plan, RECITE_TO_PLAN[p.key]) || parts[p.key].status === "done"
+            ).map((p) => {
               const pf = parts[p.key];
               const done = pf.status === "done";
               return (

@@ -17,6 +17,8 @@ import {
   hifzStartLabel,
   normalizeDigits,
   PLAN_FIELDS,
+  PLAN_PARTS,
+  partOn,
   recitePartLabel,
   TATHBIT_SPANS,
   tathbitSpan,
@@ -435,8 +437,9 @@ export function StudentSheet({
               <input
                 className={`${inputCls} text-center`}
                 inputMode="numeric"
-                placeholder="٠"
-                value={plan[key] || ""}
+                value={partOn(plan, key) ? plan[key] || "" : ""}
+                placeholder={partOn(plan, key) ? "٠" : "ملغى"}
+                disabled={!partOn(plan, key)}
                 onChange={(e) =>
                   setPlan({ ...plan, [key]: planNum(e.target.value) })
                 }
@@ -445,7 +448,43 @@ export function StudentSheet({
           ))}
         </div>
 
+        {/* 🚫 إلغاء قسم عن الطالبة هذا الفصل */}
+        <div className="mt-3">
+          <span className="mb-1 block text-xs font-bold text-plum-700">🚫 إلغاء قسم هذا الفصل</span>
+          <div className="grid grid-cols-3 gap-2">
+            {PLAN_PARTS.map((p) => {
+              const off = !partOn(plan, p.key);
+              // التثبيت = حفظ سابق — يُلغى تلقائياً مع الحفظ
+              const locked = p.key === "tathbit" && !partOn(plan, "hifz");
+              return (
+                <button
+                  key={p.key}
+                  type="button"
+                  disabled={locked}
+                  onClick={() => {
+                    const next = { ...(plan.off ?? {}), [p.key]: !off };
+                    const any = Object.values(next).some(Boolean);
+                    setPlan({ ...plan, off: any ? next : undefined });
+                  }}
+                  className={`rounded-xl border px-2 py-2 text-center transition ${
+                    off ? "border-rose-600 bg-rose-600 text-white" : "border-cream-dark bg-white text-plum-800"
+                  } ${locked ? "opacity-60" : ""}`}
+                >
+                  <span className="block text-sm font-bold">
+                    {p.icon} {off ? `بلا ${p.label.replace("ال", "")}` : p.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1 text-[11px] text-silver-600">
+            القسم الملغى يختفي من الجدول وشاشة التسميع والمطلوب، وتُحتسب نقاطه في السباق تلقائياً
+            عند الحضور. إلغاء الحفظ يُلغي التثبيت معه.
+          </p>
+        </div>
+
         {/* 📌 مدى التثبيت: حفظ آخر لقاء (الافتراضي) أو لقاءين أو ثلاثة */}
+        {partOn(plan, "tathbit") && (
         <div className="mt-3">
           <span className="mb-1 block text-xs font-bold text-plum-700">📌 التثبيت = حفظ</span>
           <div className="grid grid-cols-3 gap-2">
@@ -471,6 +510,7 @@ export function StudentSheet({
             في الجدول وشاشة التسميع والسباق.
           </p>
         </div>
+        )}
       </div>
 
       </fieldset>
@@ -527,6 +567,7 @@ export function StudentSheet({
                       {formatSchedDate(s.date)}
                     </span>
                   </div>
+                  {(partOn(plan, "hifz") || tasmiLabel) && (
                   <p className="mt-0.5 font-kufi text-sm font-bold text-plum-800">
                     📖{" "}
                     {att && tasmiLabel
@@ -534,6 +575,7 @@ export function StudentSheet({
                       : hifzPlan || (s.hifz ? facesLabel(s.hifz) : "—")}{" "}
                     <VerdictChip v={vH} voice="admin" />
                   </p>
+                  )}
                   {(s.tathbit > 0 || thLabel || tathbitPlan) && (
                     <p className="text-[11px] text-silver-600">
                       📌 تثبيت:{" "}
@@ -544,6 +586,7 @@ export function StudentSheet({
                       <VerdictChip v={vT} voice="admin" />
                     </p>
                   )}
+                  {(partOn(plan, "murajaah") || murLabel) && (
                   <p className="text-[11px] text-silver-600">
                     🔁 مراجعة:{" "}
                     {att && murLabel
@@ -552,6 +595,7 @@ export function StudentSheet({
                         (s.murajaah ? facesLabel(s.murajaah) : "—")}{" "}
                     <VerdictChip v={vM} voice="admin" />
                   </p>
+                  )}
                   {log?.note && <p className="mt-1 text-[11px] text-amber-800">📝 {log.note}</p>}
                 </div>
               );

@@ -3,6 +3,7 @@ import {
   isDesc,
   isMurDesc,
   tathbitSpan,
+  partOn,
   type Halaqa,
   type ReadingProgress,
   type RecitationLog,
@@ -72,6 +73,9 @@ export function computeRace(
         a.date < b.date ? -1 : a.date > b.date ? 1 : (a.createdAt ?? "") < (b.createdAt ?? "") ? -1 : 1
       );
     const kT = tathbitSpan(st.plan);
+    const onH = partOn(st.plan, "hifz");
+    const onT = partOn(st.plan, "tathbit");
+    const onM = partOn(st.plan, "murajaah");
     const recentTasmi: number[] = []; // أوجه حفظ آخر k لقاء حاضر
     for (const r of mine) {
       const prevTasmi = recentTasmi.reduce((n, x) => n + x, 0);
@@ -84,10 +88,11 @@ export function computeRace(
         attends++;
         faces += fH;
         points += 10;
-        if (fH > 0 && fH >= reqH) points += 5;
-        if (fT > 0 && fT >= prevTasmi) points += 5;
-        if (fM > 0 && fM >= reqM) points += 5;
-        if (reqH > 0 && fH > reqH) points += 5; // زيادة عن المقرر — مرة واحدة في اللقاء
+        // 🚫 القسم الملغى عن الطالبة يُحتسب لها تلقائياً بالحضور (ولا زيادة في حفظ ملغى)
+        if (!onH || (fH > 0 && fH >= reqH)) points += 5;
+        if (!onT || (fT > 0 && fT >= prevTasmi)) points += 5;
+        if (!onM || (fM > 0 && fM >= reqM)) points += 5;
+        if (onH && reqH > 0 && fH > reqH) points += 5; // زيادة عن المقرر — مرة واحدة في اللقاء
       }
       recentTasmi.push(fH);
       if (recentTasmi.length > kT) recentTasmi.shift();
