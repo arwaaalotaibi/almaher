@@ -172,8 +172,8 @@ export function RaceBoard({
                         pos === 0
                           ? "linear-gradient(135deg,#b7973f,#8a6d3b)"
                           : pos === 1
-                            ? "#e5e0d5"
-                            : "#e8d5c4",
+                            ? "var(--podium-2, #e5e0d5)"
+                            : "var(--podium-3, #e8d5c4)",
                     }}
                   >
                     <span className="font-kufi text-lg font-bold">

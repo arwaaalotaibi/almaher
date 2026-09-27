@@ -16,6 +16,7 @@ import {
 import { StudentSheet } from "./student-sheet";
 import { QuickSession } from "./quick-session";
 import { NotificationsCard } from "./notifications-card";
+import { ThemeToggle } from "./theme-toggle";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 
@@ -182,6 +183,8 @@ export function TeacherScreen({ teacher, onLogout }: { teacher: Teacher; onLogou
       })}
 
       <NotificationsCard halaqaIds={teacher.halaqaIds} />
+
+      <ThemeToggle className="mt-6" />
 
       <button
         type="button"

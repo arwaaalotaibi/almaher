@@ -93,7 +93,7 @@ function PathSvg({
       <path
         d={pathD(29)}
         fill="none"
-        stroke="#ece4d9"
+        stroke="var(--jm-road, #ece4d9)"
         strokeWidth="9"
         strokeLinecap="round"
       />
@@ -148,7 +148,7 @@ function PathSvg({
               cx={x}
               cy={y}
               r={16}
-              fill={done ? "#a8894f" : isCur ? "#5d3f4e" : "#ffffff"}
+              fill={done ? "#a8894f" : isCur ? "#5d3f4e" : "var(--jm-node, #ffffff)"}
               stroke={done ? "#8a6d3b" : isCur ? "#5d3f4e" : "#ded4c5"}
               strokeWidth="2"
             />
@@ -273,7 +273,7 @@ function GardenSvg({
       role="img"
       aria-label={`بستان الحفظ — ${juzLabel(juz)}`}
     >
-      <rect x="0" y="0" width={W} height={G_H} fill="#fdf9f0" />
+      <rect x="0" y="0" width={W} height={G_H} fill="var(--jm-garden, #fdf9f0)" />
       {/* شمس البستان */}
       <circle cx="34" cy="28" r="13" fill="#f3d9a1" />
       <circle cx="34" cy="28" r="18" fill="none" stroke="#f3d9a1" strokeWidth="1.5" opacity="0.5" />
@@ -284,7 +284,7 @@ function GardenSvg({
           <path
             key={r}
             d={`M 10 ${gy} Q ${W / 2} ${gy + 6} ${W - 10} ${gy}`}
-            stroke="#e8e0cf"
+            stroke="var(--jm-row, #e8e0cf)"
             strokeWidth="2"
             fill="none"
           />

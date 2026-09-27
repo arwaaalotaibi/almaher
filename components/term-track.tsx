@@ -46,7 +46,7 @@ export function TermTrack({
                       isCur ? "jm-pulse ring-2 ring-plum-300" : ""
                     }`}
                     style={{
-                      backgroundColor: done ? "#a8894f" : isCur ? "#5d3f4e" : "#e6ddcf",
+                      backgroundColor: done ? "#a8894f" : isCur ? "#5d3f4e" : "var(--tt-dot, #e6ddcf)",
                     }}
                   />
                 );
@@ -70,8 +70,8 @@ export function TermTrack({
               style={{
                 borderColor: "#e7c873",
                 background: d < 0
-                  ? "#f6f1e7"
-                  : "linear-gradient(180deg,#fff8e1,#f3e2a8)",
+                  ? "var(--tt-past, #f6f1e7)"
+                  : "var(--tt-gold, linear-gradient(180deg,#fff8e1,#f3e2a8))",
                 opacity: d < 0 ? 0.7 : 1,
               }}
             >

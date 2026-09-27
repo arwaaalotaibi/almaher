@@ -14,6 +14,7 @@ import {
 } from "@/components/ui";
 
 import { RoleOnly } from "@/components/admin-only";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function SettingsPage() {
   return (
@@ -194,6 +195,9 @@ function SettingsInner() {
           })}
         </div>
       </section>
+
+      {/* 🌙 المظهر — على هذا الجهاز */}
+      <ThemeToggle className="mb-4" />
 
       {/* الحساب */}
       <section className="card mb-4 rounded-2xl p-4">

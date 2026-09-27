@@ -44,6 +44,7 @@ import { RaceBoard } from "./race-board";
 import { SupportBox } from "./support-box";
 import { NotificationsCenter, PinnedNotice } from "./notifications-card";
 import { PushToggle } from "./push-toggle";
+import { ThemeToggle } from "./theme-toggle";
 import { AppTour, hasSeenTour } from "./app-tour";
 import { BookQuotes } from "./book-quotes";
 import { PlanConfirmGate } from "./plan-confirm";
@@ -289,6 +290,7 @@ export function StudentHome() {
               </span>
             </span>
           </button>
+          <ThemeToggle />
           <button
             type="button"
             onClick={logout}

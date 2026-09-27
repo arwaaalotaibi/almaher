@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Amiri, Noto_Naskh_Arabic } from "next/font/google";
 import { AuthGate } from "@/components/auth-gate";
+import { ThemeWatcher } from "@/components/theme-toggle";
+import { THEME_BOOT } from "@/lib/theme";
 import "./globals.css";
 
 // خط كلاسيكي نسخي أنيق للعناوين (نفس خط الطباعة)
@@ -36,8 +38,17 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ar" dir="rtl" className={`${amiri.variable} ${naskh.variable}`}>
+    <html
+      lang="ar"
+      dir="rtl"
+      className={`${amiri.variable} ${naskh.variable}`}
+      // data-theme يضبطه سكربت المظهر قبل React — لا نعدّه اختلافاً
+      suppressHydrationWarning
+    >
       <body className="pattern-bg font-body antialiased">
+        {/* 🌙 المظهر (فاتح/داكن/تلقائي) قبل رسم أي محتوى — بلا وميض */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
+        <ThemeWatcher />
         {/* سكربت طوارئ بصيغة قديمة يعمل على أي متصفح: إن بقيت شاشة «جاري التحميل»
             ٢٠ ثانية (كود التطبيق لم يشتغل أو الاتصال معلّق) يُظهر رسالة وزر إعادة التحميل */}
         <script

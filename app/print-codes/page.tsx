@@ -1,5 +1,6 @@
 "use client";
 
+import { useForceLight } from "@/components/theme-toggle";
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { toJpeg } from "html-to-image";
@@ -11,6 +12,7 @@ const ar = (n: number) => n.toLocaleString("ar-EG");
 /** 🖨️ بطاقات رموز الدخول — بطاقة لكل طالبة (اسم + رمز + QR يُدخلها مباشرة)،
     أربع بطاقات في صفحة A4 مع خطوط قصّ */
 export default function PrintCodesPage() {
+  useForceLight(); // 🖨️ الطباعة فاتحة دائماً
   const [data, setData] = useState<PrintCodesPayload | null | undefined>(undefined);
   const [qrs, setQrs] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false); // جاري توليد PDF

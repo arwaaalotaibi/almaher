@@ -177,3 +177,108 @@ input, textarea, select {
   animation-timing-function: ease-in;
   animation-fill-mode: both;
 }
+
+/* ================== 🌙 الوضع الداكن ==================
+   <html data-theme="dark"> (يضبطه lib/theme.ts). تُقلب درجات الهوية: درجات الخلفية
+   (كريمي، plum-50/100/200) تصير داكنة، ودرجات النص (plum-700/800/900، ink، silver)
+   تصير فاتحة. plum-600 يبقى كما هو لأنه لون الأزرار الممتلئة بنص أبيض.
+   قواعد هذا القسم خارج طبقات Tailwind فتتقدّم على أدواته. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: #261e23; /* بديل الأبيض للبطاقات والنوافذ */
+  --color-cream: #1b1519;
+  --color-cream-dark: #3b3037;
+  --color-plum-50: #2d232a;
+  --color-plum-100: #372b33;
+  --color-plum-200: #4d3d47;
+  --color-plum-500: #b590a5;
+  --color-plum-700: #dcc8d3;
+  --color-plum-800: #efe3e9;
+  --color-plum-900: #f7eff3;
+  --color-ink: #eee6ea;
+  --color-silver-600: #aa9fa6;
+  --color-silver-500: #8d8389;
+  --color-silver-400: #5f565c;
+  --color-gold: #c9a567;
+
+  /* ألوان الحالات: الخلفيات الفاتحة تصير داكنة، والنصوص الداكنة تصير فاتحة */
+  --color-emerald-50: #10291f;
+  --color-emerald-100: #133426;
+  --color-emerald-200: #1b4735;
+  --color-emerald-300: #2c6a50;
+  --color-emerald-700: #7fdcb4;
+  --color-emerald-800: #a6ecce;
+  --color-emerald-900: #cff6e4;
+  --color-amber-50: #2c2210;
+  --color-amber-100: #382b12;
+  --color-amber-200: #4a3816;
+  --color-amber-300: #6a4f20;
+  --color-amber-700: #efc46e;
+  --color-amber-800: #f5d392;
+  --color-amber-900: #f9e2b6;
+  --color-amber-950: #fcecd0;
+  --color-red-50: #331719;
+  --color-red-100: #3f1c20;
+  --color-red-200: #57242b;
+  --color-red-300: #7a3039;
+  --color-red-700: #f4a0a0;
+  --color-red-800: #f7b8b8;
+  --color-red-900: #fad2d2;
+  --color-orange-50: #321f10;
+  --color-orange-100: #3d2713;
+  --color-orange-300: #7a4a1f;
+  --color-orange-700: #f5b27c;
+  --color-orange-900: #fbd8b9;
+  --color-rose-100: #3c1a24;
+  --color-rose-700: #f3a5b9;
+  --color-green-700: #88dfa7;
+  --color-sky-50: #102633;
+  --color-indigo-50: #1d1f38;
+
+  /* درب الحفظ والحديقة (SVG) */
+  --jm-road: #43363e;
+  --jm-node: #2f262c;
+  --jm-garden: #221b20;
+  --jm-row: #3b3037;
+  /* شريط الفصل ومنصّة السباق */
+  --tt-dot: #4a3e45;
+  --tt-past: #2a2227;
+  --tt-gold: linear-gradient(180deg, #3d321c, #4d3d1c);
+  --podium-2: #48424a;
+  --podium-3: #4e3b31;
+}
+
+/* الأبيض كخلفية (لا كنص) ← سطح داكن */
+:root[data-theme="dark"] .bg-white,
+:root[data-theme="dark"] .focus\:bg-white:focus,
+:root[data-theme="dark"] .hover\:bg-white:hover {
+  background-color: var(--surface);
+}
+:root[data-theme="dark"] .bg-white\/90,
+:root[data-theme="dark"] .bg-white\/95 {
+  background-color: rgb(38 30 35 / 0.94);
+}
+:root[data-theme="dark"] .card,
+:root[data-theme="dark"] .name-box-outline {
+  background: var(--surface);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+}
+:root[data-theme="dark"] .glass-bar {
+  background: rgb(38 30 35 / 0.92);
+  box-shadow: 0 2px 14px rgb(0 0 0 / 0.45);
+}
+
+/* نص plum-600 أغمق من أن يُقرأ على الداكن (الخلفية plum-600 تبقى كما هي) */
+:root[data-theme="dark"] .text-plum-600 { color: #cfaec0; }
+:root[data-theme="dark"] .text-red-600 { color: #f58a8a; }
+:root[data-theme="dark"] .text-emerald-600 { color: #45d39b; }
+:root[data-theme="dark"] .text-amber-600 { color: #eab25a; }
+
+/* درجات الهوية الداكنة حين تُستعمل خلفيةً/تدرّجاً — تبقى داكنة كما في الفاتح */
+:root[data-theme="dark"] .bg-plum-800 { background-color: #5d3f4e; }
+:root[data-theme="dark"] .bg-plum-800\/90 { background-color: rgb(93 63 78 / 0.9); }
+:root[data-theme="dark"] .bg-plum-900\/40 { background-color: rgb(0 0 0 / 0.55); }
+:root[data-theme="dark"] .from-plum-500 { --tw-gradient-from: #8a6579; }
+:root[data-theme="dark"] .from-plum-600 { --tw-gradient-from: #7d5a6c; }
+:root[data-theme="dark"] .to-plum-700 { --tw-gradient-to: #6e4d5e; }
+:root[data-theme="dark"] .to-plum-800 { --tw-gradient-to: #5d3f4e; }

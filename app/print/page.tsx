@@ -1,5 +1,6 @@
 "use client";
 
+import { useForceLight } from "@/components/theme-toggle";
 import { useEffect, useState } from "react";
 import { formatSchedDate } from "@/lib/store";
 import { PRINT_KEY, type PrintPayload } from "@/lib/print-schedule";
@@ -8,6 +9,7 @@ const ar = (n: number) => n.toLocaleString("ar-EG");
 
 /** 🖨️ صفحة طباعة جدول الحفظ — داخل التطبيق (تعمل في المتصفح وفي التطبيق المثبّت) */
 export default function PrintPage() {
+  useForceLight(); // 🖨️ الطباعة فاتحة دائماً
   const [data, setData] = useState<PrintPayload | null | undefined>(undefined);
 
   useEffect(() => {
