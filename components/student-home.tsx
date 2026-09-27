@@ -44,6 +44,7 @@ import { RaceBoard } from "./race-board";
 import { SupportBox } from "./support-box";
 import { NotificationsCenter, PinnedNotice } from "./notifications-card";
 import { PushToggle } from "./push-toggle";
+import { PushPrompt } from "./push-prompt";
 import { ThemeToggle } from "./theme-toggle";
 import { AppTour, hasSeenTour } from "./app-tour";
 import { BookQuotes } from "./book-quotes";
@@ -231,6 +232,13 @@ export function StudentHome() {
   return (
     <main className="relative mx-auto max-w-2xl px-4 pb-16 pt-10">
       <WelcomeSplash name={me.name} />
+
+      {/* 🔔 دعوة لتفعيل الإشعارات — بعد اللائحة وجولة الشرح */}
+      <PushPrompt
+        studentId={me.id}
+        halaqaId={me.halaqaId}
+        enabled={agreed && !tourOpen && hasSeenTour()}
+      />
 
       {/* 🎓 شرح البرنامج — أول مرة تلقائياً، ثم من الإعدادات */}
       <AppTour
