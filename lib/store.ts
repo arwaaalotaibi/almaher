@@ -1052,6 +1052,56 @@ function run(op: () => PromiseLike<{ error: unknown }>) {
 }
 
 /** جلب كل البيانات من قاعدة البيانات وتحديث العرض */
+/* ================== 🗂️ أرشيف سجلات التسميع (v15) ==================
+   نسخة كل سجلّ قبل حذفه أو تعديله — يكتبها مشغّل في قاعدة البيانات، وتقرؤها الإدارة فقط. */
+export interface SessionHistoryRow {
+  hid: number;
+  op: "delete" | "update";
+  changedAt: string; // ISO
+  actor: string; // «الإدارة» / «المعلّمة فلانة» / «الطالبة»
+  log: Omit<RecitationLog, "id" | "createdAt">;
+  sessionId: string;
+  createdAt?: string;
+}
+
+/** آخر عمليات الحذف/التعديل (الأحدث أولاً). ready=false: لم يُشغَّل v15 بعد */
+export async function fetchSessionHistory(
+  limit = 400
+): Promise<{ ready: boolean; rows: SessionHistoryRow[] }> {
+  const { data, error } = await supabase
+    .from("almaher_sessions_history")
+    .select("hid,op,changed_at,actor,session_id,student_id,log_date,attended,parts,faces,note,created_at")
+    .order("changed_at", { ascending: false })
+    .limit(limit);
+  if (error) return { ready: false, rows: [] };
+  const rows = (data ?? []).map((r) => {
+    const parts = (r.parts ?? {}) as Record<string, unknown>;
+    const f = (r.faces ?? {}) as Record<string, unknown>;
+    return {
+      hid: Number(r.hid),
+      op: r.op === "delete" ? "delete" : "update",
+      changedAt: r.changed_at as string,
+      actor: (r.actor as string) || "",
+      sessionId: r.session_id as string,
+      createdAt: (r.created_at as string) ?? undefined,
+      log: {
+        studentId: r.student_id as string,
+        date: r.log_date as string,
+        attended: !!r.attended,
+        tasmi: normPart(parts.tasmi),
+        muraja: normPart(parts.muraja),
+        tathbit: normPart(parts.tathbit),
+        note: (r.note as string) ?? "",
+        faces:
+          typeof f.tasmi === "number" || typeof f.tathbit === "number" || typeof f.muraja === "number"
+            ? { tasmi: Number(f.tasmi) || 0, tathbit: Number(f.tathbit) || 0, muraja: Number(f.muraja) || 0 }
+            : undefined,
+      },
+    } satisfies SessionHistoryRow;
+  });
+  return { ready: true, rows };
+}
+
 export async function pullRemote(): Promise<void> {
   const [h, t, s, a, b, r, sess, trm, tj, tjr, rdp, sup, codes, setg, tcodes] = await Promise.all([
     supabase
@@ -1750,6 +1800,35 @@ export const actions = {
           faces: data.faces ?? {},
         })
         .eq("id", id)
+    );
+  },
+  /** 🗂️ استرجاع نسخة من الأرشيف: تحلّ محلّ سجلّ اللقاء نفسه إن وُجد (فتُؤرشف نسخته الحالية
+      بدورها)، وإلا يُعاد السجلّ المحذوف بمعرّفه الأصلي */
+  restoreRecitation(h: SessionHistoryRow) {
+    const cur = getState().recitations.find(
+      (r) => r.id === h.sessionId || (r.studentId === h.log.studentId && r.date === h.log.date)
+    );
+    if (cur) {
+      actions.updateRecitation(cur.id, h.log);
+      return;
+    }
+    const rec: RecitationLog = {
+      ...h.log,
+      id: h.sessionId,
+      createdAt: h.createdAt ?? new Date().toISOString(),
+    };
+    setState((s) => ({ ...s, recitations: [rec, ...s.recitations] }));
+    run(() =>
+      supabase.from("almaher_sessions").insert({
+        id: rec.id,
+        student_id: rec.studentId,
+        log_date: rec.date,
+        attended: rec.attended,
+        parts: { tasmi: rec.tasmi, muraja: rec.muraja, tathbit: rec.tathbit },
+        note: rec.note ?? "",
+        faces: rec.faces ?? {},
+        created_at: rec.createdAt,
+      })
     );
   },
   removeRecitation(id: string) {
