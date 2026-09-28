@@ -9,6 +9,7 @@ import {
   EMPTY_PLAN,
   formatSchedDate,
   mergeReciteParts,
+  missingEarlierSession,
   recitePartLabel,
   tathbitSpan,
   partOn,
@@ -34,6 +35,7 @@ import { facesText } from "@/lib/faces";
 import { ayahCount, SURAHS } from "@/lib/surahs";
 import { PrimaryBtn, inputCls } from "./ui";
 import { supabase } from "@/lib/supabase";
+import { useRole } from "./auth-gate";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 
@@ -93,6 +95,8 @@ export function QuickSession({
 }) {
   const { recitations } = useApp();
   const termRows = useMemo(() => buildSchedule(halaqa, EMPTY_PLAN), [halaqa]);
+  // 🔒 المعلّمة لا تُدخل لقاءً قبل تسجيل ما قبله — الإدارة مستثناة لمعالجة الحالات الخاصة
+  const strict = useRole() !== "admin";
   const [open, setOpen] = useState(defaultOpen);
   const [groupKey, setGroupKey] = useState<string>("all");
   // الافتراضي: آخر لقاء وقع فعلاً (التسجيل بعد اللقاء لا قبله)
@@ -140,6 +144,8 @@ export function QuickSession({
         hifz: PosRange | null;
         mur: PosRange | null;
         tathbit: RecitePart | null;
+        /** 🔒 لقاء سابق لم يُسجَّل — يمنع إدخال هذا اللقاء (لغير الإدارة) */
+        gap: number | null;
       }
     > = {};
     for (const g of shown)
@@ -160,10 +166,11 @@ export function QuickSession({
         );
         // 🚫 التثبيت الملغى عن الطالبة لا يُقترح (الحفظ والمراجعة الملغيان بلا مطلوب أصلاً)
         const tathbit = partOn(s.plan, "tathbit") ? lastTasmi : null;
-        map[s.id] = { existing, hifz: p.nextHifzRange, mur: p.nextMurRange, tathbit };
+        const miss = !existing && strict ? missingEarlierSession(halaqa, s.id, recitations, date) : null;
+        map[s.id] = { existing, hifz: p.nextHifzRange, mur: p.nextMurRange, tathbit, gap: miss?.n ?? null };
       }
     return map;
-  }, [shown, recitations, date, halaqa]);
+  }, [shown, recitations, date, halaqa, strict]);
 
   const rowOf = (s: Student): RowState => {
     if (rows[s.id]) return rows[s.id];
@@ -307,7 +314,8 @@ export function QuickSession({
 
   const saveAll = () => {
     const items: SessionItem[] = [];
-    for (const g of visible) for (const s of g.list) items.push(saveOne(s, true));
+    for (const g of visible)
+      for (const s of g.list) if (info[s.id]?.gap == null) items.push(saveOne(s, true));
     setRows({});
     setSaved(items.length);
     setTimeout(() => setSaved(null), 2500);
@@ -562,7 +570,8 @@ export function QuickSession({
                           <button
                             type="button"
                             onClick={() => saveOne(s)}
-                            className={`rounded-full px-2.5 py-1 text-sm font-bold transition ${
+                            disabled={i.gap != null}
+                            className={`rounded-full px-2.5 py-1 text-sm font-bold transition disabled:bg-silver-400 disabled:text-white ${
                               rows[s.id]
                                 ? "bg-amber-500 text-white"
                                 : justSaved[s.id] || i.existing
@@ -577,7 +586,13 @@ export function QuickSession({
                                   : "اعتماد سجلّ هذه الطالبة وحدها"
                             }
                           >
-                            {rows[s.id] ? "💾 اعتماد*" : justSaved[s.id] || i.existing ? "✓ تم الاعتماد" : "💾 اعتماد"}
+                            {i.gap != null
+                              ? "🔒 اعتماد"
+                              : rows[s.id]
+                                ? "💾 اعتماد*"
+                                : justSaved[s.id] || i.existing
+                                  ? "✓ تم الاعتماد"
+                                  : "💾 اعتماد"}
                           </button>
                         </span>
                       </div>
@@ -589,7 +604,13 @@ export function QuickSession({
                           onChange={(e) => setRow(s.id, { note: e.target.value }, st)}
                         />
                       )}
-                      {st.attended && (
+                      {i.gap != null && (
+                        <p className="mt-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900">
+                          🔒 لم يُسجَّل «لقاء {ar(i.gap)}» لهذه الطالبة بعد — اختاري لقاء {ar(i.gap)} من قائمة
+                          «اللقاء» أعلاه وسجّليه أولاً (حضوراً أو غياباً)
+                        </p>
+                      )}
+                      {st.attended && i.gap == null && (
                         <div className="mt-1.5 grid gap-1.5">
                           {PARTS.some((p) => !partOn(s.plan, RECITE_TO_PLAN[p.key])) && (
                             <p className="text-xs font-bold text-silver-600">
@@ -733,8 +754,13 @@ export function QuickSession({
             <PrimaryBtn onClick={saveAll}>
               {saved !== null
                 ? `تم حفظ ${ar(saved)} سجلّاً ✓`
-                : `حفظ ${filter === "all" ? "الجميع" : "المعروضات"} — لقاء ${sessionNo ? ar(sessionNo) : ""} لـ ${ar(visible.reduce((n, g) => n + g.list.length, 0))} طالبة`}
+                : `حفظ ${filter === "all" ? "الجميع" : "المعروضات"} — لقاء ${sessionNo ? ar(sessionNo) : ""} لـ ${ar(visible.reduce((n, g) => n + g.list.filter((s) => info[s.id]?.gap == null).length, 0))} طالبة`}
             </PrimaryBtn>
+            {visible.some((g) => g.list.some((s) => info[s.id]?.gap != null)) && (
+              <p className="mt-1.5 text-center text-xs font-bold text-amber-800">
+                🔒 لا يُحفظ من لم يُسجَّل لها لقاء سابق — سجّلي اللقاء السابق لها أولاً
+              </p>
+            )}
             <p className="mt-1.5 text-center text-[10px] text-silver-600">
               «اعتماد*» بعلامة النجمة = صفّ فيه تعديل لم يُحفظ بعد · الأخضر «تم الاعتماد» = محفوظ
             </p>

@@ -885,6 +885,20 @@ export function dateKey(d: Date): string {
   ).padStart(2, "0")}`;
 }
 
+/** 🔒 أول لقاء سابق في جدول الفصل لم يُسجَّل للطالبة (قبل date) — null إن كان كل ما قبله مسجّلاً.
+    لا يُسجَّل لقاء قبل تسجيل كل ما قبله (حضوراً أو غياباً)، إلا للإدارة */
+export function missingEarlierSession(
+  halaqa: Pick<Halaqa, "day" | "termStart" | "termSessions"> | undefined,
+  studentId: string,
+  recitations: Pick<RecitationLog, "studentId" | "date">[],
+  date: string
+): ScheduleRow | null {
+  const rows = halaqa ? buildSchedule(halaqa, EMPTY_PLAN) : null;
+  if (!rows) return null;
+  const have = new Set(recitations.filter((r) => r.studentId === studentId).map((r) => r.date));
+  return rows.find((r) => dateKey(r.date) < date && !have.has(dateKey(r.date))) ?? null;
+}
+
 export function formatSchedDate(d: Date): string {
   return d.toLocaleDateString("ar-u-ca-gregory-nu-arab", {
     weekday: "short",

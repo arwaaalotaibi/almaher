@@ -12,6 +12,8 @@ import {
   partOn,
   isDesc,
   isMurDesc,
+  getState,
+  missingEarlierSession,
   recitePartLabel,
   useApp,
   type Halaqa,
@@ -29,6 +31,7 @@ import {
 import { facesAcc, facesPlain } from "@/lib/arabic";
 import { ayahCount, SURAHS } from "@/lib/surahs";
 import { Field, inputCls, PrimaryBtn } from "./ui";
+import { useRole } from "./auth-gate";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 
@@ -364,6 +367,7 @@ export function ReciteLogger({
   voice?: ChipVoice;
 }) {
   const schedule = halaqa ? buildSchedule(halaqa, student.plan) : null;
+  const strict = useRole() !== "admin"; // 🔒 الإدارة مستثناة
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(() => {
     if (schedule && schedule.length) {
@@ -414,6 +418,18 @@ export function ReciteLogger({
   };
 
   const save = () => {
+    // 🔒 لا يُسجَّل لقاء قبل تسجيل كل ما قبله (حضوراً أو غياباً)
+    if (!editingId && strict) {
+      const recs = getState().recitations;
+      const exists = recs.some((r) => r.studentId === student.id && r.date === date);
+      const miss = exists ? null : missingEarlierSession(halaqa, student.id, recs, date);
+      if (miss) {
+        window.alert(
+          `🔒 لم يُسجَّل «لقاء ${miss.n.toLocaleString("ar-EG")}» (${formatSchedDate(miss.date)}) بعد — سجّليه أولاً (حضوراً أو غياباً) ثم هذا اللقاء`
+        );
+        return;
+      }
+    }
     const build = (p: PartForm): RecitePart =>
       p.status === "done" && p.fromSurah
         ? {
