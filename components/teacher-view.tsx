@@ -38,7 +38,7 @@ export function TeacherView({
   topExtra?: ReactNode;
 }) {
   const router = useRouter();
-  const { teachers, halaqas, students } = useApp();
+  const { teachers, halaqas, students, settings } = useApp();
 
   const [selected, setSelected] = useState<Student | null>(null);
   const [adding, setAdding] = useState<string | null>(null); // halaqaId
@@ -46,6 +46,7 @@ export function TeacherView({
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editHalaqas, setEditHalaqas] = useState<string[]>([]);
+  const [editShares, setEditShares] = useState<string[]>([]);
 
   const teacher = teachers.find((t) => t.id === teacherId);
   if (!teacher) {
@@ -62,6 +63,7 @@ export function TeacherView({
   const openEdit = () => {
     setEditName(teacher.name);
     setEditHalaqas([...teacher.halaqaIds]);
+    setEditShares([...(settings.teacherShares?.[teacherId] ?? [])]);
     setEditing(true);
   };
 
@@ -71,6 +73,7 @@ export function TeacherView({
       name: editName.trim(),
       halaqaIds: editHalaqas,
     });
+    actions.setTeacherShares(teacherId, editShares);
     setEditing(false);
   };
 
@@ -222,6 +225,37 @@ export function TeacherView({
                   {halaqaTitle(h)}
                 </label>
               ))}
+            </div>
+          </Field>
+          <Field label="تشارك طالبات معلّمة أخرى (حلقة مشتركة)" icon="👭">
+            <p className="mb-2 text-[11px] text-silver-600">
+              تظهر لها طالبات المعلّمة المختارة وتسجّل لهنّ من رابطها — تأكّدي أن حلقتهنّ ضمن «حلقاتها» أعلاه
+            </p>
+            <div className="grid gap-2">
+              {teachers
+                .filter((t) => t.id !== teacherId)
+                .map((t) => (
+                  <label
+                    key={t.id}
+                    className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-bold ${
+                      editShares.includes(t.id)
+                        ? "border-plum-500 bg-plum-50 text-plum-800"
+                        : "border-cream-dark bg-cream/40 text-silver-600"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={editShares.includes(t.id)}
+                      onChange={() =>
+                        setEditShares((prev) =>
+                          prev.includes(t.id) ? prev.filter((x) => x !== t.id) : [...prev, t.id]
+                        )
+                      }
+                      className="h-4 w-4 accent-plum-600"
+                    />
+                    👩‍🏫 {t.name}
+                  </label>
+                ))}
             </div>
           </Field>
           <PrimaryBtn onClick={saveEdit}>حفظ</PrimaryBtn>

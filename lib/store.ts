@@ -607,6 +607,8 @@ export interface AppSettings {
   hideReading: boolean; // إخفاء تبويب القراءة عند الطالبة مؤقتاً
   hideTajweed: boolean; // إخفاء تبويب التجويد عند الطالبة مؤقتاً
   hidePlanConfirm: boolean; // إخفاء شاشة «تأكيد الخطة» عند الطالبة (تبقى علاماتها للإدارة)
+  /** 👭 معلّمة ← معلّمات تشاركهنّ طالباتهنّ: تراهنّ وتسجّل لهنّ من رابطها (مثل حلقة مشتركة) */
+  teacherShares: Record<string, string[]>;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -614,6 +616,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   hideReading: false,
   hideTajweed: false,
   hidePlanConfirm: false,
+  teacherShares: {},
 };
 
 export interface AppState {
@@ -1170,6 +1173,7 @@ export async function pullRemote(): Promise<void> {
   const settingsRows = (setg.data ?? []) as { key: string; value: Record<string, unknown> }[];
   const reciteRow = settingsRows.find((x) => x.key === "student_recite");
   const tabsRow = settingsRows.find((x) => x.key === "student_tabs");
+  const sharesRow = settingsRows.find((x) => x.key === "teacher_shares");
   const settings: AppSettings = {
     ...DEFAULT_SETTINGS,
     ...(reciteRow && typeof reciteRow.value?.enabled === "boolean"
@@ -1180,6 +1184,13 @@ export async function pullRemote(): Promise<void> {
           hideReading: tabsRow.value?.hideReading === true,
           hideTajweed: tabsRow.value?.hideTajweed === true,
           hidePlanConfirm: tabsRow.value?.hidePlanConfirm === true,
+        }
+      : {}),
+    ...(sharesRow && sharesRow.value && typeof sharesRow.value === "object"
+      ? {
+          teacherShares: Object.fromEntries(
+            Object.entries(sharesRow.value).filter(([, v]) => Array.isArray(v))
+          ) as Record<string, string[]>,
         }
       : {}),
   };
@@ -1471,6 +1482,21 @@ export const actions = {
     run(() =>
       supabase.from("almaher_settings").upsert({
         key: "student_tabs",
+        value: next,
+        updated_at: new Date().toISOString(),
+      })
+    );
+  },
+  /** 👭 المعلّمات اللاتي تشاركهنّ هذه المعلّمة طالباتهنّ */
+  setTeacherShares(teacherId: string, ids: string[]) {
+    const cur = getState().settings.teacherShares ?? {};
+    const next = { ...cur };
+    if (ids.length) next[teacherId] = ids;
+    else delete next[teacherId];
+    setState((s) => ({ ...s, settings: { ...s.settings, teacherShares: next } }));
+    run(() =>
+      supabase.from("almaher_settings").upsert({
+        key: "teacher_shares",
         value: next,
         updated_at: new Date().toISOString(),
       })

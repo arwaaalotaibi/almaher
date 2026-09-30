@@ -23,12 +23,17 @@ const ar = (n: number) => n.toLocaleString("ar-EG");
 /** 👩‍🏫 شاشة المعلّمة — واضحة ومريحة: ترحيب، ثم لكل حلقة: اللقاء الحالي وحالة التسجيل،
     وبطاقة تسجيل التسميع مفتوحة، ثم طالباتها بحالة كل واحدة. */
 export function TeacherScreen({ teacher, onLogout }: { teacher: Teacher; onLogout: () => void }) {
-  const { halaqas, students, recitations } = useApp();
+  const { halaqas, students, recitations, teachers, settings } = useApp();
+  // 👭 معلّمات تشاركهنّ طالباتهنّ (حلقة مشتركة) — تراهنّ وتسجّل لهنّ من رابطها
+  const shareIds = settings.teacherShares?.[teacher.id] ?? [];
   const [selected, setSelected] = useState<Student | null>(null);
 
   const assigned = halaqas.filter((h) => teacher.halaqaIds.includes(h.id));
-  const mine = (h: Halaqa) =>
+  const own = (h: Halaqa) =>
     students.filter((s) => s.halaqaId === h.id && s.teacherId === teacher.id && !isWithdrawn(s));
+  const sharedOf = (h: Halaqa, tid: string) =>
+    students.filter((s) => s.halaqaId === h.id && s.teacherId === tid && !isWithdrawn(s));
+  const mine = (h: Halaqa) => [...own(h), ...shareIds.flatMap((tid) => sharedOf(h, tid))];
   // الحلقات التي لها فيها طالبات فقط (وإن لم يكن لها طالبات بعد تظهر حلقاتها المسندة)
   const withStudents = assigned.filter((h) => mine(h).length > 0);
   const herHalaqas = withStudents.length ? withStudents : assigned;
@@ -138,7 +143,14 @@ export function TeacherScreen({ teacher, onLogout }: { teacher: Teacher; onLogou
               <QuickSession
                 halaqa={h}
                 groups={[
-                  { key: teacher.id, title: `المعلّمة ${teacher.name}`, list },
+                  { key: teacher.id, title: `المعلّمة ${teacher.name}`, list: own(h) },
+                  ...shareIds
+                    .map((tid) => ({
+                      key: tid,
+                      title: `👭 مع المعلّمة ${teachers.find((t) => t.id === tid)?.name ?? ""}`,
+                      list: sharedOf(h, tid),
+                    }))
+                    .filter((g) => g.list.length > 0),
                   ...(extra.length ? [{ key: "none", title: "بدون معلّمة", list: extra }] : []),
                 ]}
                 onOpenStudent={setSelected}
