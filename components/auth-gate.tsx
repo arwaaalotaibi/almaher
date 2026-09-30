@@ -251,9 +251,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
     setError("");
 
     if (role === "student" || role === "teacher") {
-      const err = await (role === "teacher" ? claimTeacher(password) : claimStudent(password)).catch(
-        () => "تعذّر الاتصال، حاولي لاحقاً"
-      );
+      // خانة واحدة تقبل الرمزين: التطبيق المضاف للشاشة الرئيسية يفتح دائماً على «دخول الطالبات»
+      // (آيفون لا يشارك دخول Safari)، فإن لم يكن الرمز لطالبة نجرّبه رمزَ معلّمة — والعكس
+      const first = role === "teacher" ? claimTeacher : claimStudent;
+      const other = role === "teacher" ? claimStudent : claimTeacher;
+      const err = await first(password)
+        .then((e) => (e === "الرمز غير صحيح" ? other(password) : e))
+        .catch(() => "تعذّر الاتصال، حاولي لاحقاً");
       setBusy(false);
       if (err) setError(err);
       return;
@@ -309,7 +313,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
               ? "أدخلي كلمة مرور الإدارة"
               : role === "teacher"
                 ? "أدخلي رمز المعلّمة من الإدارة"
-                : "أدخلي رمزك الخاص من الإدارة"}
+                : "أدخلي رمزك الخاص من الإدارة (طالبة أو معلّمة)"}
           </p>
 
           <form

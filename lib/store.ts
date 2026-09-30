@@ -288,7 +288,10 @@ export function teacherCodeMessage(name: string, code: string): string {
 }
 /** رمز معلّمة فريد من ٦ خانات */
 export function genTeacherCode(existing: Teacher[]): string {
-  const used = new Set(existing.map((t) => t.code).filter(Boolean));
+  // لا يتكرّر مع رموز المعلّمات ولا الطالبات — خانة الدخول الواحدة تقبل الاثنين
+  const used = new Set(
+    [...existing.map((t) => t.code), ...getState().students.map((s) => s.code)].filter(Boolean)
+  );
   let c = "";
   do {
     c = String(Math.floor(100000 + Math.random() * 900000));
@@ -1363,7 +1366,9 @@ function studentToRow(st: Student): StudentRow {
 
 /** رمز دخول رقمي فريد من ٦ خانات للطالبة */
 export function genStudentCode(existing: Student[]): string {
-  const used = new Set(existing.map((s) => s.code).filter(Boolean));
+  const used = new Set(
+    [...existing.map((s) => s.code), ...getState().teachers.map((t) => t.code)].filter(Boolean)
+  );
   let c = "";
   do {
     c = String(Math.floor(100000 + Math.random() * 900000));
