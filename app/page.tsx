@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ALLOWED_ABSENCES, termAbsenceDates } from "@/lib/absence";
 import { isWithdrawn, planConfirmMark, studentCountLabel, useApp } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
+import { teacherFollowups } from "@/lib/followup";
 import { Ribbon, useHydrated } from "@/components/ui";
 import { useRole } from "@/components/auth-gate";
 import { TeacherHome } from "@/components/teacher-home";
@@ -11,7 +12,7 @@ import { StudentHome } from "@/components/student-home";
 
 export default function Home() {
   const role = useRole();
-  const { halaqas, students: allStudents, support, recitations } = useApp();
+  const { halaqas, students: allStudents, support, recitations, teachers } = useApp();
   const students = allStudents.filter((s) => !isWithdrawn(s)); // 🚪 المنسحبات خارج العدّ والتنبيهات
   // طالبات بلغن الحدّ المسموح من الغياب (٣) أو تجاوزنه هذا الفصل
   const absenceAlerts = students.filter(
@@ -25,6 +26,12 @@ export default function Home() {
   const planIssues = students.filter(
     (st) => planConfirmMark(st, halaqas.find((h) => h.id === st.halaqaId), support) === "⚠️"
   ).length;
+
+  // 👩‍🏫 معلّمات عليهن لقاءات ماضية لم تُسجَّل
+  const teachersBehind =
+    role === "admin" && hydrated
+      ? teacherFollowups(teachers, halaqas, allStudents, recitations).filter((f) => f.missingCount > 0).length
+      : 0;
 
   if (role === "teacher") return <TeacherHome />;
   if (role === "student") return <StudentHome />;
@@ -174,6 +181,19 @@ export default function Home() {
           {newSupport > 0 && (
             <span className="absolute end-3 top-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
               {newSupport.toLocaleString("ar-EG")}
+            </span>
+          )}
+        </Link>
+        <Link
+          href="/followup"
+          className="card relative flex flex-col items-center gap-1.5 rounded-2xl py-4 transition active:scale-[0.97]"
+        >
+          <span className="text-2xl">👩‍🏫</span>
+          <span className="font-kufi text-sm font-bold text-plum-800">متابعة المعلّمات</span>
+          <span className="text-[11px] text-silver-600">من أكملت ومن ينقصها</span>
+          {teachersBehind > 0 && (
+            <span className="absolute end-3 top-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+              {teachersBehind.toLocaleString("ar-EG")}
             </span>
           )}
         </Link>
