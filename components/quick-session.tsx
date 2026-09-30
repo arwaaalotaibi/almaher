@@ -35,7 +35,6 @@ import { facesText } from "@/lib/faces";
 import { ayahCount, SURAHS } from "@/lib/surahs";
 import { PrimaryBtn, inputCls } from "./ui";
 import { supabase } from "@/lib/supabase";
-import { useRole } from "./auth-gate";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 
@@ -95,8 +94,6 @@ export function QuickSession({
 }) {
   const { recitations } = useApp();
   const termRows = useMemo(() => buildSchedule(halaqa, EMPTY_PLAN), [halaqa]);
-  // 🔒 المعلّمة لا تُدخل لقاءً قبل تسجيل ما قبله — الإدارة مستثناة لمعالجة الحالات الخاصة
-  const strict = useRole() !== "admin";
   const [open, setOpen] = useState(defaultOpen);
   const [groupKey, setGroupKey] = useState<string>("all");
   // الافتراضي: آخر لقاء وقع فعلاً (التسجيل بعد اللقاء لا قبله)
@@ -144,7 +141,7 @@ export function QuickSession({
         hifz: PosRange | null;
         mur: PosRange | null;
         tathbit: RecitePart | null;
-        /** 🔒 لقاء سابق لم يُسجَّل — يمنع إدخال هذا اللقاء (لغير الإدارة) */
+        /** 🔒 لقاء سابق لم يُسجَّل — يمنع إدخال هذا اللقاء (للجميع، والإدارة أيضاً) */
         gap: number | null;
       }
     > = {};
@@ -166,11 +163,11 @@ export function QuickSession({
         );
         // 🚫 التثبيت الملغى عن الطالبة لا يُقترح (الحفظ والمراجعة الملغيان بلا مطلوب أصلاً)
         const tathbit = partOn(s.plan, "tathbit") ? lastTasmi : null;
-        const miss = !existing && strict ? missingEarlierSession(halaqa, s.id, recitations, date) : null;
+        const miss = !existing ? missingEarlierSession(halaqa, s.id, recitations, date) : null;
         map[s.id] = { existing, hifz: p.nextHifzRange, mur: p.nextMurRange, tathbit, gap: miss?.n ?? null };
       }
     return map;
-  }, [shown, recitations, date, halaqa, strict]);
+  }, [shown, recitations, date, halaqa]);
 
   const rowOf = (s: Student): RowState => {
     if (rows[s.id]) return rows[s.id];

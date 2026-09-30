@@ -886,7 +886,7 @@ export function dateKey(d: Date): string {
 }
 
 /** 🔒 أول لقاء سابق في جدول الفصل لم يُسجَّل للطالبة (قبل date) — null إن كان كل ما قبله مسجّلاً.
-    لا يُسجَّل لقاء قبل تسجيل كل ما قبله (حضوراً أو غياباً)، إلا للإدارة */
+    لا يُسجَّل لقاء قبل تسجيل كل ما قبله (حضوراً أو غياباً) — للجميع، والإدارة أيضاً */
 export function missingEarlierSession(
   halaqa: Pick<Halaqa, "day" | "termStart" | "termSessions"> | undefined,
   studentId: string,
