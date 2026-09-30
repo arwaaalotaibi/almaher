@@ -114,3 +114,15 @@ export function followupMessage(f: TeacherFollowup, sharers: string[] = []): str
   if (link) lines.push(`🔗 رابطكِ: ${link}`);
   return lines.join("\n");
 }
+
+/** نص مختصر لإشعار الجوال (الرسالة الكاملة أطول من الإشعار) */
+export function followupPushText(f: TeacherFollowup): string {
+  const parts = f.halaqas
+    .filter((h) => h.missing.length)
+    .map(
+      (h) =>
+        `${h.halaqa.mosque}: ` +
+        h.missing.map((m) => `لقاء ${ar(m.n)} (${ar(m.names.length)})`).join("، ")
+    );
+  return `باقي تسجيل: ${parts.join(" · ")}\nسجّلي الأقدم أولاً 🔒 — جزاكِ الله خيراً 🤍`;
+}

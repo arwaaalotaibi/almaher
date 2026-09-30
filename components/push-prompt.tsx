@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { enablePush, getPushState, isIOS, isStandalone, pushSupported } from "@/lib/push";
+import { enablePush, getPushState, isIOS, isStandalone, pushSupported, type PushOwner } from "@/lib/push";
 import { Sheet } from "./ui";
 
 /** 🔔 نافذة تدعو الطالبة لتفعيل الإشعارات — تظهر بعد دخولها إن لم تكن مفعّلة.
@@ -39,15 +39,25 @@ function markSeen(final = false) {
 }
 
 export function PushPrompt({
-  studentId,
-  halaqaId,
+  owner,
   enabled,
 }: {
-  studentId: string;
-  halaqaId: string;
+  owner: PushOwner;
   /** لا تظهر فوق اللائحة أو جولة الشرح */
   enabled: boolean;
 }) {
+  const teacher = "teacher" in owner;
+  const perks: [string, string][] = teacher
+    ? [
+        ["📋", "تذكير بعد الحلقة إن بقي تسجيل ناقص"],
+        ["🔔", "تذكير في اليوم التالي إن لم يكتمل"],
+        ["✉️", "رسائل الإدارة"],
+      ]
+    : [
+        ["🌙", "تذكير قبل لقائكِ بالمطلوب"],
+        ["✅", "«أحسنتِ» فور اعتماد تسميعكِ"],
+        ["✉️", "رسائل الإدارة وإعلانات الحلقة"],
+      ];
   const [mode, setMode] = useState<Mode | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -77,7 +87,7 @@ export function PushPrompt({
     if (busy) return;
     setBusy(true);
     try {
-      const st = await enablePush(studentId, halaqaId);
+      const st = await enablePush(owner);
       if (st === "subscribed" || st === "denied") {
         markSeen(true); // تمّ القرار — لا نسأل ثانية
         setMode(null);
@@ -103,11 +113,7 @@ export function PushPrompt({
           <h2 className="mt-3 font-kufi text-2xl font-bold text-plum-800">خلّي الماهر يذكّركِ</h2>
           <p className="mt-1 text-sm font-bold text-silver-600">فعّلي الإشعارات ليصلكِ:</p>
           <div className="mt-3 grid gap-2 text-start">
-            {[
-              ["🌙", "تذكير قبل لقائكِ بالمطلوب"],
-              ["✅", "«أحسنتِ» فور اعتماد تسميعكِ"],
-              ["✉️", "رسائل الإدارة وإعلانات الحلقة"],
-            ].map(([i, t]) => (
+            {perks.map(([i, t]) => (
               <div key={t} className="flex items-center gap-3 rounded-xl bg-plum-50 px-3 py-2.5 text-sm font-bold text-plum-800">
                 <span className="text-xl">{i}</span>
                 {t}

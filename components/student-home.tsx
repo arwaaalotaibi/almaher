@@ -235,8 +235,7 @@ export function StudentHome() {
 
       {/* 🔔 دعوة لتفعيل الإشعارات — بعد اللائحة وجولة الشرح */}
       <PushPrompt
-        studentId={me.id}
-        halaqaId={me.halaqaId}
+        owner={{ studentId: me.id, halaqaId: me.halaqaId }}
         enabled={agreed && !tourOpen && hasSeenTour()}
       />
 
@@ -879,7 +878,7 @@ export function StudentHome() {
               → رجوع
             </button>
           </div>
-          <PushToggle studentId={me.id} halaqaId={me.halaqaId} />
+          <PushToggle owner={{ studentId: me.id, halaqaId: me.halaqaId }} />
           <NotificationsCenter
             halaqaIds={myHalaqaIds}
             smart={smartNotifs}

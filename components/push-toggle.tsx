@@ -8,25 +8,22 @@ import {
   getPushState,
   syncPush,
   registerServiceWorker,
+  type PushOwner,
   type PushState,
 } from "@/lib/push";
 
-/** زر تفعيل إشعارات الجهاز (Web Push) للطالبة */
-export function PushToggle({
-  studentId,
-  halaqaId,
-}: {
-  studentId: string;
-  halaqaId: string;
-}) {
+/** زر تفعيل إشعارات الجهاز (Web Push) — للطالبة، أو للمعلّمة ({ teacher: true }) */
+export function PushToggle({ owner }: { owner: PushOwner }) {
+  const ownerKey = "teacher" in owner ? "teacher" : `${owner.studentId}|${owner.halaqaId}`;
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     registerServiceWorker();
     // تصحيح صامت للاشتراكات القديمة ثم قراءة الحالة
-    syncPush(studentId, halaqaId).finally(() => getPushState().then(setState));
-  }, [studentId, halaqaId]);
+    syncPush(owner).finally(() => getPushState().then(setState));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownerKey]);
 
   if (state === null || state === "unsupported") return null;
 
@@ -37,7 +34,7 @@ export function PushToggle({
       if (state === "subscribed") {
         setState(await disablePush());
       } else {
-        setState(await enablePush(studentId, halaqaId));
+        setState(await enablePush(owner));
       }
     } catch (e) {
       window.alert(
@@ -65,7 +62,7 @@ export function PushToggle({
     setBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke("almaher-push", {
-        body: { kind: "test" },
+        body: { kind: "teacher" in owner ? "teacher_test" : "test" },
       });
       if (error) throw error;
       const sent = (data as { sent?: number } | null)?.sent ?? 0;

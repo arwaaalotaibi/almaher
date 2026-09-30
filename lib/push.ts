@@ -78,31 +78,31 @@ function subMatchesKey(sub: PushSubscription): boolean {
   return true;
 }
 
+/** صاحبة الجهاز: طالبة (بحلقتها) أو المعلّمة المربوط بها الجهاز (v16) */
+export type PushOwner = { studentId: string; halaqaId: string } | { teacher: true };
+
+/** حفظ الاشتراك باسم صاحبته — عبر دالة آمنة (SECURITY DEFINER) لتجاوز قيود RLS على الكتابة */
+async function saveSub(sub: PushSubscription, owner: PushOwner) {
+  const json = sub.toJSON();
+  const keys = { p_endpoint: sub.endpoint, p_p256dh: json.keys?.p256dh ?? "", p_auth: json.keys?.auth ?? "" };
+  return "teacher" in owner
+    ? supabase.rpc("almaher_save_teacher_push_sub", keys)
+    : supabase.rpc("almaher_save_push_sub", { ...keys, p_sid: owner.studentId, p_halaqa: owner.halaqaId });
+}
+
 /** اشتراك جديد بالمفتاح الحالي وحفظه في قاعدة البيانات */
-async function subscribeAndSave(
-  reg: ServiceWorkerRegistration,
-  studentId: string,
-  halaqaId: string
-): Promise<void> {
+async function subscribeAndSave(reg: ServiceWorkerRegistration, owner: PushOwner): Promise<void> {
   const sub = await reg.pushManager.subscribe({
     userVisibleOnly: true,
     applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as BufferSource,
   });
-  const json = sub.toJSON();
-  // عبر دالة آمنة (SECURITY DEFINER) لتجاوز قيود RLS على الكتابة
-  const { error } = await supabase.rpc("almaher_save_push_sub", {
-    p_endpoint: sub.endpoint,
-    p_p256dh: json.keys?.p256dh ?? "",
-    p_auth: json.keys?.auth ?? "",
-    p_sid: studentId,
-    p_halaqa: halaqaId,
-  });
+  const { error } = await saveSub(sub, owner);
   if (error) throw error;
 }
 
 /** مزامنة صامتة عند فتح التطبيق: إن كان الاشتراك بمفتاح قديم (قبل ١٢ سبتمبر ٢٠٢٦)
     يُستبدل باشتراك جديد دون طلب إذن، وإن كان سليماً يُعاد حفظه ليبقى مرتبطاً بالطالبة الحالية */
-export async function syncPush(studentId: string, halaqaId: string): Promise<void> {
+export async function syncPush(owner: PushOwner): Promise<void> {
   if (!pushSupported() || Notification.permission !== "granted") return;
   const reg = await navigator.serviceWorker.getRegistration();
   const sub = await reg?.pushManager.getSubscription();
@@ -111,27 +111,17 @@ export async function syncPush(studentId: string, halaqaId: string): Promise<voi
     if (!subMatchesKey(sub)) {
       await supabase.rpc("almaher_delete_push_sub", { p_endpoint: sub.endpoint });
       await sub.unsubscribe();
-      await subscribeAndSave(reg, studentId, halaqaId);
+      await subscribeAndSave(reg, owner);
       return;
     }
-    const json = sub.toJSON();
-    await supabase.rpc("almaher_save_push_sub", {
-      p_endpoint: sub.endpoint,
-      p_p256dh: json.keys?.p256dh ?? "",
-      p_auth: json.keys?.auth ?? "",
-      p_sid: studentId,
-      p_halaqa: halaqaId,
-    });
+    await saveSub(sub, owner);
   } catch {
     /* بلا إنترنت أو رفض — نحاول في الفتح القادم */
   }
 }
 
 /** تفعيل إشعارات الجهاز: إذن + اشتراك + حفظه في قاعدة البيانات */
-export async function enablePush(
-  studentId: string,
-  halaqaId: string
-): Promise<PushState> {
+export async function enablePush(owner: PushOwner): Promise<PushState> {
   if (!pushSupported()) return "unsupported";
   // على آيفون لا تعمل الإشعارات إلا من التطبيق المثبّت على الشاشة الرئيسية
   if (isIOS() && !isStandalone()) {
@@ -154,7 +144,7 @@ export async function enablePush(
     await supabase.rpc("almaher_delete_push_sub", { p_endpoint: existing.endpoint });
     await existing.unsubscribe();
   }
-  await subscribeAndSave(reg, studentId, halaqaId);
+  await subscribeAndSave(reg, owner);
   return "subscribed";
 }
 

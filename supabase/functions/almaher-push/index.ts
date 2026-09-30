@@ -9,6 +9,11 @@
 //                             بعد اعتماد سجلّ اللقاء: تشجيع للحاضرة بما سمّعته، ورسالة متدرّجة للغائبة
 //   { kind: "reminders" }     تذكير «لقاؤكِ غداً» لطالبات حلقات الغد — يُستدعى من
 //                             المجدول (pg_cron) مع الترويسة x-cron-secret
+//   ——— المعلّمات (v16: almaher_push_subs.teacher_id) ———
+//   { kind: "teacher_test" }  إشعار تجريبي لأجهزة المعلّمة صاحبة الجلسة
+//   { kind: "teacher_direct", teacher_id, body, title? }  رسالة من الإدارة لمعلّمة (جلسة إدارة)
+//   { kind: "teacher_reminders" }  ٩ م يومياً من المجدول: لمن كان لها لقاء اليوم أو أمس
+//                             ولم يكتمل تسجيله (الحلقات تنتهي ٧–٨ م)
 //
 // الأسرار (supabase secrets set): VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, CRON_SECRET
 // SUPABASE_URL و SUPABASE_SERVICE_ROLE_KEY تُوفَّر تلقائياً.
@@ -16,7 +21,8 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 
-type Sub = { endpoint: string; p256dh: string; auth: string; student_id: string; halaqa_id: string };
+type Sub = { endpoint: string; p256dh: string; auth: string; student_id: string; halaqa_id: string; teacher_id?: string };
+const SUB_COLS = "endpoint,p256dh,auth,student_id,halaqa_id,teacher_id";
 type Payload = { title: string; body: string; url?: string; tag?: string };
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -79,21 +85,43 @@ async function sendTo(
 }
 
 /** دور صاحبة الجلسة (admin / teacher / student / null) ومعرّف الطالبة إن وُجد */
-async function whoIs(req: Request): Promise<{ role: string | null; studentId: string | null }> {
+async function whoIs(
+  req: Request
+): Promise<{ role: string | null; studentId: string | null; teacherId: string | null }> {
   const auth = req.headers.get("authorization") ?? "";
-  if (!auth.startsWith("Bearer ")) return { role: null, studentId: null };
+  if (!auth.startsWith("Bearer ")) return { role: null, studentId: null, teacherId: null };
   const user = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY") ?? SERVICE_KEY, {
     global: { headers: { Authorization: auth } },
     auth: { persistSession: false },
   });
-  const [{ data: role }, { data: sid }] = await Promise.all([
+  const [{ data: role }, { data: sid }, { data: tid }] = await Promise.all([
     user.rpc("almaher_role"),
     user.rpc("almaher_my_student"),
+    user.rpc("almaher_my_teacher"),
   ]);
   return {
     role: typeof role === "string" ? role : null,
     studentId: typeof sid === "string" && sid ? sid : null,
+    teacherId: typeof tid === "string" && tid ? tid : null,
   };
+}
+
+/** تاريخ yyyy-mm-dd بتوقيت الكويت (UTC+3)، مع إزاحة بالأيام */
+function kuwaitDay(offsetDays = 0): string {
+  const t = new Date(Date.now() + 3 * 60 * 60 * 1000 + offsetDays * 24 * 60 * 60 * 1000);
+  return t.toISOString().slice(0, 10);
+}
+
+/** تواريخ لقاءات الفصل لحلقة: أول يوم موافق ليومها في/بعد البداية، ثم أسبوعياً — مطابق لـ buildSchedule */
+function sessionDates(h: { day: string; term_start: string | null; term_sessions: number | null }): string[] {
+  const dow = WEEK_DAYS.indexOf(h.day);
+  if (!h.term_start || dow < 0) return [];
+  const first = new Date(h.term_start + "T00:00:00Z");
+  while (first.getUTCDay() !== dow) first.setUTCDate(first.getUTCDate() + 1);
+  const n = h.term_sessions || 0;
+  return Array.from({ length: n }, (_, i) =>
+    new Date(first.getTime() + i * 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  );
 }
 
 /** يوم الغد بتوقيت الكويت (UTC+3) */
@@ -206,8 +234,101 @@ Deno.serve(async (req) => {
     return json({ ok: true, day: iso, halaqas: ids.length, sent, removed });
   }
 
+
+  // ---------- 🔔 تذكير المعلّمات (من المجدول، ٩ م) ----------
+  if (body.kind === "teacher_reminders") {
+    if (!CRON_SECRET || req.headers.get("x-cron-secret") !== CRON_SECRET) {
+      return json({ error: "forbidden" }, 403);
+    }
+    const today = kuwaitDay(0);
+    const yesterday = kuwaitDay(-1);
+    const { data: last } = await admin.from("almaher_settings").select("value").eq("key", "push_teacher_reminder_last").maybeSingle();
+    if (last?.value?.day === today) return json({ ok: true, skipped: "already sent", day: today });
+
+    const [{ data: subsAll }, { data: teachers }, { data: halaqas }, { data: students }, { data: shareRow }, { data: logs }] =
+      await Promise.all([
+        admin.from("almaher_push_subs").select(SUB_COLS).neq("teacher_id", ""),
+        admin.from("almaher_teachers").select("id, name"),
+        admin.from("almaher_halaqas").select("id, mosque, day, term_start, term_sessions"),
+        admin.from("almaher_students").select("id, halaqa_id, teacher_id, plan"),
+        admin.from("almaher_settings").select("value").eq("key", "teacher_shares").maybeSingle(),
+        admin.from("almaher_sessions").select("student_id, log_date"),
+      ]);
+    const shares = (shareRow?.value ?? {}) as Record<string, string[]>;
+    const logged = new Set((logs ?? []).map((l) => `${l.student_id}|${l.log_date}`));
+    const active = (students ?? []).filter((s) => !(s.plan as { withdrawnAt?: string } | null)?.withdrawnAt);
+    let sent = 0;
+    let removed = 0;
+    let teachersNotified = 0;
+    for (const t of teachers ?? []) {
+      const mine = (subsAll ?? []).filter((s) => s.teacher_id === t.id);
+      if (!mine.length) continue;
+      const tids = new Set([t.id, ...(shares[t.id] ?? [])]); // 👭 الحلقة المشتركة
+      const hers = active.filter((s) => tids.has(s.teacher_id));
+      const lines: string[] = [];
+      let older = 0;
+      let anyToday = false;
+      for (const h of halaqas ?? []) {
+        const list = hers.filter((s) => s.halaqa_id === h.id);
+        if (!list.length) continue;
+        for (const d of sessionDates(h)) {
+          if (d > today) break;
+          const miss = list.filter((s) => !logged.has(`${s.id}|${d}`)).length;
+          if (!miss) continue;
+          if (d === today || d === yesterday) {
+            if (d === today) anyToday = true;
+            lines.push(
+              `${d === today ? "لقاء اليوم" : "لقاء أمس"} — ${h.mosque}: باقي ${ar(miss)} من ${ar(list.length)} طالبة`
+            );
+          } else if (d < yesterday) older += miss;
+        }
+      }
+      if (!lines.length) continue; // لا لقاء اليوم/أمس ناقص — لا إزعاج
+      if (older) lines.push(`وعليكِ ${ar(older)} سجلاً من لقاءات سابقة — سجّلي الأقدم أولاً 🔒`);
+      const r = await sendTo(mine, {
+        title: anyToday ? `📋 أبلة ${t.name}، تسجيل لقاء اليوم` : `📋 أبلة ${t.name}، لقاء أمس ما زال ناقصاً`,
+        body: lines.join("\n"),
+        url: "/",
+        tag: `teacher-reminder-${today}`,
+      });
+      sent += r.sent;
+      removed += r.removed;
+      teachersNotified++;
+    }
+    await admin
+      .from("almaher_settings")
+      .upsert({ key: "push_teacher_reminder_last", value: { day: today, sent }, updated_at: new Date().toISOString() });
+    return json({ ok: true, day: today, teachers: teachersNotified, sent, removed });
+  }
   // ---------- بقية الأنواع تحتاج جلسة ----------
   const who = await whoIs(req);
+
+  if (body.kind === "teacher_test") {
+    if (!who.teacherId) return json({ error: "not a teacher" }, 403);
+    const { data: subs } = await admin.from("almaher_push_subs").select(SUB_COLS).eq("teacher_id", who.teacherId);
+    const r = await sendTo(subs ?? [], {
+      title: "الماهر 🌸",
+      body: "إشعاراتكِ تعمل بنجاح — سيصلكِ تذكير تسجيل اللقاء ورسائل الإدارة هنا",
+      url: "/",
+      tag: "teacher-test",
+    });
+    return json({ ok: true, ...r });
+  }
+
+  if (body.kind === "teacher_direct") {
+    if (who.role !== "admin") return json({ error: "forbidden" }, 403);
+    const b = body as { teacher_id?: string; body?: string; title?: string };
+    if (!b.teacher_id || !b.body) return json({ error: "teacher_id and body required" }, 400);
+    const { data: subs } = await admin.from("almaher_push_subs").select(SUB_COLS).eq("teacher_id", b.teacher_id);
+    const text = String(b.body);
+    const r = await sendTo(subs ?? [], {
+      title: b.title || "✉️ رسالة من الإدارة",
+      body: text.length > 300 ? text.slice(0, 297) + "…" : text,
+      url: "/",
+      tag: `teacher-direct-${Date.now()}`,
+    });
+    return json({ ok: true, devices: (subs ?? []).length, ...r });
+  }
 
   if (body.kind === "test") {
     if (!who.studentId) return json({ error: "not a student" }, 403);
@@ -236,14 +357,15 @@ Deno.serve(async (req) => {
     if (a.show_at && new Date(a.show_at).getTime() > Date.now() + 60_000) {
       return json({ ok: true, skipped: "scheduled for later" });
     }
-    let q = admin.from("almaher_push_subs").select("endpoint,p256dh,auth,student_id,halaqa_id");
+    let q = admin.from("almaher_push_subs").select(SUB_COLS);
     if (a.halaqa_id) q = q.eq("halaqa_id", a.halaqa_id);
     const [{ data: subsAll }, { data: withdrawn }] = await Promise.all([
       q,
       admin.from("almaher_students").select("id").not("plan->>withdrawnAt", "is", null),
     ]);
     const gone = new Set((withdrawn ?? []).map((x) => x.id as string));
-    const subs = (subsAll ?? []).filter((s) => !gone.has(s.student_id)); // 🚪 المنسحبات لا يصلهن الإعلان
+    // 🚪 المنسحبات لا يصلهن الإعلان، واشتراكات المعلّمات خارج إعلانات الطالبات
+    const subs = (subsAll ?? []).filter((s) => !gone.has(s.student_id) && !s.teacher_id);
     const title = a.type === "important" ? "⚠️ إعلان مهم من الماهر" : a.type === "reminder" ? "⏰ تذكير من الماهر" : "📢 إعلان من الماهر";
     const text = String(a.body ?? "");
     const r = await sendTo(subs ?? [], {

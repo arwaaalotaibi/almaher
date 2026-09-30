@@ -17,6 +17,8 @@ import { StudentSheet } from "./student-sheet";
 import { QuickSession } from "./quick-session";
 import { NotificationsCard } from "./notifications-card";
 import { ThemeToggle } from "./theme-toggle";
+import { PushToggle } from "./push-toggle";
+import { PushPrompt } from "./push-prompt";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 
@@ -103,6 +105,10 @@ export function TeacherScreen({ teacher, onLogout }: { teacher: Teacher; onLogou
           ))}
         </ol>
       </details>
+
+      {/* 🔔 إشعارات جوال المعلّمة: تذكير التسجيل بعد الحلقة ورسائل الإدارة */}
+      <PushPrompt owner={{ teacher: true }} enabled />
+      <PushToggle owner={{ teacher: true }} />
 
       {herHalaqas.map((h) => {
         const list = mine(h);

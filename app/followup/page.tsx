@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { halaqaTitle, useApp, whatsappLink } from "@/lib/store";
-import { followupMessage, teacherFollowups, type TeacherFollowup } from "@/lib/followup";
+import { followupMessage, followupPushText, teacherFollowups, type TeacherFollowup } from "@/lib/followup";
 import { supabase } from "@/lib/supabase";
 import { PageHeader, useHydrated } from "@/components/ui";
 import { RoleOnly } from "@/components/admin-only";
@@ -62,6 +62,26 @@ function FollowupInner() {
   const lastSeen = useTeacherLastSeen();
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState<string | null>(null);
+  const [pushed, setPushed] = useState<Record<string, string>>({}); // نتيجة الإشعار لكل معلّمة
+
+  /** 🔔 إرسال التذكير إشعاراً لجوال المعلّمة (ولمن تدخل الحلقة المشتركة) */
+  const notify = async (f: TeacherFollowup) => {
+    const targets = [f.teacher.id, ...sharersOf(f.teacher.id).map((t) => t.id)];
+    setPushed((p) => ({ ...p, [f.teacher.id]: "⏳ …" }));
+    let sent = 0;
+    try {
+      for (const id of targets) {
+        const { data, error } = await supabase.functions.invoke("almaher-push", {
+          body: { kind: "teacher_direct", teacher_id: id, title: "📋 تذكير من الإدارة", body: followupPushText(f) },
+        });
+        if (error) throw error;
+        sent += (data as { sent?: number } | null)?.sent ?? 0;
+      }
+      setPushed((p) => ({ ...p, [f.teacher.id]: sent ? `✓ وصل (${ar(sent)})` : "🔕 لم تفعّل الإشعارات" }));
+    } catch {
+      setPushed((p) => ({ ...p, [f.teacher.id]: "تعذّر الإرسال" }));
+    }
+  };
 
   const list = useMemo(
     () => (hydrated ? teacherFollowups(teachers, halaqas, students, recitations) : []),
@@ -204,13 +224,21 @@ function FollowupInner() {
                     </div>
                   )}
 
-                  <div className="mt-2.5 grid grid-cols-2 gap-2">
+                  <div className="mt-2.5 grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => notify(f)}
+                      className="rounded-xl bg-amber-500 py-2 text-sm font-bold text-white"
+                      title="إرسال التذكير إشعاراً لجوالها"
+                    >
+                      {pushed[f.teacher.id] ?? "🔔 إشعار"}
+                    </button>
                     <button
                       type="button"
                       onClick={() => copy(f)}
                       className="rounded-xl bg-plum-600 py-2 text-sm font-bold text-white"
                     >
-                      {copied === f.teacher.id ? "تم النسخ ✓" : "📋 نسخ رسالة التذكير"}
+                      {copied === f.teacher.id ? "تم النسخ ✓" : "📋 نسخ"}
                     </button>
                     <a
                       href={whatsappLink("", followupMessage(f, sharers.map((t) => t.name)))}
