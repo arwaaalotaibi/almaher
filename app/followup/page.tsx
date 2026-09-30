@@ -47,7 +47,17 @@ export default function FollowupPage() {
 }
 
 function FollowupInner() {
-  const { teachers, halaqas, students, recitations } = useApp();
+  const { teachers, halaqas, students, recitations, settings } = useApp();
+  // 👭 الحلقة المشتركة: المعلّمات اللاتي يدخلنها من روابطهنّ (teacherShares)
+  const sharersOf = (id: string) =>
+    teachers.filter((t) => (settings.teacherShares?.[t.id] ?? []).includes(id));
+  /** آخر دخول: للحلقة المشتركة = أحدث دخول لمن تدخلها (ولها إن كان لها جهاز) */
+  const seenOf = (id: string): string | undefined =>
+    [id, ...sharersOf(id).map((t) => t.id)]
+      .map((x) => lastSeen?.get(x))
+      .filter((x): x is string => !!x)
+      .sort()
+      .pop();
   const hydrated = useHydrated();
   const lastSeen = useTeacherLastSeen();
   const [open, setOpen] = useState<Set<string>>(new Set());
@@ -65,7 +75,7 @@ function FollowupInner() {
   );
 
   const copy = async (f: TeacherFollowup) => {
-    const msg = followupMessage(f);
+    const msg = followupMessage(f, sharersOf(f.teacher.id).map((t) => t.name));
     try {
       await navigator.clipboard.writeText(msg);
       setCopied(f.teacher.id);
@@ -139,7 +149,8 @@ function FollowupInner() {
           <h2 className="mb-2 font-kufi text-lg font-bold text-plum-800">⚠️ عليهن نقص</h2>
           <div className="grid gap-2.5">
             {behind.map((f) => {
-              const seen = lastSeenLabel(lastSeen?.get(f.teacher.id));
+              const seen = lastSeenLabel(seenOf(f.teacher.id));
+              const sharers = sharersOf(f.teacher.id);
               const isOpen = open.has(f.teacher.id);
               return (
                 <div key={f.teacher.id} className="card rounded-2xl p-3.5">
@@ -156,6 +167,11 @@ function FollowupInner() {
                         <span className="rounded-full bg-cream px-2 py-0.5 text-silver-600">
                           {ar(f.students)} طالبة
                         </span>
+                        {sharers.length > 0 && (
+                          <span className="rounded-full bg-plum-50 px-2 py-0.5 text-plum-700">
+                            👭 مشتركة: {sharers.map((t) => t.name).join(" و")}
+                          </span>
+                        )}
                         {lastSeen && <span className={`rounded-full px-2 py-0.5 ${seen.cls}`}>{seen.text}</span>}
                       </span>
                     </span>
@@ -197,7 +213,7 @@ function FollowupInner() {
                       {copied === f.teacher.id ? "تم النسخ ✓" : "📋 نسخ رسالة التذكير"}
                     </button>
                     <a
-                      href={whatsappLink("", followupMessage(f))}
+                      href={whatsappLink("", followupMessage(f, sharers.map((t) => t.name)))}
                       target="_blank"
                       rel="noreferrer"
                       className="rounded-xl bg-emerald-500 py-2 text-center text-sm font-bold text-white"
@@ -217,7 +233,8 @@ function FollowupInner() {
           <h2 className="mb-2 font-kufi text-lg font-bold text-plum-800">✅ أكملن كل اللقاءات</h2>
           <div className="grid gap-1.5">
             {done.map((f) => {
-              const seen = lastSeenLabel(lastSeen?.get(f.teacher.id));
+              const seen = lastSeenLabel(seenOf(f.teacher.id));
+              const sharers = sharersOf(f.teacher.id);
               return (
                 <div
                   key={f.teacher.id}
@@ -226,6 +243,9 @@ function FollowupInner() {
                   <span className="font-bold text-plum-800">
                     {f.teacher.name}{" "}
                     <span className="text-xs font-normal text-silver-600">· {ar(f.students)} طالبة</span>
+                    {sharers.length > 0 && (
+                      <span className="text-xs font-normal text-plum-700"> · 👭 {sharers.map((t) => t.name).join(" و")}</span>
+                    )}
                   </span>
                   {lastSeen && (
                     <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${seen.cls}`}>

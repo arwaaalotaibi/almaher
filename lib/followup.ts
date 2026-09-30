@@ -85,27 +85,32 @@ export function teacherFollowups(
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 
-/** رسالة واتساب للمعلّمة بما ينقصها — الأقدم أولاً، مع رابط دخولها */
-export function followupMessage(f: TeacherFollowup): string {
+/** رسالة واتساب للمعلّمة بما ينقصها — الأقدم أولاً، مع رابط دخولها.
+    الحلقة المشتركة (sharers): تُخاطَب المعلّمات اللاتي يدخلنها، بلا رابط (كلٌّ تدخل من رابطها) */
+export function followupMessage(f: TeacherFollowup, sharers: string[] = []): string {
+  const many = sharers.length > 1; // مخاطبة الجمع في الحلقة المشتركة
+  const who = sharers.length ? sharers.map((n) => `أبلة ${n}`).join(" و") : `أبلة ${f.teacher.name}`;
   const lines: string[] = [
     "السلام عليكم ورحمة الله 🌷",
-    `أبلة ${f.teacher.name}، جزاكِ الله خيراً على جهودكِ 🤍`,
-    "باقي تسجيل هذه اللقاءات في الماهر:",
+    many ? `${who}، جزاكنّ الله خيراً على جهودكنّ 🤍` : `${who}، جزاكِ الله خيراً على جهودكِ 🤍`,
   ];
+  if (sharers.length) lines.push(`حلقتكنّ المشتركة «${f.teacher.name}» — تسجّلها كل واحدة من رابطها.`);
+  lines.push("باقي تسجيل هذه اللقاءات في الماهر:");
   for (const h of f.halaqas) {
     if (!h.missing.length) continue;
     lines.push("", `🕌 ${halaqaTitle(h.halaqa)}`);
     for (const m of h.missing) {
-      const who =
+      const names =
         m.names.length === m.total ? `كل الطالبات (${ar(m.total)})` : m.names.join("، ");
-      lines.push(`• لقاء ${ar(m.n)} (${m.dateLabel}): ${who}`);
+      lines.push(`• لقاء ${ar(m.n)} (${m.dateLabel}): ${names}`);
     }
   }
   lines.push(
     "",
-    "🔒 سجّلي الأقدم أولاً — لا يُفتح اللقاء التالي للطالبة قبل تسجيل ما قبله (حضوراً أو غياباً)."
+    "🔒 الأقدم أولاً — لا يُفتح اللقاء التالي للطالبة قبل تسجيل ما قبله (حضوراً أو غياباً)."
   );
-  const link = f.teacher.code ? teacherCodeLink(f.teacher.code) : "";
+  // الحلقة المشتركة بلا رابط: كلٌّ تدخل من رابطها الخاص
+  const link = !sharers.length && f.teacher.code ? teacherCodeLink(f.teacher.code) : "";
   if (link) lines.push(`🔗 رابطكِ: ${link}`);
   return lines.join("\n");
 }
