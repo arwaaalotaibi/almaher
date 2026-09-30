@@ -84,6 +84,8 @@ export function QuickSession({
   groups,
   onOpenStudent,
   defaultOpen = false,
+  initialDate,
+  simple = false,
 }: {
   halaqa: Halaqa;
   groups: { key: string; title: string; list: Student[] }[];
@@ -91,6 +93,10 @@ export function QuickSession({
   onOpenStudent?: (s: Student) => void;
   /** مفتوحة من البداية (شاشة المعلّمة) */
   defaultOpen?: boolean;
+  /** اللقاء المختار عند الفتح (yyyy-mm-dd) — مثل «سجّلي اللقاء الناقص» */
+  initialDate?: string;
+  /** واجهة مبسّطة للمعلّمة: بلا خيارات الترتيب وزر الإشعار والشرح الطويل */
+  simple?: boolean;
 }) {
   const { recitations } = useApp();
   const termRows = useMemo(() => buildSchedule(halaqa, EMPTY_PLAN), [halaqa]);
@@ -98,6 +104,7 @@ export function QuickSession({
   const [groupKey, setGroupKey] = useState<string>("all");
   // الافتراضي: آخر لقاء وقع فعلاً (التسجيل بعد اللقاء لا قبله)
   const [date, setDate] = useState<string>(() => {
+    if (initialDate) return initialDate;
     if (termRows?.length) {
       const endOfToday = new Date().setHours(23, 59, 59, 999);
       const passed = [...termRows].reverse().find((r) => r.date.getTime() <= endOfToday);
@@ -143,6 +150,7 @@ export function QuickSession({
         tathbit: RecitePart | null;
         /** 🔒 لقاء سابق لم يُسجَّل — يمنع إدخال هذا اللقاء (للجميع، والإدارة أيضاً) */
         gap: number | null;
+        gapDate: string | null;
       }
     > = {};
     for (const g of shown)
@@ -164,7 +172,7 @@ export function QuickSession({
         // 🚫 التثبيت الملغى عن الطالبة لا يُقترح (الحفظ والمراجعة الملغيان بلا مطلوب أصلاً)
         const tathbit = partOn(s.plan, "tathbit") ? lastTasmi : null;
         const miss = !existing ? missingEarlierSession(halaqa, s.id, recitations, date) : null;
-        map[s.id] = { existing, hifz: p.nextHifzRange, mur: p.nextMurRange, tathbit, gap: miss?.n ?? null };
+        map[s.id] = { existing, hifz: p.nextHifzRange, mur: p.nextMurRange, tathbit, gap: miss?.n ?? null, gapDate: miss ? dateKey(miss.date) : null };
       }
     return map;
   }, [shown, recitations, date, halaqa]);
@@ -195,7 +203,15 @@ export function QuickSession({
   const [filter, setFilter] = useState<"all" | "pending" | "done">("all");
   const passes = (s: Student) =>
     filter === "all" ? true : filter === "done" ? !!info[s.id]?.existing : !info[s.id]?.existing;
-  const visible = shown.map((g) => ({ ...g, list: g.list.filter(passes) }));
+  // المبسّطة: المقفلات (لقاء سابق ناقص) تُجمع في سطر واحد بدل صفّ لكل واحدة
+  const visible = shown.map((g) => ({
+    ...g,
+    list: g.list.filter((s) => passes(s) && !(simple && info[s.id]?.gap != null)),
+  }));
+  const lockedAll = shown.flatMap((g) => g.list).filter((s) => info[s.id]?.gap != null);
+  const firstGap = lockedAll
+    .map((s) => ({ n: info[s.id].gap!, date: info[s.id].gapDate! }))
+    .sort((a, b) => a.n - b.n)[0];
   const [noteOpen, setNoteOpen] = useState<Record<string, boolean>>({}); // 📝 حقل الملاحظة المفتوح لكل طالبة
 
   /** المقطع الفعلي لقسم: المعدَّل الآن إن وُجد، وإلا المحفوظ في سجلّ هذا اللقاء،
@@ -340,7 +356,7 @@ export function QuickSession({
         </p>
       ) : (
         <div className="mt-3">
-          <div className={`mb-3 grid gap-2 ${groups.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+          <div className={`mb-3 grid gap-2 ${groups.length > 1 && !simple ? "grid-cols-2" : "grid-cols-1"}`}>
             <label className="block">
               <span className="mb-1 block text-xs font-bold text-plum-700">اللقاء</span>
               <select
@@ -358,7 +374,7 @@ export function QuickSession({
                 ))}
               </select>
             </label>
-            <label className={groups.length > 1 ? "block" : "hidden"}>
+            <label className={groups.length > 1 && !simple ? "block" : "hidden"}>
               <span className="mb-1 block text-xs font-bold text-plum-700">المعلّمة</span>
               <select
                 className={inputCls}
@@ -378,6 +394,7 @@ export function QuickSession({
             </label>
           </div>
 
+          {!simple && (
           <div className="mb-2 flex items-center gap-1.5 text-xs">
             <span className="font-bold text-plum-700">الترتيب:</span>
             {[
@@ -396,6 +413,7 @@ export function QuickSession({
               </button>
             ))}
           </div>
+          )}
           {(() => {
             const all = shown.flatMap((g) => g.list);
             const done = all.filter((x) => !!info[x.id]?.existing).length;
@@ -423,6 +441,7 @@ export function QuickSession({
             );
           })()}
 
+          {!simple && (
           <button
             type="button"
             onClick={() => setNotify((v) => !v)}
@@ -440,18 +459,42 @@ export function QuickSession({
               <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${notify ? "start-4" : "start-0.5"}`} />
             </span>
           </button>
+          )}
           {notified && (
             <p className="mb-2 rounded-xl bg-emerald-50 px-3 py-1.5 text-center text-[11px] font-bold text-emerald-700">
               {notified}
             </p>
           )}
+          {simple ? (
+            <p className="mb-2 rounded-xl bg-cream px-3 py-2 text-xs font-bold leading-relaxed text-plum-800">
+              ✅ الكل «حاضرة» بوردها كاملاً — اضغطي «حاضرة ✓» لمن غابت، و«− / +» لمن سمّعت أقل أو أكثر،
+              ثم «💾 حفظ الجميع» في الأسفل.
+            </p>
+          ) : (
           <p className="mb-2 text-[11px] text-silver-600">
             الكل «حاضرة» وسمّعت وردها كاملاً افتراضياً — عدّلي الغائبات، ومن سمّعت
             أكثر أو أقل استخدمي «− / +» لتغيير الأوجه أو ✏️ لتحديد آية النهاية بدقة،
             ثم «اعتماد» لكل طالبة على حدة، أو زر الحفظ في الأسفل للجميع دفعة واحدة.
             من لها سجلّ لهذا اللقاء تظهر عليها «مسجّل ✓» ويُحدَّث.
           </p>
+          )}
 
+          {simple && lockedAll.length > 0 && firstGap && (
+            <div className="mb-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-bold text-amber-900">
+              🔒 {ar(lockedAll.length)} طالبة لم يُسجَّل لها لقاء سابق بعد، فلا تظهر هنا:
+              <span className="block text-xs font-normal">{lockedAll.map((s) => s.name).join("، ")}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setDate(firstGap.date);
+                  setRows({});
+                }}
+                className="mt-2 block w-full rounded-lg bg-amber-500 py-2 text-center text-sm font-bold text-white"
+              >
+                افتحي لقاء {ar(firstGap.n)} وسجّليه أولاً ←
+              </button>
+            </div>
+          )}
           {/* عدّاد التسجيل: كم طالبة لها سجلّ لهذا اللقاء من مجموع الطالبات */}
           {(() => {
             const all = shown.flatMap((g) => g.list);
@@ -602,10 +645,21 @@ export function QuickSession({
                         />
                       )}
                       {i.gap != null && (
-                        <p className="mt-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900">
-                          🔒 لم يُسجَّل «لقاء {ar(i.gap)}» لهذه الطالبة بعد — اختاري لقاء {ar(i.gap)} من قائمة
-                          «اللقاء» أعلاه وسجّليه أولاً (حضوراً أو غياباً)
-                        </p>
+                        <div className="mt-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900">
+                          🔒 لم يُسجَّل «لقاء {ar(i.gap)}» لهذه الطالبة بعد — سجّليه أولاً (حضوراً أو غياباً)
+                          {i.gapDate && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDate(i.gapDate!);
+                                setRows({});
+                              }}
+                              className="mt-1.5 block w-full rounded-lg bg-amber-500 py-1.5 text-center text-sm font-bold text-white"
+                            >
+                              افتحي لقاء {ar(i.gap)} ←
+                            </button>
+                          )}
+                        </div>
                       )}
                       {st.attended && i.gap == null && (
                         <div className="mt-1.5 grid gap-1.5">

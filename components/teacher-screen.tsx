@@ -19,11 +19,12 @@ import { NotificationsCard } from "./notifications-card";
 import { ThemeToggle } from "./theme-toggle";
 import { PushToggle } from "./push-toggle";
 import { PushPrompt } from "./push-prompt";
+import { teacherFollowups } from "@/lib/followup";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 
-/** 👩‍🏫 شاشة المعلّمة — واضحة ومريحة: ترحيب، ثم لكل حلقة: اللقاء الحالي وحالة التسجيل،
-    وبطاقة تسجيل التسميع مفتوحة، ثم طالباتها بحالة كل واحدة. */
+/** 👩‍🏫 شاشة المعلّمة — بسيطة وواضحة: ترحيب، ثم «المطلوب منكِ» (لقاءات ناقصة بزرّ يفتحها)،
+    ثم لكل حلقة بطاقة تسجيل اللقاء (واجهة مبسّطة)، وفي الأسفل المساعدة والإعدادات. */
 export function TeacherScreen({ teacher, onLogout }: { teacher: Teacher; onLogout: () => void }) {
   const { halaqas, students, recitations, teachers, settings } = useApp();
   // 👭 معلّمات تشاركهنّ طالباتهنّ (حلقة مشتركة) — تراهنّ وتسجّل لهنّ من رابطها
@@ -67,48 +68,80 @@ export function TeacherScreen({ teacher, onLogout }: { teacher: Teacher; onLogou
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [herHalaqas.map((h) => h.id + h.termStart + h.termSessions + h.day).join("|"), today]);
 
+  // 📋 المطلوب منكِ: لقاءات مضت ولم تُسجَّل (لطالباتها وللحلقة المشتركة)
+  const tasks = useMemo(() => {
+    const ts = [teacher, ...teachers.filter((t) => shareIds.includes(t.id))];
+    const merged = new Map<string, { h: Halaqa; n: number; date: string; label: string; count: number }>();
+    for (const f of teacherFollowups(ts, herHalaqas, students, recitations)) {
+      for (const hf of f.halaqas)
+        for (const m of hf.missing) {
+          const k = `${hf.halaqa.id}|${m.date}`;
+          const cur = merged.get(k);
+          if (cur) cur.count += m.names.length;
+          else merged.set(k, { h: hf.halaqa, n: m.n, date: m.date, label: m.dateLabel, count: m.names.length });
+        }
+    }
+    return [...merged.values()].sort((a, b) => (a.date < b.date ? -1 : 1));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teacher, teachers, shareIds.join(","), herHalaqas, students, recitations]);
+
+  // فتح لقاء معيّن في بطاقة حلقته (من «المطلوب منكِ») — nonce يعيد فتح البطاقة على التاريخ
+  const [focus, setFocus] = useState<{ hid: string; date: string; nonce: number } | null>(null);
+  const openSession = (hid: string, date: string) => {
+    setFocus({ hid, date, nonce: Date.now() });
+    setTimeout(() => document.getElementById(`qs-${hid}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
+
   return (
     <main className="mx-auto max-w-2xl px-4 pb-28 pt-6">
       {/* ترحيب */}
-      <div className="name-box mb-5 rounded-3xl px-5 py-5 text-white">
+      <div className="name-box mb-4 rounded-3xl px-5 py-5 text-white">
         <p className="text-sm text-white/80">أهلاً معلّمتنا 🌷</p>
         <h1 className="font-kufi text-2xl font-bold">{firstName}</h1>
         <p className="mt-2 text-sm text-white/90">
           {herHalaqas.length === 0
             ? "لم تُسند لكِ حلقة بعد — تواصلي مع الإدارة"
-            : herHalaqas.length > 2
-              ? `${ar(total)} طالبة في ${ar(herHalaqas.length)} حلقات`
-              : `${ar(total)} طالبة في ${herHalaqas.map(halaqaTitle).join(" و")}`}
+            : `${ar(total)} طالبة · ${herHalaqas.map(halaqaTitle).join(" · ")}`}
         </p>
       </div>
-
-      {/* ❓ دليل مختصر لتسجيل اللقاء */}
-      <details className="mb-5 rounded-2xl bg-white shadow-sm ring-1 ring-cream-dark open:pb-2">
-        <summary className="cursor-pointer list-none px-4 py-3 font-kufi text-base font-bold text-plum-800">
-          ❓ كيف أسجّل تسميع اللقاء؟ <span className="float-start text-plum-500">▾</span>
-        </summary>
-        <ol className="grid gap-2 px-4 pb-2 text-sm leading-relaxed text-ink">
-          {[
-            ["📋", "تحت اسم حلقتكِ بطاقة «تسجيل تسميع اللقاء»، واللقاء الحالي مختار تلقائياً. لتسجيل لقاء آخر غيّريه من قائمة «اللقاء»."],
-            ["✅", "كل طالبة تظهر «حاضرة ✓» وقد سمّعت وردها كاملاً كما في خطتها. من غابت اضغطي الزر ليصير «غائبة ✗»."],
-            ["➖➕", "من سمّعت أقل أو أكثر من المطلوب: زرا − و+ يغيّران عدد الأوجه، و✏️ يحدّد آية النهاية بدقة."],
-            ["🔘", "لم تسمّع قسماً (حفظ أو تثبيت أو مراجعة)؟ اضغطي على القسم نفسه ليُطفأ."],
-            ["📝", "زر 📝 لكتابة ملاحظة على لقاء الطالبة، تراها هي والإدارة."],
-            ["💾", "اضغطي «اعتماد» عند كل طالبة بعد ضبطها، أو «حفظ الجميع» في الأسفل دفعة واحدة. يتحول الزر إلى الأخضر «تم الاعتماد» وتصير الطالبة «مسجّل ✓»."],
-            ["🔔", "مع كل اعتماد يصل الطالبة إشعار تشجيع أو رسالة غياب، ما دام زر الإشعار مفعّلاً."],
-            ["🔁", "للتصحيح: افتحي اللقاء نفسه، عدّلي، واضغطي «اعتماد» من جديد."],
-          ].map(([icon, text], i) => (
-            <li key={i} className="flex gap-2">
-              <span className="w-8 shrink-0 text-center">{icon}</span>
-              <span>{text}</span>
-            </li>
-          ))}
-        </ol>
-      </details>
 
       {/* 🔔 إشعارات جوال المعلّمة: تذكير التسجيل بعد الحلقة ورسائل الإدارة */}
       <PushPrompt owner={{ teacher: true }} enabled />
       <PushToggle owner={{ teacher: true }} />
+
+      {/* 📋 المطلوب منكِ */}
+      {herHalaqas.length > 0 &&
+        (tasks.length === 0 ? (
+          <div className="mb-5 rounded-2xl bg-emerald-50 px-4 py-3 text-center font-kufi text-base font-bold text-emerald-800 ring-1 ring-emerald-200">
+            ✅ كل اللقاءات الماضية مسجّلة — جزاكِ الله خيراً
+          </div>
+        ) : (
+          <div className="mb-5 rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-300">
+            <p className="font-kufi text-base font-bold text-amber-900">📋 المطلوب منكِ — لقاءات لم تُسجَّل</p>
+            <p className="mb-2 text-xs text-amber-800">ابدئي بالأقدم؛ لا يُفتح اللقاء التالي قبل تسجيل ما قبله 🔒</p>
+            <div className="grid gap-2">
+              {tasks.map((t) => (
+                <button
+                  key={t.h.id + t.date}
+                  type="button"
+                  onClick={() => openSession(t.h.id, t.date)}
+                  className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2.5 text-start shadow-sm ring-1 ring-amber-200 active:scale-[0.99]"
+                >
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold text-plum-800">
+                      لقاء {ar(t.n)} · {t.label}
+                    </span>
+                    <span className="block text-xs text-silver-600">
+                      {herHalaqas.length > 1 ? `${halaqaTitle(t.h)} · ` : ""}
+                      {ar(t.count)} طالبة لم تُسجَّل
+                    </span>
+                  </span>
+                  <span className="shrink-0 rounded-lg bg-amber-500 px-3 py-1.5 text-sm font-bold text-white">سجّليه ←</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
 
       {herHalaqas.map((h) => {
         const list = mine(h);
@@ -124,32 +157,38 @@ export function TeacherScreen({ teacher, onLogout }: { teacher: Teacher; onLogou
         const recorded = curDateKey
           ? all.filter((s) => recitations.some((r) => r.studentId === s.id && r.date === curDateKey)).length
           : 0;
+        const f = focus?.hid === h.id ? focus : null;
         return (
-          <section key={h.id} className="mb-8">
-            <div className="mb-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-cream-dark">
-              <h2 className="font-kufi text-lg font-bold text-plum-800">🕌 {halaqaTitle(h)}</h2>
-              {cur ? (
-                <>
-                  <p className={`mt-1 text-sm font-bold ${cur.isToday ? "text-emerald-700" : "text-plum-700"}`}>
-                    {cur.isToday ? "📍 لقاء اليوم" : "📅 آخر لقاء"}: لقاء {ar(cur.n)} — {cur.date}
+          <section key={h.id} id={`qs-${h.id}`} className="mb-8 scroll-mt-4">
+            <div className="mb-3 flex items-center justify-between gap-2 rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-cream-dark">
+              <div className="min-w-0">
+                <h2 className="font-kufi text-lg font-bold text-plum-800">🕌 {halaqaTitle(h)}</h2>
+                {cur ? (
+                  <p className={`text-sm font-bold ${cur.isToday ? "text-emerald-700" : "text-plum-700"}`}>
+                    {cur.isToday ? "📍 لقاء اليوم" : "📅 آخر لقاء"}: {ar(cur.n)} — {cur.date}
                   </p>
-                  <p className="mt-1 text-xs text-silver-600">
-                    {recorded === all.length && all.length > 0
-                      ? `✅ سُجّل لكل الطالبات (${ar(all.length)})`
-                      : `🧮 تم تسجيل ${ar(recorded)} من ${ar(all.length)} طالبة`}
-                    {cur.next && !cur.isToday && ` · اللقاء القادم ${cur.next}`}
-                  </p>
-                </>
-              ) : (
-                <p className="mt-1 text-xs text-silver-600">لم تُحدَّد بداية الفصل لهذه الحلقة بعد</p>
+                ) : (
+                  <p className="text-xs text-silver-600">لم تُحدَّد بداية الفصل لهذه الحلقة بعد</p>
+                )}
+              </div>
+              {cur && all.length > 0 && (
+                <span
+                  className={`shrink-0 rounded-full px-3 py-1 text-sm font-bold ${
+                    recorded === all.length ? "bg-emerald-100 text-emerald-800" : "bg-plum-50 text-plum-800"
+                  }`}
+                >
+                  {recorded === all.length ? "✅ " : ""}
+                  {ar(recorded)}/{ar(all.length)}
+                </span>
               )}
             </div>
 
             {all.length > 0 && (
               <QuickSession
+                key={f ? `${f.date}-${f.nonce}` : "cur"}
                 halaqa={h}
                 groups={[
-                  { key: teacher.id, title: `المعلّمة ${teacher.name}`, list: own(h) },
+                  { key: teacher.id, title: `طالباتي`, list: own(h) },
                   ...shareIds
                     .map((tid) => ({
                       key: tid,
@@ -161,40 +200,9 @@ export function TeacherScreen({ teacher, onLogout }: { teacher: Teacher; onLogou
                 ]}
                 onOpenStudent={setSelected}
                 defaultOpen
+                initialDate={f?.date}
+                simple
               />
-            )}
-
-            {/* الطالبات */}
-            <h3 className="mb-2 mt-4 text-sm font-bold text-plum-700">🌸 طالباتكِ ({ar(list.length)})</h3>
-            {list.length === 0 ? (
-              <p className="rounded-xl bg-cream/60 px-4 py-3 text-center text-sm text-silver-600">لا طالبات بعد</p>
-            ) : (
-              <div className="grid gap-2 sm:grid-cols-2">
-                {[...list]
-                  .sort((a, b) => a.name.localeCompare(b.name, "ar"))
-                  .map((s) => {
-                    const done = curDateKey
-                      ? recitations.find((r) => r.studentId === s.id && r.date === curDateKey)
-                      : undefined;
-                    return (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => setSelected(s)}
-                        className="flex items-center justify-between gap-2 rounded-xl bg-white px-4 py-3 text-start shadow-sm ring-1 ring-cream-dark active:scale-[0.99]"
-                      >
-                        <span className="min-w-0 truncate font-kufi text-base font-bold text-plum-800">{s.name}</span>
-                        <span
-                          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                            !done ? "bg-cream text-silver-600" : done.attended ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
-                          }`}
-                        >
-                          {!done ? "لم يُسجَّل" : done.attended ? "حاضرة ✓" : "غائبة"}
-                        </span>
-                      </button>
-                    );
-                  })}
-              </div>
             )}
           </section>
         );
@@ -202,17 +210,39 @@ export function TeacherScreen({ teacher, onLogout }: { teacher: Teacher; onLogou
 
       <NotificationsCard halaqaIds={teacher.halaqaIds} />
 
-      <ThemeToggle className="mt-6" />
-
-      <button
-        type="button"
-        onClick={() => {
-          if (window.confirm("تسجيل الخروج من هذا الجهاز؟")) onLogout();
-        }}
-        className="mx-auto mt-8 block text-sm font-bold text-silver-600 underline"
-      >
-        🚪 تسجيل الخروج
-      </button>
+      {/* ⚙️ المساعدة والإعدادات — مطويّة لتبقى الشاشة بسيطة */}
+      <details className="mt-6 rounded-2xl bg-white shadow-sm ring-1 ring-cream-dark open:pb-3">
+        <summary className="cursor-pointer list-none px-4 py-3 font-kufi text-base font-bold text-plum-800">
+          ❓ المساعدة والإعدادات <span className="float-start text-plum-500">▾</span>
+        </summary>
+        <div className="grid gap-3 px-4">
+          <ol className="grid gap-2 text-sm leading-relaxed text-ink">
+            {[
+              ["📋", "تحت كل حلقة بطاقة التسجيل، واللقاء الحالي مختار تلقائياً. لتسجيل لقاء آخر غيّريه من قائمة «اللقاء»."],
+              ["✅", "كل طالبة «حاضرة ✓» بوردها كاملاً. من غابت اضغطي الزر ليصير «غائبة ✗»."],
+              ["➖➕", "من سمّعت أقل أو أكثر: − و+ يغيّران الأوجه، و✏️ يحدّد آية النهاية بدقة. ولإطفاء قسم لم تسمّعه اضغطي عليه."],
+              ["💾", "«اعتماد» عند كل طالبة، أو «حفظ الجميع» في الأسفل. يصير الزر أخضر «تم الاعتماد»."],
+              ["🔒", "لا يُفتح لقاء قبل تسجيل ما قبله — اضغطي «افتحي لقاء …» في الرسالة الصفراء."],
+              ["📝", "زر 📝 لملاحظة على لقاء الطالبة، واضغطي اسمها لفتح ملفها وخطتها."],
+            ].map(([icon, text], i) => (
+              <li key={i} className="flex gap-2">
+                <span className="w-8 shrink-0 text-center">{icon}</span>
+                <span>{text}</span>
+              </li>
+            ))}
+          </ol>
+          <ThemeToggle />
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm("تسجيل الخروج من هذا الجهاز؟")) onLogout();
+            }}
+            className="w-full rounded-xl border border-red-200 bg-red-50 py-2.5 text-sm font-bold text-red-700"
+          >
+            🚪 تسجيل الخروج
+          </button>
+        </div>
+      </details>
 
       <StudentSheet
         student={selected ? (students.find((s) => s.id === selected.id) ?? selected) : null}
