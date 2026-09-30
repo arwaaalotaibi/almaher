@@ -52,16 +52,5 @@ begin
         student_id = excluded.student_id, halaqa_id = excluded.halaqa_id, teacher_id = '';
 end $$;
 
--- ⏰ تذكير المعلّمات: كل يوم ٩ مساءً بتوقيت الكويت (١٨:٠٠ UTC) — لمن كان لها لقاء اليوم أو أمس ولم يكتمل تسجيله
-select cron.unschedule(jobid) from cron.job where jobname = 'almaher-teacher-reminders';
-select cron.schedule(
-  'almaher-teacher-reminders',
-  '0 18 * * *',
-  $$
-  select net.http_post(
-    url := 'https://rpsxmqtxoapfcbbkckgv.supabase.co/functions/v1/almaher-push',
-    headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-secret', 'b4c56240348e3925689d2a733789e5b6785ac7e168974ecd'),
-    body := '{"kind":"teacher_reminders"}'::jsonb
-  );
-  $$
-);
+-- ⏰ تذكير المعلّمات: كل يوم ٩ مساءً بتوقيت الكويت (١٨:٠٠ UTC) — لمن كان لها لقاء اليوم أو أمس ولم يكتمل تسجيله.
+--    الجدولة في supabase/cron-reminders.sql (غير منشور لأنه يحمل CRON_SECRET) — مع تذكير الطالبات.
