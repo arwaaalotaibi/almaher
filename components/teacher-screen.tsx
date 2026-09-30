@@ -105,7 +105,7 @@ export function TeacherScreen({ teacher, onLogout }: { teacher: Teacher; onLogou
         </p>
       </div>
 
-      {/* 🔔 إشعارات جوال المعلّمة: تذكير التسجيل بعد الحلقة ورسائل الإدارة */}
+      {/* 🔔 إشعارات جوال المعلّمة: تذكير تسجيل اللقاءات الناقصة (تلقائي ٩ م، ومن «متابعة المعلّمات») */}
       <PushPrompt owner={{ teacher: true }} enabled />
       <PushToggle owner={{ teacher: true }} />
 

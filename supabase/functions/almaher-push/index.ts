@@ -308,7 +308,7 @@ Deno.serve(async (req) => {
     const { data: subs } = await admin.from("almaher_push_subs").select(SUB_COLS).eq("teacher_id", who.teacherId);
     const r = await sendTo(subs ?? [], {
       title: "الماهر 🌸",
-      body: "إشعاراتكِ تعمل بنجاح — سيصلكِ تذكير تسجيل اللقاء ورسائل الإدارة هنا",
+      body: "إشعاراتكِ تعمل بنجاح — سيصلكِ هنا تذكير تسجيل اللقاءات الناقصة",
       url: "/",
       tag: "teacher-test",
     });
