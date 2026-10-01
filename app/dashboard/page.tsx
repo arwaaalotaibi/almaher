@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useApp, type Student } from "@/lib/store";
+import Link from "next/link";
+import { halaqaTitle, useApp, type Student } from "@/lib/store";
 import {
   buildReports,
   downloadCsv,
@@ -55,15 +56,16 @@ function Row({
 function DashboardInner() {
   const state = useApp();
   const hydrated = useHydrated();
-  const [mosque, setMosque] = useState("");
+  const [scope, setScope] = useState(""); // معرّف الحلقة (المسجد + اليوم)، "" = الكل
   const [selected, setSelected] = useState<Student | null>(null);
 
   const reports = useMemo(() => buildReports(state), [state]);
 
   if (!hydrated) return <main className="mx-auto max-w-2xl px-4 pt-10" />;
 
-  const mosques = [...new Set(state.halaqas.map((h) => h.mosque))];
-  const list = mosque ? reports.filter((r) => r.mosque === mosque) : reports;
+  const list = scope ? reports.filter((r) => r.student.halaqaId === scope) : reports;
+  // المسؤولة عن تسجيل الطالبة (التسجيل عند المعلّمات والإدارة فقط)
+  const teacherOf = (s: Student) => state.teachers.find((t) => t.id === s.teacherId)?.name ?? "";
 
   const weekActive = list.filter((r) => r.weekActive);
   const missed = list.filter((r) => r.missedLastMeeting);
@@ -82,14 +84,14 @@ function DashboardInner() {
       .slice(0, 10);
     downloadCsv(
       reportsToCsv(list),
-      `تقرير-الماهر${mosque ? `-${mosque}` : ""}-${stamp}.csv`
+      `تقرير-الماهر${scope ? `-${halaqaTitle(state.halaqas.find((h) => h.id === scope)!)}` : ""}-${stamp}.csv`
     );
   };
 
   const kpis = [
     { l: "طالبة", v: list.length, i: "🌸" },
     { l: "نشِطة هذا الأسبوع", v: weekActive.length, i: "✅" },
-    { l: "لم يسجّلن آخر لقاء", v: missed.length, i: "⏳" },
+    { l: "لم يُسجَّل لهن آخر لقاء", v: missed.length, i: "⏳" },
     { l: "متأخرات عن الخطة", v: behind.length, i: "📉" },
   ];
 
@@ -99,18 +101,18 @@ function DashboardInner() {
 
       {/* النطاق */}
       <div className="mb-3 flex flex-wrap gap-1.5">
-        {["", ...mosques].map((m) => (
+        {["", ...state.halaqas.map((h) => h.id)].map((id) => (
           <button
-            key={m || "all"}
+            key={id || "all"}
             type="button"
-            onClick={() => setMosque(m)}
+            onClick={() => setScope(id)}
             className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
-              mosque === m
+              scope === id
                 ? "bg-plum-600 text-white"
                 : "bg-cream text-silver-600"
             }`}
           >
-            {m || "🕌 كل المساجد"}
+            {id ? halaqaTitle(state.halaqas.find((h) => h.id === id)!) : "🕌 كل الحلقات"}
           </button>
         ))}
       </div>
@@ -138,15 +140,20 @@ function DashboardInner() {
       {/* يحتجن متابعة اليوم */}
       {missed.length > 0 && (
         <section className="mb-5">
-          <h2 className="mb-2 font-kufi text-sm font-bold text-plum-800">
-            ⏳ لم يسجّلن تسميع آخر لقاء ({ar(missed.length)})
-          </h2>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 className="font-kufi text-sm font-bold text-plum-800">
+              ⏳ لم يُسجَّل لهن آخر لقاء ({ar(missed.length)})
+            </h2>
+            <Link href="/followup" className="shrink-0 text-xs font-bold text-plum-700 underline">
+              👩‍🏫 ذكّري المعلّمات ←
+            </Link>
+          </div>
           <div className="grid gap-1.5">
             {missed.map((r) => (
               <Row
                 key={r.student.id}
                 r={r}
-                metric="ذكّريها 📲"
+                metric={teacherOf(r.student) ? `👩‍🏫 ${teacherOf(r.student)}` : "بلا معلّمة"}
                 onOpen={setSelected}
               />
             ))}
