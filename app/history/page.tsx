@@ -11,7 +11,7 @@ import {
   type SessionHistoryRow,
 } from "@/lib/store";
 import { facesLabel } from "@/lib/arabic";
-import { PageHeader, inputCls } from "@/components/ui";
+import { PageHeader, Sheet, inputCls } from "@/components/ui";
 import { RoleOnly } from "@/components/admin-only";
 
 const fmtDay = (iso: string) =>
@@ -68,6 +68,18 @@ function HistoryInner() {
   const [filter, setFilter] = useState<Filter>("all");
   const [q, setQ] = useState("");
   const [restored, setRestored] = useState<Set<number>>(new Set());
+  // 🔒 نافذة تأكيد الاسترجاع: مقارنة + «راجعتُ» + كتابة «استرجاع» — حتى لا يُسترجع بالخطأ
+  const [pending, setPending] = useState<SessionHistoryRow | null>(null);
+  const [checked, setChecked] = useState(false);
+  const [typed, setTyped] = useState("");
+  const WORD = "استرجاع";
+  const norm = (x: string) => x.replace(/[\sً-ْ]/g, "").replace(/[أإآ]/g, "ا");
+  const ready = checked && norm(typed) === norm(WORD);
+  const openConfirm = (r: SessionHistoryRow) => {
+    setPending(r);
+    setChecked(false);
+    setTyped("");
+  };
 
   const load = () => {
     setState(null);
@@ -85,14 +97,13 @@ function HistoryInner() {
     });
   }, [state, filter, q, byId]);
 
-  const restore = (r: SessionHistoryRow, name: string, replacing: boolean) => {
-    const msg = replacing
-      ? `استبدال سجلّ «${name}» الحالي للقاء ${fmtDay(r.log.date)} بهذه النسخة؟\nالنسخة الحالية تُحفظ في الأرشيف أيضاً.`
-      : `إعادة سجلّ «${name}» للقاء ${fmtDay(r.log.date)} كما كان؟`;
-    if (!window.confirm(msg)) return;
-    actions.restoreRecitation(r);
-    setRestored((s) => new Set(s).add(r.hid));
+  const doRestore = () => {
+    if (!pending || !ready) return;
+    actions.restoreRecitation(pending);
+    setRestored((x) => new Set(x).add(pending.hid));
+    setPending(null);
   };
+
 
   return (
     <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
@@ -189,7 +200,7 @@ function HistoryInner() {
                     <button
                       type="button"
                       disabled={done}
-                      onClick={() => restore(r, name, !!cur)}
+                      onClick={() => openConfirm(r)}
                       className={`mt-2.5 w-full rounded-xl py-2.5 text-sm font-bold transition active:scale-[0.98] ${
                         done ? "bg-emerald-50 text-emerald-700" : "bg-plum-600 text-white"
                       }`}
@@ -210,6 +221,67 @@ function HistoryInner() {
           </button>
         </>
       )}
+      {pending &&
+        (() => {
+          const st = byId.get(pending.log.studentId);
+          const cur = recitations.find(
+            (x) =>
+              x.id === pending.sessionId ||
+              (x.studentId === pending.log.studentId && x.date === pending.log.date)
+          );
+          return (
+            <Sheet open onClose={() => setPending(null)} title="↩️ تأكيد الاسترجاع">
+              <p className="mb-3 rounded-xl bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900">
+                ⚠️ {st?.name ?? "طالبة"} — لقاء {fmtDay(pending.log.date)}
+                <span className="block text-xs font-normal">
+                  {cur
+                    ? "سيُستبدل السجلّ الموجود الآن بالنسخة المؤرشفة (ويُحفظ الحالي في الأرشيف)."
+                    : "سيُعاد هذا السجلّ المحذوف كما كان."}
+                </span>
+              </p>
+              <div className="grid gap-2">
+                <div className="rounded-xl border border-red-200 bg-red-50/40 px-3 py-2">
+                  <p className="mb-1 text-xs font-bold text-red-700">الموجود الآن</p>
+                  {cur ? <Parts log={cur} /> : <p className="text-sm text-silver-600">لا سجلّ لهذا اللقاء</p>}
+                </div>
+                <div className="rounded-xl border border-emerald-300 bg-emerald-50/40 px-3 py-2">
+                  <p className="mb-1 text-xs font-bold text-emerald-700">بعد الاسترجاع</p>
+                  <Parts log={pending.log} />
+                </div>
+              </div>
+              <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm font-bold text-plum-800">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={(e) => setChecked(e.target.checked)}
+                  className="h-5 w-5 accent-plum-600"
+                />
+                راجعتُ المقارنة وأريد الاسترجاع
+              </label>
+              <input
+                className={`${inputCls} mt-2 text-center`}
+                placeholder={`اكتبي «${WORD}» للتأكيد`}
+                value={typed}
+                onChange={(e) => setTyped(e.target.value)}
+              />
+              <button
+                type="button"
+                disabled={!ready}
+                onClick={doRestore}
+                className="mt-3 w-full rounded-xl bg-plum-600 py-3 font-bold text-white transition disabled:bg-silver-400"
+              >
+                ↩️ استرجاع
+              </button>
+              <button
+                type="button"
+                onClick={() => setPending(null)}
+                className="mt-2 w-full py-2 text-sm font-bold text-silver-600"
+              >
+                إلغاء
+              </button>
+            </Sheet>
+          );
+        })()}
     </main>
   );
 }
