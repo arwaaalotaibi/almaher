@@ -43,7 +43,7 @@ export function computeRace(
   recitations: RecitationLog[],
   readingProgress: ReadingProgress[],
   tajweedResults: TajweedResult[],
-  opts: { mosque?: string; sinceISO?: string } = {}
+  opts: { mosque?: string; halaqaId?: string; sinceISO?: string } = {}
 ): RaceEntry[] {
   const since = opts.sinceISO ?? "";
   const halaqaOf = new Map(halaqas.map((h) => [h.id, h]));
@@ -54,6 +54,7 @@ export function computeRace(
     const h = halaqaOf.get(st.halaqaId);
     const mosque = h?.mosque ?? "";
     if (opts.mosque && mosque !== opts.mosque) continue;
+    if (opts.halaqaId && st.halaqaId !== opts.halaqaId) continue; // 🕌 حلقة واحدة
 
     let points = 0;
     let faces = 0;

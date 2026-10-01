@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRole } from "./auth-gate";
-import { useApp } from "@/lib/store";
+import { halaqaTitle, useApp } from "@/lib/store";
 import { computeRace, POINTS_RULES, sinceDays, type RaceEntry } from "@/lib/points";
 import { facesLabel } from "@/lib/arabic";
 
@@ -19,24 +19,24 @@ type PeriodKey = (typeof PERIODS)[number]["key"];
 const MEDALS = ["🥇", "🥈", "🥉"];
 
 /** 🏆 لوحة سباق الحلقات — تُعرض في صفحة /race وتبويب «السباق» عند الطالبة.
-    السباق على مستويين: مسجد الطالبة (الافتراضي عندها) أو كل المساجد */
+    السباق على مستويين: حلقة الطالبة (المسجد + اليوم — الافتراضي عندها) أو كل الحلقات */
 export function RaceBoard({
   myId,
-  defaultMosque,
+  defaultHalaqa,
 }: {
   myId?: string | null;
-  defaultMosque?: string; // النطاق الابتدائي (مسجد الطالبة) — ويمكن التبديل لكل المساجد
+  defaultHalaqa?: string; // النطاق الابتدائي (حلقة الطالبة) — ويمكن التبديل لكل الحلقات
 }) {
   const { students, halaqas, recitations, readingProgress, tajweedResults } =
     useApp();
-  const [mosque, setMosqueState] = useState(defaultMosque ?? ""); // "" = كل المساجد
+  const [scope, setScope] = useState(defaultHalaqa ?? ""); // معرّف الحلقة، "" = كل الحلقات
   const [period, setPeriod] = useState<PeriodKey>("week");
   const [rulesOpen, setRulesOpen] = useState(false);
 
-  const mosques = useMemo(
-    () => [...new Set(halaqas.map((h) => h.mosque))],
-    [halaqas]
-  );
+  const titleOf = (id: string) => {
+    const h = halaqas.find((x) => x.id === id);
+    return h ? halaqaTitle(h) : "";
+  };
 
   // عند الطالبة: الترتيب من قاعدة البيانات (العشر الأوائل + ترتيبها فقط)
   const role = useRole();
@@ -49,7 +49,8 @@ export function RaceBoard({
     setRemoteEntries(null);
     supabase
       .rpc("almaher_race", {
-        p_mosque: mosque || null,
+        p_mosque: null,
+        p_halaqa: scope || null,
         p_since: p.days ? sinceDays(p.days) : null,
       })
       .then(({ data }) => {
@@ -74,7 +75,7 @@ export function RaceBoard({
     return () => {
       alive = false;
     };
-  }, [remote, mosque, period]);
+  }, [remote, scope, period]);
 
   const localEntries = useMemo(() => {
     const p = PERIODS.find((x) => x.key === period)!;
@@ -85,11 +86,11 @@ export function RaceBoard({
       readingProgress,
       tajweedResults,
       {
-        mosque: mosque || undefined,
+        halaqaId: scope || undefined,
         sinceISO: p.days ? sinceDays(p.days) : undefined,
       }
     );
-  }, [students, halaqas, recitations, readingProgress, tajweedResults, mosque, period]);
+  }, [students, halaqas, recitations, readingProgress, tajweedResults, scope, period]);
   const entries = remote ? (remoteEntries ?? []) : localEntries;
   const loading = remote && remoteEntries === null;
 
@@ -100,18 +101,18 @@ export function RaceBoard({
 
   return (
     <div>
-      {/* النطاق: مسجد الطالبة أو كل المساجد — عند الطالبة يظهر مسجدها وخيار الكل */}
+      {/* النطاق: حلقة الطالبة أو كل الحلقات — عند الإدارة كل حلقة على حدة */}
       <div className="mb-2 flex flex-wrap gap-1.5">
-        {(defaultMosque ? [defaultMosque, ""] : ["", ...mosques]).map((m) => (
+        {(defaultHalaqa ? [defaultHalaqa, ""] : ["", ...halaqas.map((h) => h.id)]).map((id) => (
           <button
-            key={m || "all"}
+            key={id || "all"}
             type="button"
-            onClick={() => setMosqueState(m)}
+            onClick={() => setScope(id)}
             className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
-              mosque === m ? "bg-plum-600 text-white" : "bg-cream text-silver-600"
+              scope === id ? "bg-plum-600 text-white" : "bg-cream text-silver-600"
             }`}
           >
-            {m ? `🕌 ${defaultMosque ? "مسجدي — " : ""}${m}` : "🌍 كل المساجد"}
+            {id ? `🕌 ${defaultHalaqa ? "حلقتي — " : ""}${titleOf(id)}` : "🌍 كل الحلقات"}
           </button>
         ))}
       </div>

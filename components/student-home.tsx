@@ -859,7 +859,7 @@ export function StudentHome() {
       {/* شاشة السباق — منافسة على مستوى مسجد الطالبة */}
       {tab === "race" && (
         <section>
-          <RaceBoard myId={me.id} defaultMosque={halaqa?.mosque} />
+          <RaceBoard myId={me.id} defaultHalaqa={halaqa?.id} />
         </section>
       )}
 
