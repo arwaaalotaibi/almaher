@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import {
+  starAllowed,
   actions,
   autoNotifsFor,
   buildSchedule,
@@ -45,6 +46,7 @@ import { SupportBox } from "./support-box";
 import { NotificationsCenter, PinnedNotice } from "./notifications-card";
 import { PushToggle } from "./push-toggle";
 import { PushPrompt } from "./push-prompt";
+import { StarMoment, loadSeenStars, saveSeenStars } from "./star-moment";
 import { ThemeToggle } from "./theme-toggle";
 import { AppTour, hasSeenTour } from "./app-tour";
 import { BookQuotes } from "./book-quotes";
@@ -95,6 +97,15 @@ export function StudentHome() {
   const [quizFor, setQuizFor] = useState<string | null>(null); // درس الأسئلة المفتوح
   const [settingsOpen, setSettingsOpen] = useState(false); // ورقة الإعدادات ⚙️
   const [tourOpen, setTourOpen] = useState(false); // شرح البرنامج
+  // ⭐ لحظة النجمة: ما احتُفل به على هذا الجهاز، وتأخير بعد شاشة الترحيب، ونبضة العدّاد
+  const [seenStars, setSeenStars] = useState<Set<string> | null | undefined>(undefined);
+  const [starReady, setStarReady] = useState(false);
+  const [starBump, setStarBump] = useState(false);
+  useEffect(() => {
+    setSeenStars(loadSeenStars());
+    const t = window.setTimeout(() => setStarReady(true), 3000);
+    return () => window.clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     setMyId(window.localStorage.getItem(STUDENT_PICK_KEY));
@@ -229,14 +240,41 @@ export function StudentHome() {
       })
     : null;
 
+  // ⭐ نجومي (من اللقاء الرابع) وما لم يُحتفل به بعد
+  const myStars = recitations
+    .filter((r) => r.studentId === me.id && r.attended && r.star && starAllowed(halaqa, r.date))
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+  const unseenStars = seenStars ? myStars.filter((r) => !seenStars.has(r.id)) : [];
+  const showStar =
+    starReady && unseenStars.length > 0 && agreed && !tourOpen && hasSeenTour();
+  const starCount = myStars.length - (unseenStars.length > 0 ? unseenStars.length : 0);
+  const starDone = () => {
+    const next = new Set(seenStars ?? []);
+    unseenStars.forEach((r) => next.add(r.id));
+    saveSeenStars(next);
+    setSeenStars(next);
+    setStarBump(true);
+    window.setTimeout(() => setStarBump(false), 800);
+  };
+
   return (
     <main className="relative mx-auto max-w-2xl px-4 pb-16 pt-10">
       <WelcomeSplash name={me.name} />
 
+      {/* ⭐ لحظة النجمة — مرة واحدة بعد كل لقاء متقن */}
+      {showStar && (
+        <StarMoment
+          record={unseenStars[unseenStars.length - 1]}
+          extra={unseenStars.length - 1}
+          chipId="my-star-chip"
+          onDone={starDone}
+        />
+      )}
+
       {/* 🔔 دعوة لتفعيل الإشعارات — بعد اللائحة وجولة الشرح */}
       <PushPrompt
         owner={{ studentId: me.id, halaqaId: me.halaqaId }}
-        enabled={agreed && !tourOpen && hasSeenTour()}
+        enabled={agreed && !tourOpen && hasSeenTour() && unseenStars.length === 0}
       />
 
       {/* 🎓 شرح البرنامج — أول مرة تلقائياً، ثم من الإعدادات */}
@@ -340,6 +378,17 @@ export function StudentHome() {
           {teacher && (
             <span className="rounded-lg bg-plum-100 px-2.5 py-0.5 text-xs font-bold text-plum-700">
               👩‍🏫 المعلّمة {teacher.name}
+            </span>
+          )}
+          {myStars.length > 0 && (
+            <span
+              id="my-star-chip"
+              className={`rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-800 ${
+                starBump ? "sm-bump" : ""
+              }`}
+              title="نجومي — «ماهرة اليوم»"
+            >
+              {starCount > 0 ? `⭐ ${ar(starCount)}` : "⭐"}
             </span>
           )}
         </p>

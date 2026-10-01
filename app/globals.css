@@ -282,3 +282,33 @@ input, textarea, select {
 :root[data-theme="dark"] .from-plum-600 { --tw-gradient-from: #7d5a6c; }
 :root[data-theme="dark"] .to-plum-700 { --tw-gradient-to: #6e4d5e; }
 :root[data-theme="dark"] .to-plum-800 { --tw-gradient-to: #5d3f4e; }
+
+/* ================== ⭐ لحظة النجمة ================== */
+@keyframes sm-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sm-pop {
+  0% { transform: scale(0) rotate(-200deg); opacity: 0; }
+  60% { transform: scale(1.15) rotate(10deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+@keyframes sm-float { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+@keyframes sm-glow { 0%, 100% { opacity: 0.65; transform: scale(0.95); } 50% { opacity: 1; transform: scale(1.08); } }
+@keyframes sm-spark {
+  0% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--a)) translateY(0) scale(1); }
+  10% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--a)) translateY(calc(-1 * var(--d))) scale(0.4); }
+}
+@keyframes sm-up { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+@keyframes sm-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+@keyframes sm-bump { 0% { transform: scale(1); } 40% { transform: scale(1.4); box-shadow: 0 0 24px #ffd45e; } 100% { transform: scale(1); } }
+.sm-fade { animation: sm-fade 0.5s ease-out both; }
+.sm-pop { animation: sm-pop 1s cubic-bezier(.34, 1.56, .64, 1) 0.3s both; }
+.sm-float { animation: sm-float 2.4s ease-in-out 1.3s infinite; display: inline-block; }
+.sm-glow { animation: sm-glow 2.2s ease-in-out 0.6s infinite both; }
+.sm-spark { animation: sm-spark 1.3s ease-out 0.7s both; }
+.sm-up { animation: sm-up 0.6s ease-out both; }
+.sm-pulse { animation: sm-pulse 1.4s ease-in-out 3s infinite; }
+.sm-bump { animation: sm-bump 0.7s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .sm-pop, .sm-float, .sm-glow, .sm-spark, .sm-up, .sm-pulse, .sm-bump { animation: none !important; opacity: 1; }
+  .sm-spark { display: none; }
+}
