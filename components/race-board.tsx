@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRole } from "./auth-gate";
-import { halaqaTitle, useApp } from "@/lib/store";
+import { halaqaTitle, starAllowed, useApp } from "@/lib/store";
 import { computeRace, POINTS_RULES, sinceDays, type RaceEntry } from "@/lib/points";
 import { facesLabel } from "@/lib/arabic";
 
@@ -346,6 +346,7 @@ export function StarsBoard({ myId, defaultHalaqa }: { myId?: string | null; defa
       if (!r.star || !r.attended || (since && r.date < since)) continue;
       const s = byId.get(r.studentId);
       if (!s || (scope && s.halaqaId !== scope)) continue;
+      if (!starAllowed(halaqas.find((h) => h.id === s.halaqaId), r.date)) continue; // من اللقاء الرابع فقط
       count.set(s.id, (count.get(s.id) ?? 0) + 1);
     }
     return [...count.entries()]

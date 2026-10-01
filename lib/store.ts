@@ -890,6 +890,26 @@ export function dateKey(d: Date): string {
   ).padStart(2, "0")}`;
 }
 
+/** ⭐ نجمة «ماهرة» تبدأ من هذا اللقاء (قرار الإدارة ١ أكتوبر ٢٠٢٦) */
+export const STAR_FROM_SESSION = 4;
+
+/** رقم اللقاء في جدول الفصل لتاريخ معيّن (0 = ليس من لقاءات الفصل) */
+export function sessionNumberOf(
+  halaqa: Pick<Halaqa, "day" | "termStart" | "termSessions"> | undefined,
+  date: string
+): number {
+  const rows = halaqa ? buildSchedule(halaqa, EMPTY_PLAN) : null;
+  return rows?.find((r) => dateKey(r.date) === date)?.n ?? 0;
+}
+
+/** هل يُسمح بنجمة «ماهرة» في هذا اللقاء؟ */
+export function starAllowed(
+  halaqa: Pick<Halaqa, "day" | "termStart" | "termSessions"> | undefined,
+  date: string
+): boolean {
+  return sessionNumberOf(halaqa, date) >= STAR_FROM_SESSION;
+}
+
 /** 🔒 أول لقاء سابق في جدول الفصل لم يُسجَّل للطالبة (قبل date) — null إن كان كل ما قبله مسجّلاً.
     لا يُسجَّل لقاء قبل تسجيل كل ما قبله (حضوراً أو غياباً) — للجميع، والإدارة أيضاً */
 export function missingEarlierSession(

@@ -10,6 +10,7 @@ import {
   formatSchedDate,
   mergeReciteParts,
   missingEarlierSession,
+  STAR_FROM_SESSION,
   recitePartLabel,
   tathbitSpan,
   partOn,
@@ -257,6 +258,8 @@ export function QuickSession({
   };
 
   const sessionNo = termRows?.find((r) => dateKey(r.date) === date)?.n;
+  // ⭐ «ماهرة» من اللقاء الرابع فقط — لا يظهر الزر قبله لأحد
+  const starOk = (sessionNo ?? 0) >= STAR_FROM_SESSION;
 
   /** حفظ سجلّ طالبة واحدة كما هو معروض في صفّها — يعيد بيانات إشعارها */
   const saveOne = (s: Student, batch = false): SessionItem => {
@@ -271,7 +274,7 @@ export function QuickSession({
       tathbit:
         st.attended && st.tathbit ? rangePart(rangeOf(s, "tathbit", st)) : { status: "none" },
       note: st.note ?? i.existing?.note ?? "",
-      star: st.attended && !!st.star,
+      star: st.attended && !!st.star && starOk,
     };
     data.faces = logFaces(data, s.plan);
     if (i.existing) actions.updateRecitation(i.existing.id, data);
@@ -641,7 +644,7 @@ export function QuickSession({
                           </button>
                         </span>
                       </div>
-                      {st.attended && i.gap == null && (
+                      {st.attended && i.gap == null && starOk && (
                         <button
                           type="button"
                           onClick={() => setRow(s.id, { star: !st.star }, st)}

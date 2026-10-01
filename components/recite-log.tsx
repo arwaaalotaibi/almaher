@@ -14,6 +14,7 @@ import {
   isMurDesc,
   getState,
   missingEarlierSession,
+  starAllowed,
   recitePartLabel,
   useApp,
   type Halaqa,
@@ -464,7 +465,7 @@ export function ReciteLogger({
         muraja: m,
         tathbit: th,
         note: note.trim() || undefined,
-        star,
+        star: star && starAllowed(halaqa, date),
       };
     } else {
       data = {
@@ -572,7 +573,7 @@ export function ReciteLogger({
             ))}
           </div>
 
-          {attended && (
+          {attended && starAllowed(halaqa, date) && (
             <button
               type="button"
               onClick={() => setStar((v) => !v)}
