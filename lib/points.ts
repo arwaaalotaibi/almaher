@@ -19,7 +19,7 @@ import {
 export const POINTS_RULES = [
   { icon: "🕌", label: "حضور لقاء", pts: 10 },
   { icon: "📖", label: "إتمام مقرر الحفظ في اللقاء", pts: 5 },
-  { icon: "📌", label: "إتمام مقرر التثبيت (حفظ اللقاء السابق)", pts: 5 },
+  { icon: "📌", label: "إتمام مقرر التثبيت (حفظ اللقاء السابق) — من ثاني لقاء", pts: 5 },
   { icon: "🔁", label: "إتمام مقرر المراجعة في اللقاء", pts: 5 },
   { icon: "🌟", label: "أي زيادة عن مقرر الحفظ", pts: 5 },
 ] as const;
@@ -78,6 +78,8 @@ export function computeRace(
     const onT = partOn(st.plan, "tathbit");
     const onM = partOn(st.plan, "murajaah");
     const recentTasmi: number[] = []; // أوجه حفظ آخر k لقاء حاضر
+    // أول لقاء تحضره الطالبة في الفصل: لا حفظ سابق يُثبَّت ⇒ لا نقاط تثبيت فيه (للجميع)
+    const firstDate = mine.find((r) => r.date >= (h?.termStart ?? ""))?.date;
     for (const r of mine) {
       const prevTasmi = recentTasmi.reduce((n, x) => n + x, 0);
       // الأوجه المحفوظة رقماً مع السجلّ (سجلات الزميلات تصل بها فقط)، وإلا من المقاطع
@@ -91,7 +93,7 @@ export function computeRace(
         points += 10;
         // 🚫 القسم الملغى عن الطالبة يُحتسب لها تلقائياً بالحضور (ولا زيادة في حفظ ملغى)
         if (!onH || (fH > 0 && fH >= reqH)) points += 5;
-        if (!onT || (fT > 0 && fT >= prevTasmi)) points += 5;
+        if (r.date !== firstDate && (!onT || (fT > 0 && fT >= prevTasmi))) points += 5;
         if (!onM || (fM > 0 && fM >= reqM)) points += 5;
         if (onH && reqH > 0 && fH > reqH) points += 5; // زيادة عن المقرر — مرة واحدة في اللقاء
       }
