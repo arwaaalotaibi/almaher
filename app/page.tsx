@@ -85,7 +85,7 @@ export default function Home() {
       <div className="mt-6 grid grid-cols-2 gap-3">
         <Link
           href="/director"
-          className="card col-span-2 flex items-center justify-between gap-3 rounded-2xl bg-plum-800 px-5 py-4 text-white transition active:scale-[0.98]"
+          className="col-span-2 flex items-center justify-between gap-3 rounded-2xl bg-plum-800 px-5 py-4 text-white shadow-md transition active:scale-[0.98]"
         >
           <span>
             <span className="block font-kufi text-base font-bold">📈 نبض الماهر</span>
