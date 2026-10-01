@@ -48,6 +48,8 @@ interface RowState {
   edit?: Partial<Record<PartKey, PosRange>>;
   // 📝 ملاحظة اللقاء (undefined = كما هي في السجلّ المحفوظ)
   note?: string;
+  // ⭐ ماهرة في هذا اللقاء (بتقدير المعلّمة)
+  star?: boolean;
 }
 
 const PARTS: { key: PartKey; icon: string; label: string }[] = [
@@ -187,6 +189,7 @@ export function QuickSession({
         tasmi: e.tasmi.status === "done",
         tathbit: e.tathbit.status === "done",
         muraja: e.muraja.status === "done",
+        star: !!e.star,
       };
     }
     return {
@@ -268,6 +271,7 @@ export function QuickSession({
       tathbit:
         st.attended && st.tathbit ? rangePart(rangeOf(s, "tathbit", st)) : { status: "none" },
       note: st.note ?? i.existing?.note ?? "",
+      star: st.attended && !!st.star,
     };
     data.faces = logFaces(data, s.plan);
     if (i.existing) actions.updateRecitation(i.existing.id, data);
@@ -288,7 +292,7 @@ export function QuickSession({
   const [notify, setNotify] = useState(true); // 🔔 إشعار للطالبة عند الاعتماد
   const [notified, setNotified] = useState<string | null>(null);
 
-  type SessionItem = { student_id: string; attended: boolean; hifz: number; tathbit: number; muraja: number; absences: number };
+  type SessionItem = { student_id: string; attended: boolean; hifz: number; tathbit: number; muraja: number; absences: number; star?: boolean };
   /** بيانات إشعار طالبة من صفّها: الأوجه الفعلية، وعدد غياباتها هذا الفصل بعد هذا اللقاء */
   const itemOf = (s: Student, st: RowState, data: Omit<RecitationLog, "id" | "createdAt">): SessionItem => {
     const f = data.faces ?? { tasmi: 0, tathbit: 0, muraja: 0 };
@@ -303,6 +307,7 @@ export function QuickSession({
       tathbit: f.tathbit,
       muraja: f.muraja,
       absences: prevAbs + (st.attended ? 0 : 1),
+      star: !!data.star,
     };
   };
   const pushSession = (items: SessionItem[]) => {
@@ -636,6 +641,19 @@ export function QuickSession({
                           </button>
                         </span>
                       </div>
+                      {st.attended && i.gap == null && (
+                        <button
+                          type="button"
+                          onClick={() => setRow(s.id, { star: !st.star }, st)}
+                          aria-pressed={!!st.star}
+                          title="نجمة «ماهرة» في هذا اللقاء — بتقديركِ"
+                          className={`mt-1.5 rounded-full px-3 py-1 text-sm font-bold transition ${
+                            st.star ? "bg-amber-400 text-white shadow-sm" : "bg-cream text-silver-600"
+                          }`}
+                        >
+                          {st.star ? "⭐ ماهرة اليوم" : "☆ ماهرة اليوم؟"}
+                        </button>
+                      )}
                       {(noteOpen[s.id] ?? !!i.existing?.note) && (
                         <textarea
                           className={`${inputCls} mt-1.5 min-h-14 text-sm`}

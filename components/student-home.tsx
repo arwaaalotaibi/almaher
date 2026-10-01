@@ -40,7 +40,7 @@ import Link from "next/link";
 import { PrimaryBtn, Ribbon, Sheet } from "./ui";
 import { TajweedQuiz } from "./tajweed-quiz";
 import { ReadingWards } from "./reading-wards";
-import { RaceBoard } from "./race-board";
+import { RaceAndStars } from "./race-board";
 import { SupportBox } from "./support-box";
 import { NotificationsCenter, PinnedNotice } from "./notifications-card";
 import { PushToggle } from "./push-toggle";
@@ -680,6 +680,7 @@ export function StudentHome() {
                             </span>
                           )}
                           <SessionVerdictChip status={overall} />
+{log?.star && (<span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-white">⭐ ماهرة</span>)}
                         </span>
                         <span className={isCur ? "text-white/85" : "text-silver-600"}>
                           {formatSchedDate(s.date)}
@@ -859,7 +860,7 @@ export function StudentHome() {
       {/* شاشة السباق — منافسة على مستوى مسجد الطالبة */}
       {tab === "race" && (
         <section>
-          <RaceBoard myId={me.id} defaultHalaqa={halaqa?.id} />
+          <RaceAndStars myId={me.id} defaultHalaqa={halaqa?.id} />
         </section>
       )}
 

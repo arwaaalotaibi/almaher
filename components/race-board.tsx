@@ -294,3 +294,192 @@ export function RaceBoard({
     </div>
   );
 }
+
+/* ================== 🌟 لوحة «الماهرات» ==================
+   روح غير السباق: لا مراكز ولا ميداليات — كل من نالت نجمة «ماهرة» تظهر مجمّعة بعدد نجومها،
+   ومن لم تنل بعد لا تظهر (لا إحراج). النجمة بتقدير المعلّمة ولا تدخل نقاط السباق. */
+type StarEntry = { studentId: string; name: string; halaqaLabel: string; stars: number };
+
+const STAR_PERIODS = [
+  { key: "month", label: "هذا الشهر", days: 30 },
+  { key: "all", label: "منذ البداية", days: 0 },
+] as const;
+
+export function StarsBoard({ myId, defaultHalaqa }: { myId?: string | null; defaultHalaqa?: string }) {
+  const { students, halaqas, recitations } = useApp();
+  const role = useRole();
+  const remote = role === "student";
+  const [scope, setScope] = useState(defaultHalaqa ?? "");
+  const [period, setPeriod] = useState<(typeof STAR_PERIODS)[number]["key"]>("all");
+  const [remoteList, setRemoteList] = useState<StarEntry[] | null>(null);
+  const since = (() => {
+    const p = STAR_PERIODS.find((x) => x.key === period)!;
+    return p.days ? sinceDays(p.days) : null;
+  })();
+
+  useEffect(() => {
+    if (!remote) return;
+    let alive = true;
+    setRemoteList(null);
+    supabase
+      .rpc("almaher_stars", { p_halaqa: scope || null, p_since: since })
+      .then(({ data }) => {
+        if (!alive) return;
+        setRemoteList(
+          ((data ?? []) as { student_id: string; name: string; halaqa_label: string; stars: number }[]).map((r) => ({
+            studentId: r.student_id,
+            name: r.name,
+            halaqaLabel: r.halaqa_label,
+            stars: Number(r.stars) || 0,
+          }))
+        );
+      });
+    return () => {
+      alive = false;
+    };
+  }, [remote, scope, since]);
+
+  const localList = useMemo<StarEntry[]>(() => {
+    const byId = new Map(students.filter((s) => !s.plan?.withdrawnAt).map((s) => [s.id, s]));
+    const count = new Map<string, number>();
+    for (const r of recitations) {
+      if (!r.star || !r.attended || (since && r.date < since)) continue;
+      const s = byId.get(r.studentId);
+      if (!s || (scope && s.halaqaId !== scope)) continue;
+      count.set(s.id, (count.get(s.id) ?? 0) + 1);
+    }
+    return [...count.entries()]
+      .map(([id, n]) => {
+        const s = byId.get(id)!;
+        const h = halaqas.find((x) => x.id === s.halaqaId);
+        return { studentId: id, name: s.name, halaqaLabel: h ? halaqaTitle(h) : "", stars: n };
+      })
+      .sort((a, b) => b.stars - a.stars || a.name.localeCompare(b.name, "ar"));
+  }, [students, halaqas, recitations, scope, since]);
+
+  const list = remote ? (remoteList ?? []) : localList;
+  const loading = remote && remoteList === null;
+  const mine = myId ? list.find((e) => e.studentId === myId) : undefined;
+  // مجموعات حسب عدد النجوم (الأكثر أولاً) — بلا ترقيم مراكز
+  const groups = [...new Set(list.map((e) => e.stars))].map((n) => ({ n, names: list.filter((e) => e.stars === n) }));
+  const titleOf = (id: string) => {
+    const h = halaqas.find((x) => x.id === id);
+    return h ? halaqaTitle(h) : "";
+  };
+
+  return (
+    <div>
+      <div
+        className="mb-4 rounded-3xl px-5 py-5 text-center text-white"
+        style={{ background: "radial-gradient(ellipse at 50% 0%,#6c4566,#2b1a2c)" }}
+      >
+        <p className="text-4xl">🌟</p>
+        <p className="mt-1 font-kufi text-2xl font-bold text-amber-200">الماهرات</p>
+        <p className="mt-1 font-kufi text-sm text-white/85">«الماهر بالقرآن مع السفرة الكرام البررة»</p>
+        {myId && !loading && (
+          <p className="mt-3 rounded-2xl bg-white/10 px-3 py-2 text-sm font-bold">
+            {mine
+              ? `نجومكِ: ${"⭐".repeat(Math.min(mine.stars, 10))}${mine.stars > 10 ? ` (${ar(mine.stars)})` : ""} — أنتِ من الماهرات 🌟`
+              : "لم تنالي نجمة بعد — أتقني حفظكِ وستلمع نجمتكِ قريباً بإذن الله 🌸"}
+          </p>
+        )}
+      </div>
+
+      <div className="mb-2 flex flex-wrap gap-1.5">
+        {(defaultHalaqa ? [defaultHalaqa, ""] : ["", ...halaqas.map((h) => h.id)]).map((id) => (
+          <button
+            key={id || "all"}
+            type="button"
+            onClick={() => setScope(id)}
+            className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
+              scope === id ? "bg-plum-600 text-white" : "bg-cream text-silver-600"
+            }`}
+          >
+            {id ? `🕌 ${defaultHalaqa ? "حلقتي — " : ""}${titleOf(id)}` : "🌍 كل الحلقات"}
+          </button>
+        ))}
+      </div>
+      <div className="mb-4 flex gap-1 rounded-2xl bg-cream p-1">
+        {STAR_PERIODS.map((p) => (
+          <button
+            key={p.key}
+            type="button"
+            onClick={() => setPeriod(p.key)}
+            className={`flex-1 rounded-xl py-2 font-kufi text-sm font-bold transition ${
+              period === p.key ? "bg-white text-plum-800 shadow-sm" : "text-silver-600"
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <p className="py-8 text-center text-sm font-bold text-silver-600">جاري التحميل…</p>
+      ) : list.length === 0 ? (
+        <div className="card rounded-2xl p-8 text-center">
+          <p className="text-3xl">✨</p>
+          <p className="mt-2 font-kufi font-bold text-plum-800">لم تُمنح نجوم بعد</p>
+          <p className="mt-1 text-sm text-silver-600">
+            تمنح المعلّمة نجمة «ماهرة» لمن أتقنت في اللقاء — كوني أولى الماهرات 🌟
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          {groups.map((g) => (
+            <div key={g.n} className="card rounded-2xl p-3.5">
+              <p className="mb-2 font-kufi text-base font-bold text-amber-700">
+                {"⭐".repeat(Math.min(g.n, 10))}
+                <span className="ms-1 text-sm text-silver-600">
+                  {g.n === 1 ? "نجمة" : g.n === 2 ? "نجمتان" : `${ar(g.n)} نجوم`}
+                </span>
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {g.names.map((e) => (
+                  <span
+                    key={e.studentId}
+                    className={`rounded-full px-3 py-1 text-sm font-bold ${
+                      e.studentId === myId ? "bg-amber-400 text-white" : "bg-amber-50 text-amber-900"
+                    }`}
+                    title={e.halaqaLabel}
+                  >
+                    {e.studentId === myId ? `${e.name} (أنتِ)` : e.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 🏆/🌟 تبويب السباق: السباق بالنقاط، أو لوحة الماهرات */
+export function RaceAndStars(props: { myId?: string | null; defaultHalaqa?: string }) {
+  const [view, setView] = useState<"race" | "stars">("race");
+  return (
+    <div>
+      <div className="mb-4 grid grid-cols-2 gap-1 rounded-2xl bg-cream p-1">
+        {(
+          [
+            ["race", "🏆 السباق"],
+            ["stars", "🌟 الماهرات"],
+          ] as const
+        ).map(([k, l]) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setView(k)}
+            className={`rounded-xl py-2.5 font-kufi text-base font-bold transition ${
+              view === k ? "bg-plum-600 text-white shadow-sm" : "text-plum-700"
+            }`}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+      {view === "race" ? <RaceBoard {...props} /> : <StarsBoard {...props} />}
+    </div>
+  );
+}

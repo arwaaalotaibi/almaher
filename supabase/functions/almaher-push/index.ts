@@ -399,7 +399,7 @@ Deno.serve(async (req) => {
     if (who.role !== "admin" && who.role !== "teacher") return json({ error: "forbidden" }, 403);
     const b = body as {
       date?: string;
-      items?: { student_id: string; attended: boolean; hifz?: number; tathbit?: number; muraja?: number; absences?: number }[];
+      items?: { student_id: string; attended: boolean; hifz?: number; tathbit?: number; muraja?: number; absences?: number; star?: boolean }[];
     };
     const items = (b.items ?? []).filter((x) => x && x.student_id);
     if (items.length === 0) return json({ error: "items required" }, 400);
@@ -443,7 +443,9 @@ Deno.serve(async (req) => {
         if (it.tathbit) parts.push(`📌 تثبيت ${facesText(it.tathbit)}`);
         if (it.muraja) parts.push(`🔁 مراجعة ${facesText(it.muraja)}`);
         const praise = PRAISE[(seed + it.student_id.charCodeAt(0)) % PRAISE.length];
-        title = name ? `أحسنتِ يا ${name} ✅` : "أحسنتِ ✅";
+        title = it.star
+          ? name ? `⭐ أنتِ من الماهرات اليوم يا ${name}!` : "⭐ أنتِ من الماهرات اليوم!"
+          : name ? `أحسنتِ يا ${name} ✅` : "أحسنتِ ✅";
         text = (parts.length ? `سمّعتِ اليوم: ${parts.join(" · ")}
 ` : "") + praise;
       } else {

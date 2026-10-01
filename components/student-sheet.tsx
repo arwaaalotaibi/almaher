@@ -562,6 +562,7 @@ export function StudentSheet({
                         </span>
                       )}
                       <SessionVerdictChip status={overall} voice="admin" />
+{log?.star && (<span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-white">⭐ ماهرة</span>)}
                     </span>
                     <span className="text-silver-600">
                       {formatSchedDate(s.date)}

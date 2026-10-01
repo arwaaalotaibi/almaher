@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { STUDENT_PICK_KEY } from "@/lib/store";
 import { PageHeader, useHydrated } from "@/components/ui";
-import { RaceBoard } from "@/components/race-board";
+import { RaceAndStars } from "@/components/race-board";
 
 /** 🏆 سباق الحلقات: منافسة تلقائية بين الطالبات — كل المساجد أو مسجد معين */
 export default function RacePage() {
@@ -22,7 +22,7 @@ export default function RacePage() {
       <p className="-mt-2 mb-4 text-sm text-silver-600">
         النقاط تُحسب تلقائياً من التسميع والحضور والقراءة والاختبارات
       </p>
-      <RaceBoard myId={myId} />
+      <RaceAndStars myId={myId} />
     </main>
   );
 }

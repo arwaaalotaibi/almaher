@@ -305,6 +305,9 @@ export function ReciteHistory({
                 ) : (
                   <SessionVerdictChip status={overall} voice={voice} />
                 )}
+                {r.star && (
+                  <span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-white">⭐ ماهرة</span>
+                )}
               </span>
               <span className="flex items-center gap-2.5">
                 {onEdit && (
@@ -381,6 +384,7 @@ export function ReciteLogger({
   });
   const [attended, setAttended] = useState(true);
   const [note, setNote] = useState("");
+  const [star, setStar] = useState(false); // ⭐ ماهرة في هذا اللقاء
   const [saved, setSaved] = useState(false);
   // سجلّ قيد التعديل — تصحيح خطأ دون إعادة الإدخال من البداية
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -397,6 +401,7 @@ export function ReciteLogger({
   const reset = () => {
     setParts({ tasmi: { ...EMPTY }, muraja: { ...EMPTY }, tathbit: { ...EMPTY } });
     setNote("");
+    setStar(false);
     setAttended(true);
     setEditingId(null);
   };
@@ -407,6 +412,7 @@ export function ReciteLogger({
     setDate(r.date);
     setAttended(r.attended);
     setNote(r.note ?? "");
+    setStar(!!r.star);
     setParts({
       tasmi: partToForm(r.tasmi),
       muraja: partToForm(r.muraja),
@@ -458,6 +464,7 @@ export function ReciteLogger({
         muraja: m,
         tathbit: th,
         note: note.trim() || undefined,
+        star,
       };
     } else {
       data = {
@@ -565,6 +572,19 @@ export function ReciteLogger({
             ))}
           </div>
 
+          {attended && (
+            <button
+              type="button"
+              onClick={() => setStar((v) => !v)}
+              aria-pressed={star}
+              className={`mb-2 flex w-full items-center justify-between rounded-2xl border-2 px-4 py-2.5 text-sm font-bold transition ${
+                star ? "border-amber-400 bg-amber-50 text-amber-800" : "border-cream-dark text-silver-600"
+              }`}
+            >
+              <span>{star ? "⭐ ماهرة في هذا اللقاء" : "☆ ماهرة في هذا اللقاء؟"}</span>
+              <span className="text-xs font-normal">بتقدير المعلّمة</span>
+            </button>
+          )}
           {attended &&
             RECITE_PARTS.filter(
               // 🚫 القسم الملغى عن الطالبة يختفي — إلا إن كان مسجّلاً في هذا السجلّ

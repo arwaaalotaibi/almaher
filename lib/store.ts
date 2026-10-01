@@ -402,6 +402,8 @@ export interface RecitationLog {
   /** أوجه مكتملة لكل قسم — تُحسب عند التسجيل وتُحفظ رقماً، ومنها تحسب
       قاعدة البيانات ترتيب السباق دون كشف مقاطع الطالبة لغيرها */
   faces?: { tasmi: number; tathbit: number; muraja: number };
+  /** ⭐ «ماهرة» في هذا اللقاء — بتقدير المعلّمة (تُحفظ داخل parts.star)، لها لوحة «الماهرات» ولا تدخل نقاط السباق */
+  star?: boolean;
 }
 
 /** أقسام سجلّ التسميع الثلاثة */
@@ -1111,6 +1113,7 @@ export async function fetchSessionHistory(
         tasmi: normPart(parts.tasmi),
         muraja: normPart(parts.muraja),
         tathbit: normPart(parts.tathbit),
+        star: parts.star === true,
         note: (r.note as string) ?? "",
         faces:
           typeof f.tasmi === "number" || typeof f.tathbit === "number" || typeof f.muraja === "number"
@@ -1288,6 +1291,7 @@ export async function pullRemote(): Promise<void> {
         tasmi: normPart(parts.tasmi),
         muraja: normPart(parts.muraja),
         tathbit: normPart(parts.tathbit),
+        star: parts.star === true || undefined,
         note: (row.note as string) || undefined,
         createdAt: (row.created_at as string) ?? undefined,
         faces: normFaces(row.faces),
@@ -1820,7 +1824,7 @@ export const actions = {
         student_id: rec.studentId,
         log_date: rec.date,
         attended: rec.attended,
-        parts: { tasmi: rec.tasmi, muraja: rec.muraja, tathbit: rec.tathbit },
+        parts: { tasmi: rec.tasmi, muraja: rec.muraja, tathbit: rec.tathbit, ...(rec.star ? { star: true } : {}) },
         note: rec.note ?? "",
         faces: rec.faces ?? {},
       })
@@ -1840,7 +1844,7 @@ export const actions = {
         .update({
           log_date: data.date,
           attended: data.attended,
-          parts: { tasmi: data.tasmi, muraja: data.muraja, tathbit: data.tathbit },
+          parts: { tasmi: data.tasmi, muraja: data.muraja, tathbit: data.tathbit, ...(data.star ? { star: true } : {}) },
           note: data.note ?? "",
           faces: data.faces ?? {},
         })
@@ -1869,7 +1873,7 @@ export const actions = {
         student_id: rec.studentId,
         log_date: rec.date,
         attended: rec.attended,
-        parts: { tasmi: rec.tasmi, muraja: rec.muraja, tathbit: rec.tathbit },
+        parts: { tasmi: rec.tasmi, muraja: rec.muraja, tathbit: rec.tathbit, ...(rec.star ? { star: true } : {}) },
         note: rec.note ?? "",
         faces: rec.faces ?? {},
         created_at: rec.createdAt,
