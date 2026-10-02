@@ -190,6 +190,42 @@ export function whatsappLink(phone: string | undefined, text: string): string {
     : `https://wa.me/?text=${msg}`;
 }
 
+/** 📲 رسالة واتساب للمعلّمة عن ملاحظة طالبة على خطتها — مع الخطة الحالية كما في البرنامج */
+export function planNoteForTeacher(
+  st: Student,
+  teacherName: string | undefined,
+  halaqaLabel: string,
+  note: string
+): string {
+  const p = st.plan ?? EMPTY_PLAN;
+  const n = (v: number) => {
+    const x = v || 0;
+    return `${x.toLocaleString("ar-EG")} ${x >= 3 && x <= 10 && Number.isInteger(x) ? "أوجه" : "وجه"}`;
+  };
+  const lines: string[] = [];
+  if (partOn(p, "hifz")) lines.push(`📖 الحفظ: ${n(p.hifz)} كل لقاء${hifzStartLabel(p) ? ` — يبدأ من ${hifzStartLabel(p)}` : ""}`);
+  else lines.push("📖 الحفظ: ملغى هذا الفصل");
+  if (partOn(p, "tathbit")) lines.push(`📌 التثبيت: ${n(p.tathbit)}`);
+  else lines.push("📌 التثبيت: ملغى هذا الفصل");
+  if (partOn(p, "murajaah"))
+    lines.push(
+      `🔁 المراجعة: ${n(p.murajaah)} كل لقاء${
+        p.murStartSurah ? ` — تبدأ من سورة ${p.murStartSurah} — آية ${(p.murStartAyah ?? 1).toLocaleString("ar-EG")}` : ""
+      }`
+    );
+  else lines.push("🔁 المراجعة: ملغاة هذا الفصل");
+  return [
+    `السلام عليكم ${teacherName ? `أ. ${teacherName}` : ""} 🌸`.replace("  ", " "),
+    `الطالبة «${st.name}»${halaqaLabel ? ` — ${halaqaLabel}` : ""} كتبت ملاحظة على خطتها:`,
+    `«${note.trim() || "—"}»`,
+    "",
+    "خطتها الحالية في البرنامج:",
+    ...lines,
+    "",
+    "نرجو مراجعتها وإفادتنا بالصحيح لنعدّلها، وجزاكِ الله خيراً 🤍",
+  ].join("\n");
+}
+
 /** نص رسالة رمز الدخول */
 export function codeMessage(name: string, code: string): string {
   const link = codeLink(code);

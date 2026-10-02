@@ -7,6 +7,7 @@ import {
   halaqaTitle,
   lastPlanIssue,
   planConfirmMark,
+  planNoteForTeacher,
   useApp,
   whatsappLink,
   type Student,
@@ -15,6 +16,7 @@ import { supabase } from "@/lib/supabase";
 import { PageHeader, useHydrated } from "@/components/ui";
 import { RoleOnly } from "@/components/admin-only";
 import { StudentSheet } from "@/components/student-sheet";
+import { useRole } from "@/components/auth-gate";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 
@@ -35,7 +37,8 @@ export default function PlansPage() {
 }
 
 function PlansInner() {
-  const { students: allStudents, halaqas, support } = useApp();
+  const { students: allStudents, halaqas, support, teachers } = useApp();
+  const isAdmin = useRole() === "admin";
   const students = useMemo(() => activeStudents(allStudents), [allStudents]);
   const hydrated = useHydrated();
   const [halaqaId, setHalaqaId] = useState("");
@@ -207,6 +210,22 @@ function PlansInner() {
                     📲
                   </a>
                 </div>
+                {isAdmin && (
+                  <a
+                    href={whatsappLink(
+                      "",
+                      planNoteForTeacher(st, teachers.find((t) => t.id === st.teacherId)?.name, hLabel(st), note)
+                    )}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 block w-full rounded-xl bg-emerald-50 py-2 text-center text-xs font-bold text-emerald-800 ring-1 ring-emerald-300"
+                  >
+                    📲 أرسلي الملاحظة لمعلّمتها
+                    {teachers.find((t) => t.id === st.teacherId)?.name && (
+                      <span> ({teachers.find((t) => t.id === st.teacherId)?.name})</span>
+                    )}
+                  </a>
+                )}
                 {replyFor === msgId ? (
                   <div className="mt-2 rounded-xl bg-white p-2.5">
                     <p className="mb-1 text-[11px] font-bold text-plum-800">💬 ردّكِ عليها (الخطة صحيحة كما هي)</p>

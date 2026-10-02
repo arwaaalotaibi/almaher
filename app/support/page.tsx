@@ -3,6 +3,8 @@
 import { confirmDanger } from "@/lib/confirm";
 import { useState } from "react";
 import {
+  planNoteForTeacher,
+  whatsappLink,
   actions,
   halaqaTitle,
   SUPPORT_KINDS,
@@ -29,7 +31,7 @@ const FILTERS = [
 ] as const;
 
 function SupportInner() {
-  const { support, students, halaqas } = useApp();
+  const { support, students, halaqas, teachers } = useApp();
   const hydrated = useHydrated();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("new");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -123,6 +125,22 @@ function SupportInner() {
                 <p className="rounded-xl bg-cream/60 px-3 py-2 text-sm font-medium text-ink">
                   {m.body}
                 </p>
+                {(() => {
+                  const st = students.find((s) => s.id === m.studentId);
+                  if (!st) return null;
+                  const t = teachers.find((x) => x.id === st.teacherId);
+                  const h = halaqas.find((x) => x.id === st.halaqaId);
+                  return (
+                    <a
+                      href={whatsappLink("", planNoteForTeacher(st, t?.name, h ? halaqaTitle(h) : "", m.body))}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 block rounded-xl bg-emerald-50 py-1.5 text-center text-[11px] font-bold text-emerald-800 ring-1 ring-emerald-200"
+                    >
+                      📲 عن الخطة؟ أرسليها لمعلّمتها{t ? ` (${t.name})` : ""} مع خطتها
+                    </a>
+                  );
+                })()}
 
                 {m.status === "done" ? (
                   <div className="mt-2 rounded-xl bg-emerald-50 px-3 py-2">
