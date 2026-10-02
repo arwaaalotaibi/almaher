@@ -36,6 +36,7 @@ export function Memorizer({
   const [perAyah, setPerAyah] = useState(3);
   const [echo, setEcho] = useState(false);
   const [view, setView] = useState<"page" | "text">("page"); // 📖 صفحة المصحف أو الآية مكبّرة
+  const [full, setFull] = useState(false); // ⛶ الصفحة على كامل الشاشة
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const echoTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -111,6 +112,19 @@ export function Memorizer({
     const m = blobs.current;
     return () => m.forEach((u) => URL.revokeObjectURL(u));
   }, []);
+
+  // ⛶ إيقاف تمرير الصفحة خلف وضع ملء الشاشة، والخروج بزر الرجوع/Escape
+  useEffect(() => {
+    if (!full) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const k = (e: KeyboardEvent) => e.key === "Escape" && setFull(false);
+    window.addEventListener("keydown", k);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", k);
+    };
+  }, [full]);
 
   /** تعذّر المصدر ⇒ الرابط الاحتياطي (مرة واحدة لكل آية) */
   const onError = () => {
@@ -295,12 +309,63 @@ export function Memorizer({
           </span>
         </p>
         {view === "page" ? (
-          <MushafPage
-            page={pageOf(cur.surah, cur.ayah)}
-            currentKey={`${cur.surah}:${cur.ayah}`}
-            wardKeys={wardKeys}
-            onPick={goTo}
-          />
+          <>
+            <MushafPage
+              page={pageOf(cur.surah, cur.ayah)}
+              currentKey={`${cur.surah}:${cur.ayah}`}
+              wardKeys={wardKeys}
+              onPick={goTo}
+            />
+            <button
+              type="button"
+              onClick={() => setFull(true)}
+              className="mx-auto mt-2 flex items-center gap-1.5 rounded-full bg-plum-600 px-4 py-2 font-kufi text-sm font-bold text-white shadow"
+            >
+              ⛶ تكبير الصفحة على الشاشة
+            </button>
+            {full && (
+              <div className="fixed inset-0 z-[80] flex flex-col bg-cream px-2 pb-[max(env(safe-area-inset-bottom),8px)] pt-[max(env(safe-area-inset-top),8px)]">
+                <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
+                  <button
+                    type="button"
+                    onClick={() => setFull(false)}
+                    className="rounded-full bg-white px-3 py-1.5 text-sm font-bold text-plum-700 shadow-sm"
+                    aria-label="إغلاق ملء الشاشة"
+                  >
+                    ✕ تصغير
+                  </button>
+                  <span className="text-[11px] font-bold text-silver-600">
+                    آية {ar(idx + 1)} من {ar(ayahs.length)} · تكرار {ar(Math.min(rep + 1, perAyah))}/{ar(perAyah)}
+                  </span>
+                </div>
+                <div className="min-h-0 flex-1">
+                  <MushafPage
+                    fill
+                    page={pageOf(cur.surah, cur.ayah)}
+                    currentKey={`${cur.surah}:${cur.ayah}`}
+                    wardKeys={wardKeys}
+                    onPick={goTo}
+                  />
+                </div>
+                <div className="mt-2 flex items-center justify-center gap-4">
+                  <button type="button" onClick={() => jump(1)} className="card flex h-11 w-11 items-center justify-center rounded-full text-lg text-plum-700" aria-label="الآية التالية">
+                    ⏭
+                  </button>
+                  <button
+                    type="button"
+                    onClick={toggle}
+                    className="flex h-14 w-14 items-center justify-center rounded-full bg-plum-600 text-2xl text-white shadow-lg transition active:scale-95"
+                    aria-label={playing ? "إيقاف" : "تشغيل"}
+                  >
+                    {playing ? "⏸" : "▶️"}
+                  </button>
+                  <button type="button" onClick={() => jump(-1)} className="card flex h-11 w-11 items-center justify-center rounded-full text-lg text-plum-700" aria-label="الآية السابقة">
+                    ⏮
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         ) : (
           <p
             className="font-body text-2xl font-medium leading-[2.3] text-ink"

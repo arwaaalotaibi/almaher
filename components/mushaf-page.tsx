@@ -14,16 +14,19 @@ export function MushafPage({
   currentKey,
   wardKeys,
   onPick,
+  fill = false,
 }: {
   page: number;
   currentKey: string; // «سورة:آية»
   wardKeys: Set<string>;
   onPick?: (key: string) => void;
+  /** ⛶ ملء الشاشة: الصفحة تملأ الطول والعرض المتاحين */
+  fill?: boolean;
 }) {
   const [lines, setLines] = useState<MushafLine[] | null>(null);
   const [failed, setFailed] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(340);
+  const [size, setSize] = useState({ w: 340, h: 0 });
 
   useEffect(() => {
     let off = false;
@@ -45,18 +48,19 @@ export function MushafPage({
   useEffect(() => {
     const el = boxRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setWidth(el.clientWidth));
+    const read = () => setSize({ w: el.clientWidth, h: fill ? el.clientHeight : 0 });
+    const ro = new ResizeObserver(read);
     ro.observe(el);
-    setWidth(el.clientWidth);
+    read();
     return () => ro.disconnect();
-  }, []);
+  }, [fill]);
 
   // حجم الخط: يُقاس أعرض سطر بحجم مبدئي ثم يُصغَّر ليملأ العرض دون أن يفيض
   const BASE = 20;
   const [fit, setFit] = useState<number | null>(null);
   useLayoutEffect(() => {
     setFit(null);
-  }, [lines, width]);
+  }, [lines, size.w, size.h]);
   useLayoutEffect(() => {
     if (fit !== null || !lines || !boxRef.current) return;
     let widest = 0;
@@ -66,18 +70,20 @@ export function MushafPage({
       widest = Math.max(widest, w);
     });
     const inner = boxRef.current.clientWidth - 24; // الحشو الجانبي
-    setFit(widest > 0 ? Math.min(34, (BASE * inner * 0.97) / widest) : BASE);
-  }, [fit, lines]);
+    let f = widest > 0 ? (BASE * inner * 0.97) / widest : BASE;
+    if (fill && size.h > 0 && lines.length) f = Math.min(f, (size.h - 8) / (lines.length * 1.75)); // وأن تتّسع السطور طولاً
+    setFit(Math.min(fill ? 64 : 34, f));
+  }, [fit, lines, fill, size.h]);
 
   const right = page % 2 === 1;
   const fs = fit ?? BASE;
-  const lineH = Math.max(fs * 1.75, 30);
+  const lineH = fill ? fs * 1.75 : Math.max(fs * 1.75, 30);
 
   const firstWords = lines?.find((l) => l.kind === "words")?.words[0];
   const pageSurah = firstWords ? Number(firstWords.key.split(":")[0]) : 0;
 
   return (
-    <div>
+    <div className={fill ? "flex h-full min-h-0 flex-col" : ""}>
       {/* جهة الصفحة في المصحف */}
       <div className="mb-2 flex items-center justify-center gap-2">
         <span className="flex h-6 overflow-hidden rounded-md border-2 border-plum-600" aria-hidden>
@@ -91,15 +97,15 @@ export function MushafPage({
       </div>
 
       {/* الورقة: ظلّ الكعب في الجهة الداخلية كالمصحف المفتوح */}
-      <div key={page} className={`mushaf-sheet mushaf-turn ${right ? "mushaf-right" : "mushaf-left"}`}>
-        <div className="mushaf-frame">
+      <div key={page} className={`mushaf-sheet mushaf-turn ${right ? "mushaf-right" : "mushaf-left"} ${fill ? "flex min-h-0 flex-1 flex-col" : ""}`}>
+        <div className={`mushaf-frame ${fill ? "flex min-h-0 flex-1 flex-col" : ""}`}>
           {/* ترويسة الصفحة كما في المصحف: السورة يميناً والجزء يساراً */}
           <div className="mushaf-running flex items-center justify-between px-3 pt-1.5 font-kufi text-[11px] font-bold">
             <span>{pageSurah ? `سورة ${surahName(pageSurah)}` : ""}</span>
             <span>الجزء {ar(juzOfPage(page))}</span>
           </div>
 
-      <div ref={boxRef} className="overflow-hidden px-3 pb-1 pt-1" dir="rtl" style={{ visibility: lines && fit === null ? "hidden" : undefined }}>
+      <div ref={boxRef} className={`overflow-hidden px-3 pb-1 pt-1 ${fill ? "flex min-h-0 flex-1 flex-col justify-center" : ""}`} dir="rtl" style={{ visibility: lines && fit === null ? "hidden" : undefined }}>
         {failed ? (
           <p className="py-10 text-center text-sm font-bold text-silver-600">
             📡 تعذّر تحميل صفحة المصحف — جرّبي «الآية مكبّرة»
@@ -160,9 +166,9 @@ export function MushafPage({
           </div>
         </div>
       </div>
-      <p className="mt-2 text-center text-[10px] font-bold text-silver-600">
+      {!fill && <p className="mt-2 text-center text-[10px] font-bold text-silver-600">
         المظلّل = الآية التي تسمعينها · اضغطي آية من وردكِ للانتقال إليها
-      </p>
+      </p>}
     </div>
   );
 }
