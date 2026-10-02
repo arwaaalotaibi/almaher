@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   audioUrl,
+  audioUrlFallback,
   fetchWardAyahs,
   RECITERS,
   type ReciterId,
   type WardAyah,
 } from "@/lib/quran-audio";
-import { refLabel } from "@/lib/mushaf";
+import { pageOf, refLabel } from "@/lib/mushaf";
+import { MushafPage } from "./mushaf-page";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 
@@ -33,6 +35,7 @@ export function Memorizer({
   const [reciter, setReciter] = useState<ReciterId>("ar.alafasy");
   const [perAyah, setPerAyah] = useState(3);
   const [echo, setEcho] = useState(false);
+  const [view, setView] = useState<"page" | "text">("page"); // 📖 صفحة المصحف أو الآية مكبّرة
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const echoTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -47,6 +50,7 @@ export function Memorizer({
       if (RECITERS.some((r) => r.id === p.reciter)) setReciter(p.reciter);
       if (REPEATS.includes(p.perAyah)) setPerAyah(p.perAyah);
       if (typeof p.echo === "boolean") setEcho(p.echo);
+      if (p.view === "page" || p.view === "text") setView(p.view);
     } catch {
       /* نتجاهل */
     }
@@ -83,6 +87,41 @@ export function Memorizer({
   }, [from, to]);
 
   const cur = ayahs?.[idx];
+
+  /* ⚡ الصوت: الآيات القادمة تُحمَّل مسبقاً على الجهاز فتتصل التلاوة بلا انتظار بين الآيات */
+  const blobs = useRef(new Map<string, string>()); // «قارئ:رقم» ← رابط محلي
+  const pending = useRef(new Set<string>());
+  const srcOf = (a: WardAyah) =>
+    blobs.current.get(`${reciter}:${a.n}`) ?? audioUrl(reciter, a.surah, a.ayah);
+  useEffect(() => {
+    if (!ayahs) return;
+    for (let i = idx; i < Math.min(ayahs.length, idx + 4); i++) {
+      const a = ayahs[i];
+      const k = `${reciter}:${a.n}`;
+      if (blobs.current.has(k) || pending.current.has(k)) continue;
+      pending.current.add(k);
+      fetch(audioUrl(reciter, a.surah, a.ayah))
+        .then((r) => (r.ok ? r.blob() : Promise.reject(new Error("audio"))))
+        .then((b) => blobs.current.set(k, URL.createObjectURL(b)))
+        .catch(() => {})
+        .finally(() => pending.current.delete(k));
+    }
+  }, [idx, reciter, ayahs]);
+  useEffect(() => {
+    const m = blobs.current;
+    return () => m.forEach((u) => URL.revokeObjectURL(u));
+  }, []);
+
+  /** تعذّر المصدر ⇒ الرابط الاحتياطي (مرة واحدة لكل آية) */
+  const onError = () => {
+    const el = audioRef.current;
+    const a = ayahs?.[live.current.idx];
+    if (!el || !a) return;
+    const fb = audioUrlFallback(reciter, a.n);
+    if (el.src === fb) return;
+    el.src = fb;
+    if (playing) void el.play().catch(() => setPlaying(false));
+  };
 
   /** الانتقال بعد اكتمال آية (بكل تكراراتها) */
   const advance = useCallback(() => {
@@ -128,12 +167,9 @@ export function Memorizer({
     if (!cur) return;
     const el = audioRef.current;
     if (el && playing && !echoing) {
-      el.src = audioUrl(reciter, cur.n);
+      el.src = srcOf(cur);
       void el.play().catch(() => setPlaying(false));
     }
-    // تحميل مسبق للآية التالية
-    const next = ayahs?.[idx + 1];
-    if (next) new Audio(audioUrl(reciter, next.n)).preload = "auto";
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idx, reciter, ayahs]);
 
@@ -153,7 +189,7 @@ export function Memorizer({
       setPlaying(false);
     } else {
       setFinished(false);
-      if (!el.src) el.src = audioUrl(reciter, cur.n);
+      if (!el.src) el.src = srcOf(cur);
       void el.play().catch(() => setPlaying(false));
       setPlaying(true);
     }
@@ -169,9 +205,16 @@ export function Memorizer({
     setIdx(n);
     const el = audioRef.current;
     if (el && ayahs[n]) {
-      el.src = audioUrl(reciter, ayahs[n].n);
+      el.src = srcOf(ayahs[n]);
       if (playing) void el.play().catch(() => setPlaying(false));
     }
+  };
+
+  /** الانتقال إلى آية بالضغط عليها في صفحة المصحف */
+  const goTo = (key: string) => {
+    if (!ayahs) return;
+    const n = ayahs.findIndex((a) => `${a.surah}:${a.ayah}` === key);
+    if (n >= 0) jump(n - idx);
   };
 
   const restart = () => {
@@ -180,11 +223,13 @@ export function Memorizer({
     setFinished(false);
     const el = audioRef.current;
     if (el && ayahs?.[0]) {
-      el.src = audioUrl(reciter, ayahs[0].n);
+      el.src = srcOf(ayahs[0]);
       void el.play().catch(() => setPlaying(false));
       setPlaying(true);
     }
   };
+
+  const wardKeys = new Set((ayahs ?? []).map((a) => `${a.surah}:${a.ayah}`));
 
   if (failed) {
     return (
@@ -213,10 +258,34 @@ export function Memorizer({
 
   return (
     <div>
-      <audio ref={audioRef} onEnded={onEnded} preload="auto" />
+      <audio ref={audioRef} onEnded={onEnded} onError={onError} preload="auto" />
+
+      {/* طريقة العرض */}
+      <div className="mb-2.5 flex gap-1 rounded-2xl bg-cream p-1">
+        {(
+          [
+            { v: "page", label: "📖 صفحة المصحف" },
+            { v: "text", label: "🔤 الآية مكبّرة" },
+          ] as const
+        ).map((o) => (
+          <button
+            key={o.v}
+            type="button"
+            onClick={() => {
+              setView(o.v);
+              savePrefs({ view: o.v });
+            }}
+            className={`flex-1 rounded-xl py-2 font-kufi text-sm font-bold transition ${
+              view === o.v ? "bg-white text-plum-800 shadow-sm" : "text-silver-600"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
 
       {/* الآية الحالية */}
-      <div className="card rounded-2xl p-5 text-center">
+      <div className={view === "page" ? "text-center" : "card rounded-2xl p-5 text-center"}>
         <p className="mb-3 flex items-center justify-center gap-2 text-[11px] font-bold text-silver-600">
           <span className="rounded-full bg-plum-100 px-2.5 py-0.5 text-plum-700">
             آية {ar(idx + 1)} من {ar(ayahs.length)}
@@ -225,12 +294,21 @@ export function Memorizer({
             تكرار {ar(Math.min(rep + 1, perAyah))} / {ar(perAyah)}
           </span>
         </p>
-        <p
-          className="font-body text-2xl font-medium leading-[2.3] text-ink"
-          dir="rtl"
-        >
-          {cur.text}
-        </p>
+        {view === "page" ? (
+          <MushafPage
+            page={pageOf(cur.surah, cur.ayah)}
+            currentKey={`${cur.surah}:${cur.ayah}`}
+            wardKeys={wardKeys}
+            onPick={goTo}
+          />
+        ) : (
+          <p
+            className="font-body text-2xl font-medium leading-[2.3] text-ink"
+            dir="rtl"
+          >
+            {cur.text}
+          </p>
+        )}
         <p className="mt-3 font-kufi text-sm font-bold text-plum-700">
           {refLabel(cur.surah, cur.ayah)}
         </p>

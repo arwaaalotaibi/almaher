@@ -364,3 +364,37 @@ input, textarea, select {
 @media (prefers-reduced-motion: reduce) {
   .sl-cloud, .sl-fill, .sl-in, .sl-bob, .sl-blink, .sl-jump, .sl-wiggle, .sl-twinkle, .sl-flash { animation: none !important; }
 }
+
+/* ================== 📖 صفحة المصحف (مسمّعي) ================== */
+.mushaf-sheet {
+  position: relative; padding: 4px 2px; border-radius: 10px;
+  background: var(--mushaf-paper, #ffffff);
+  box-shadow: 0 8px 22px #5d3f4e1f, 0 0 0 1px #ece2e7;
+}
+/* ظلّ الكعب: الصفحة اليمنى كعبها يسارها، واليسرى كعبها يمينها */
+.mushaf-sheet::after { content: ""; position: absolute; top: 0; bottom: 0; width: 26px; pointer-events: none; }
+.mushaf-right::after { left: 0; border-radius: 10px 0 0 10px; background: linear-gradient(90deg, #5d3f4e1c, #5d3f4e00); }
+.mushaf-left::after { right: 0; border-radius: 0 10px 10px 0; background: linear-gradient(270deg, #5d3f4e1c, #5d3f4e00); }
+.mushaf-frame { position: relative; }
+.mushaf-running { color: #a0803f; border-bottom: 1px solid #e3cf9f88; padding-bottom: 3px; margin: 0 6px; }
+.mushaf-banner {
+  position: relative; display: inline-block; padding: 2px 34px; border-radius: 999px; color: #6e4d5e;
+  background: var(--mushaf-head, linear-gradient(180deg, #fbf0d4, #f3dfae));
+  border: 1.5px solid #c9a567; box-shadow: inset 0 0 0 3px var(--mushaf-head-in, #fffaf0), inset 0 0 0 4px #e3cf9f;
+}
+.mushaf-banner::before, .mushaf-banner::after { content: "❁"; position: absolute; top: 50%; transform: translateY(-50%); color: #b8955a; font-size: 0.8em; }
+.mushaf-banner::before { right: 12px; } .mushaf-banner::after { left: 12px; }
+.mushaf-pageno {
+  min-width: 34px; padding: 1px 8px; text-align: center; color: #8a6a3a; border-radius: 999px;
+  border: 1.5px solid #c9a567; background: var(--mushaf-head-in, #fffaf0);
+}
+.mushaf-cur { background: var(--mushaf-cur, #fde68ab3); box-shadow: 0 0 0 2px var(--mushaf-cur, #fde68ab3); }
+@keyframes mushaf-turn { from { opacity: 0; transform: translateX(-18px) rotateY(8deg); } to { opacity: 1; transform: none; } }
+.mushaf-turn { animation: mushaf-turn 0.45s ease-out both; transform-origin: right center; }
+@media (prefers-reduced-motion: reduce) { .mushaf-turn { animation: none; } }
+:root[data-theme="dark"] {
+  --mushaf-paper: linear-gradient(180deg, #2a2125, #241c20);
+  --mushaf-head: linear-gradient(180deg, #4a3b26, #3d311f);
+  --mushaf-head-in: #2a2125;
+  --mushaf-cur: #8a6a1fcc;
+}
