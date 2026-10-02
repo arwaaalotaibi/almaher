@@ -40,12 +40,16 @@ function SupportInner() {
 
   // ملاحظات الخطة لها صفحتها (تأكيد الخطط) — لا تزاحم صندوق الدعم
   const inbox = support.filter(
-    (m) => m.kind !== "plan_issue" && m.kind !== "plan_edit" && m.kind !== "admin_msg"
+    (m) => m.kind !== "plan_edit" && m.kind !== "admin_msg"
   );
   const list = inbox.filter((m) =>
     filter === "all" ? true : m.status === filter
   );
   const newCount = inbox.filter((m) => m.status === "new").length;
+
+  // بلاغ الخطة يُحفظ «… فصل yyyy-mm-dd: الملاحظة» — نعرض الملاحظة فقط
+  const bodyText = (m: { kind: string; body: string }) =>
+    m.kind === "plan_issue" ? m.body.replace(/^[^:]*:\s*/, "") || "—" : m.body;
 
   const studentLabel = (id: string) => {
     const st = students.find((s) => s.id === id);
@@ -123,7 +127,7 @@ function SupportInner() {
                   {k?.icon} {k?.label} · {fmtDate(m.createdAt)}
                 </p>
                 <p className="rounded-xl bg-cream/60 px-3 py-2 text-sm font-medium text-ink">
-                  {m.body}
+                  {bodyText(m)}
                 </p>
                 {(() => {
                   const st = students.find((s) => s.id === m.studentId);
@@ -132,7 +136,7 @@ function SupportInner() {
                   const h = halaqas.find((x) => x.id === st.halaqaId);
                   return (
                     <a
-                      href={whatsappLink("", planNoteForTeacher(st, t?.name, h ? halaqaTitle(h) : "", m.body))}
+                      href={whatsappLink("", planNoteForTeacher(st, t?.name, h ? halaqaTitle(h) : "", bodyText(m)))}
                       target="_blank"
                       rel="noreferrer"
                       className="mt-2 block rounded-xl bg-emerald-50 py-1.5 text-center text-[11px] font-bold text-emerald-800 ring-1 ring-emerald-200"

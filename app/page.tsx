@@ -20,7 +20,7 @@ export default function Home() {
   ).length;
   const hydrated = useHydrated();
   const newSupport = support.filter(
-    (m) => m.status === "new" && m.kind !== "plan_issue" && m.kind !== "plan_edit"
+    (m) => m.status === "new" && m.kind !== "plan_edit" && m.kind !== "admin_msg"
   ).length;
   // طالبات أبلغن عن خطأ في خطة الفصل ولم تُعدَّل بعد
   const planIssues = students.filter(
