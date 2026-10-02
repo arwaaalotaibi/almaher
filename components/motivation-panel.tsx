@@ -306,6 +306,8 @@ export function MotivationPanel({
         goalJuz={p.termGoalJuz}
         studentId={student.id}
         reverse={p.desc}
+        hifzFrom={p.nextHifzFrom}
+        goalSurah={p.termGoalSurah}
       >
         {track}
       </JourneyMap>

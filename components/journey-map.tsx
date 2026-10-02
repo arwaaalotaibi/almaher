@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { juzLabel } from "@/lib/progress";
+import { ladderPos, SurahLadder, surahCountLabel } from "./surah-ladder";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 
@@ -46,7 +47,7 @@ function pathD(to: number): string {
 /** لوح ألوان قصاصات الاحتفال — من هوية التطبيق */
 const CONFETTI = ["#a8894f", "#5d3f4e", "#e7c873", "#8a5d75", "#ffffff"];
 
-type MapView = "path" | "garden";
+type MapView = "path" | "garden" | "ladder";
 
 /* ================== مظهر الدرب (خريطة المراحل) ================== */
 function PathSvg({
@@ -397,6 +398,8 @@ export function JourneyMap({
   studentId = "",
   reverse = false,
   children,
+  hifzFrom,
+  goalSurah,
 }: {
   juz: number; // الجزء الحالي (1..30)
   juzPct: number; // نسبة إنجازه
@@ -404,19 +407,24 @@ export function JourneyMap({
   studentId?: string; // لتذكّر آخر محطة احتُفل بها + المظهر المفضّل
   reverse?: boolean; // الحفظ من الناس: المحطات من جزء عمّ نزولاً إلى الجزء الأول
   children?: React.ReactNode; // مسار الفصل (المحطات الذهبية) أسفل الدرب
+  hifzFrom?: { surah: number; ayah: number } | null; // 🪜 الآية التالية للحفظ (موضعها في السلّم)
+  goalSurah?: number; // 🪜 سورة هدف الفصل
 }) {
   const j = Math.min(Math.max(1, juz), 30);
   const cur = reverse ? 30 - j : j - 1; // فهرس المحطة الحالية
   const [celebrate, setCelebrate] = useState(false);
   const [view, setView] = useState<MapView>("path");
+  const hasLadder = hifzFrom !== undefined;
+  const lpos = hasLadder ? ladderPos(hifzFrom, reverse) : null;
 
   const viewKey = `almaher-jm-view:${studentId}`;
 
   // المظهر المفضّل المحفوظ على الجهاز
   useEffect(() => {
     const stored = window.localStorage.getItem(viewKey);
-    if (stored === "garden" || stored === "path") setView(stored);
-  }, [viewKey]);
+    if (stored === "garden" || stored === "path" || stored === "ladder") setView(stored);
+    else if (hasLadder) setView("ladder"); // 🪜 السلّم هو المظهر الافتراضي
+  }, [viewKey, hasLadder]);
 
   const pickView = (v: MapView) => {
     setView(v);
@@ -456,11 +464,13 @@ export function JourneyMap({
     <div className="card relative mb-2.5 overflow-hidden rounded-2xl">
       <div className="flex items-center justify-between gap-2 bg-gradient-to-l from-plum-500 to-plum-700 px-3 py-2.5">
         <span className="font-kufi text-sm font-bold text-white">
-          {view === "garden" ? "🌷 بستان حفظي" : "🗺️ درب حفظي"}
+          {view === "garden" ? "🌷 بستان حفظي" : view === "ladder" ? "🪜 سُلّم سوري" : "🗺️ درب حفظي"}
         </span>
         <span className="flex items-center gap-1.5">
           <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold text-white">
-            {juzLabel(juz)} · {ar(juzPct)}٪
+            {view === "ladder" && lpos
+              ? `${surahCountLabel(Math.min(lpos.curK, 114))} ✓`
+              : `${juzLabel(juz)} · ${ar(juzPct)}٪`}
           </span>
           {/* تبديل المظهر — يتذكّره الجهاز */}
           <span className="flex gap-0.5 rounded-full bg-white/15 p-0.5">
@@ -468,7 +478,8 @@ export function JourneyMap({
               [
                 { v: "path", icon: "🗺️", label: "مظهر الدرب" },
                 { v: "garden", icon: "🌷", label: "مظهر البستان" },
-              ] as const
+                ...(lpos ? [{ v: "ladder", icon: "🪜", label: "سُلّم السور" }] : []),
+              ] as { v: MapView; icon: string; label: string }[]
             ).map((o) => (
               <button
                 key={o.v}
@@ -487,7 +498,7 @@ export function JourneyMap({
       </div>
 
       {/* 🎊 قصاصات الاحتفال بمحطة جديدة */}
-      {celebrate && (
+      {celebrate && view !== "ladder" && (
         <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
           {pieces.map((p, i) => (
             <span
@@ -514,7 +525,9 @@ export function JourneyMap({
         </div>
       )}
 
-      {view === "garden" ? (
+      {view === "ladder" && lpos ? (
+        <SurahLadder pos={lpos} goalSurah={goalSurah} studentId={studentId} />
+      ) : view === "garden" ? (
         <GardenSvg cur={cur} juz={juz} juzPct={juzPct} goalJuz={goalJuz} reverse={reverse} />
       ) : (
         <PathSvg cur={cur} juz={juz} juzPct={juzPct} goalJuz={goalJuz} reverse={reverse} />
@@ -522,7 +535,7 @@ export function JourneyMap({
 
       {children}
 
-      <p className="border-t border-cream-dark px-4 py-2.5 text-center text-[11px] font-bold text-silver-600">
+      {view !== "ladder" && <p className="border-t border-cream-dark px-4 py-2.5 text-center text-[11px] font-bold text-silver-600">
         {view === "garden"
           ? cur > 0
             ? `أزهرت ${ar(cur)} من ${ar(30)} زهرة — وزهرة ${juzLabel(juz)} تتفتّح الآن 🌸`
@@ -530,7 +543,7 @@ export function JourneyMap({
           : cur > 0
             ? `قطعتِ ${ar(cur)} من ${ar(30)} محطة — و${juzLabel(juz)} بين يديكِ الآن 💪`
             : `أول الدرب — ${juzLabel(juz)} بين يديكِ الآن 💪`}
-      </p>
+      </p>}
     </div>
   );
 }

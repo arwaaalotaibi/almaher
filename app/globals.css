@@ -246,6 +246,17 @@ input, textarea, select {
   --tt-gold: linear-gradient(180deg, #3d321c, #4d3d1c);
   --podium-2: #48424a;
   --podium-3: #4e3b31;
+  /* 🪜 سُلّم السور */
+  --sl-sky: linear-gradient(180deg, #1f2a3a 0%, #2a2233 60%, #2d2228 100%);
+  --sl-todo-bg: #2f262ccc;
+  --sl-todo-bd: #5a4852;
+  --sl-todo-tx: #a8949f;
+  --sl-cur-bg: #2f262c;
+  --sl-cur-tx: #f7eff3;
+  --sl-done-tx: #3a2a33;
+  --sl-base: linear-gradient(90deg, #3d321c, #4d3d1c);
+  --sl-base-tx: #f3d9a4;
+  --sl-cloud: #ffffff22;
 }
 
 /* الأبيض كخلفية (لا كنص) ← سطح داكن */
@@ -311,4 +322,45 @@ input, textarea, select {
 @media (prefers-reduced-motion: reduce) {
   .sm-pop, .sm-float, .sm-glow, .sm-spark, .sm-up, .sm-pulse, .sm-bump { animation: none !important; opacity: 1; }
   .sm-spark { display: none; }
+}
+
+
+/* ================== 🪜 سُلّم السور ================== */
+.sl-sky { background: var(--sl-sky, linear-gradient(180deg, #cfeafc 0%, #e6f2fb 32%, #fbeef3 72%, #fff6e6 100%)); }
+.sl-cloud { position: absolute; background: var(--sl-cloud, #fff); border-radius: 40px; animation: sl-drift linear infinite; }
+.sl-cloud::before, .sl-cloud::after { content: ""; position: absolute; background: inherit; border-radius: 50%; }
+.sl-cloud::before { width: 55%; height: 150%; top: -60%; left: 15%; }
+.sl-cloud::after { width: 40%; height: 120%; top: -40%; right: 12%; }
+@keyframes sl-drift { from { transform: translateX(-140px); } to { transform: translateX(520px); } }
+.sl-rail { background: linear-gradient(90deg, #d7a86e, #f0cf98 45%, #c48f55); box-shadow: 0 3px 8px #b07a4044; }
+.sl-todo { background: var(--sl-todo-bg, #ffffffd9); border: 2px dashed var(--sl-todo-bd, #d9c8d1); color: var(--sl-todo-tx, #a898a1); }
+.sl-goal { border: 2.5px solid #f5b83d; background: var(--sl-cur-bg, #fffbea); color: #b07a1a; }
+.sl-done { color: var(--sl-done-tx, #4d3340); box-shadow: 0 3px 0 #0000001a; }
+.sl-cur { background: var(--sl-cur-bg, #fff); color: var(--sl-cur-tx, #5d3f4e); border: 3px solid #ff8fab; box-shadow: 0 0 0 5px #ff8fab33, 0 8px 16px #ff8fab55; }
+.sl-fill { background: repeating-linear-gradient(-45deg, #ffe48a 0 10px, #ffd45e 10px 20px); background-size: 28.28px 28.28px; animation: sl-stripes 1.2s linear infinite; }
+@keyframes sl-stripes { from { background-position: 0 0; } to { background-position: 28.28px 0; } }
+.sl-base { background: var(--sl-base, linear-gradient(90deg, #fff1c7, #ffe39a)); color: var(--sl-base-tx, #7a5418); }
+.sl-bubble { background: #ff8fab; color: #fff; box-shadow: 0 4px 10px #ff8fab66; }
+.sl-bubble::after { content: ""; position: absolute; right: -7px; top: 50%; margin-top: -6px; border: 6px solid transparent; border-right: 0; border-left: 7px solid #ff8fab; }
+@keyframes sl-in { 0% { transform: scale(0.3); opacity: 0; } 70% { transform: scale(1.06); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+.sl-in { animation: sl-in 0.5s cubic-bezier(.34, 1.56, .64, 1) both; }
+@keyframes sl-bob { 0%, 100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-5px) rotate(6deg); } }
+.sl-bob { animation: sl-bob 2.4s ease-in-out infinite; }
+@keyframes sl-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.12); } }
+.sl-blink { animation: sl-blink 3.2s infinite; transform-origin: 0 -4px; transform-box: view-box; }
+/* القفزة: من الدرجة السابقة (أسفل بمقدار --gap) إلى الحالية بقوس ودورة */
+@keyframes sl-jump {
+  0% { transform: translateY(var(--gap)) rotate(0); }
+  50% { transform: translateY(calc(var(--gap) * -0.2 - 40px)) rotate(-200deg) scale(0.9, 1.1); }
+  100% { transform: translateY(0) rotate(-360deg); }
+}
+.sl-jump { animation: sl-jump 0.8s cubic-bezier(.3, .7, .4, 1) 1.1s both; }
+@keyframes sl-wiggle { 0%, 100% { transform: rotate(-8deg) translateY(0); } 50% { transform: rotate(8deg) translateY(-4px); } }
+.sl-wiggle { animation: sl-wiggle 1.4s ease-in-out infinite; display: inline-block; }
+@keyframes sl-twinkle { 0%, 100% { opacity: 0.3; transform: scale(0.7); } 50% { opacity: 1; transform: scale(1.1); } }
+.sl-twinkle { animation: sl-twinkle 2.4s ease-in-out infinite; }
+@keyframes sl-flash { 0% { box-shadow: 0 0 0 0 #ffd45e; } 50% { box-shadow: 0 0 0 12px #ffd45e88; } 100% { box-shadow: 0 0 0 0 #ffd45e00; } }
+.sl-flash { animation: sl-flash 0.9s ease-out 0.4s 2; }
+@media (prefers-reduced-motion: reduce) {
+  .sl-cloud, .sl-fill, .sl-in, .sl-bob, .sl-blink, .sl-jump, .sl-wiggle, .sl-twinkle, .sl-flash { animation: none !important; }
 }

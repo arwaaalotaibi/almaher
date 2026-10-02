@@ -500,6 +500,7 @@ export interface Progress {
   expectedPage: number; // المتوقّع اليوم حسب الخطة
   aheadPages: number; // + متقدّمة، − متأخّرة (بالصفحات المكتملة)
   termGoalJuz: number; // الجزء الذي تبلغه بإتمام حفظ خطة الفصل (0 = بلا خطة)
+  termGoalSurah: number; // السورة التي تبلغها بإتمام حفظ خطة الفصل (0 = بلا خطة) — لسُلّم السور
   // المراجعة مقابل خطتها (تراكمياً)
   aheadMurPages: number;
   hasMurPlan: boolean;
@@ -575,6 +576,7 @@ export function computeProgress(
   let termSessionsLeft = 0;
   let nextIdx = 0; // اللقاء القادم بعد آخر مسجَّل (0 = انتهى)
   let termGoalJuz = 0;
+  let termGoalSurah = 0;
   if (schedule && schedule.length) {
     nextIdx = currentSessionIndex(schedule, mine);
     const passed = nextIdx > 0 ? nextIdx - 1 : schedule.length;
@@ -591,10 +593,18 @@ export function computeProgress(
       const st0 = normalizeDescStart({ surah: surahNumber(plan.startSurah), ayah: plan.startAyah || 1 });
       expectedPage = cum > 0 ? descPosAfter(st0, cum).page : startPage;
       // هدف الفصل: الصفحة التي تبلغها بإتمام كل حفظ الخطة — وجزؤها
-      if (totalH > 0) termGoalJuz = juzOfPage(descPosAfter(st0, totalH).page);
+      if (totalH > 0) {
+        const g = descPosAfter(st0, totalH);
+        termGoalJuz = juzOfPage(g.page);
+        termGoalSurah = g.pos.surah;
+      }
     } else {
       expectedPage = cum > 0 ? advance(startPage, cum) : desc ? startPage + 1 : startPage - 1;
-      if (plan.startSurah && totalH > 0) termGoalJuz = juzOfPage(advance(startPage, totalH));
+      if (plan.startSurah && totalH > 0) {
+        const gp = advance(startPage, totalH);
+        termGoalJuz = juzOfPage(gp);
+        termGoalSurah = (desc ? pageStart(gp) : pageEnd(gp)).surah;
+      }
     }
   }
   // المقارنة بالخطة تكون بالصفحات «المكتملة» (كقاعدة عدّ الأوجه).
@@ -847,6 +857,7 @@ export function computeProgress(
     expectedPage,
     aheadPages,
     termGoalJuz,
+    termGoalSurah,
     aheadMurPages,
     hasMurPlan,
     termPlan,
