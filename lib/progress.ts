@@ -500,7 +500,7 @@ export interface Progress {
   expectedPage: number; // المتوقّع اليوم حسب الخطة
   aheadPages: number; // + متقدّمة، − متأخّرة (بالصفحات المكتملة)
   termGoalJuz: number; // الجزء الذي تبلغه بإتمام حفظ خطة الفصل (0 = بلا خطة)
-  termGoalSurah: number; // السورة التي تبلغها بإتمام حفظ خطة الفصل (0 = بلا خطة) — لسُلّم السور
+  termGoalSurah: number; // السورة التي تبلغها بإتمام حفظ خطة الفصل (0 = بلا خطة) — لسُلّم حفظي
   // المراجعة مقابل خطتها (تراكمياً)
   aheadMurPages: number;
   hasMurPlan: boolean;

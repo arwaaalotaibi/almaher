@@ -464,7 +464,7 @@ export function JourneyMap({
     <div className="card relative mb-2.5 overflow-hidden rounded-2xl">
       <div className="flex items-center justify-between gap-2 bg-gradient-to-l from-plum-500 to-plum-700 px-3 py-2.5">
         <span className="font-kufi text-sm font-bold text-white">
-          {view === "garden" ? "🌷 بستان حفظي" : view === "ladder" ? "🪜 سُلّم سوري" : "🗺️ درب حفظي"}
+          {view === "garden" ? "🌷 بستان حفظي" : view === "ladder" ? "🪜 سُلّم حفظي" : "🗺️ درب حفظي"}
         </span>
         <span className="flex items-center gap-1.5">
           <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold text-white">
@@ -478,7 +478,7 @@ export function JourneyMap({
               [
                 { v: "path", icon: "🗺️", label: "مظهر الدرب" },
                 { v: "garden", icon: "🌷", label: "مظهر البستان" },
-                ...(lpos ? [{ v: "ladder", icon: "🪜", label: "سُلّم السور" }] : []),
+                ...(lpos ? [{ v: "ladder", icon: "🪜", label: "سُلّم حفظي" }] : []),
               ] as { v: MapView; icon: string; label: string }[]
             ).map((o) => (
               <button

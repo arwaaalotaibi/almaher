@@ -246,7 +246,7 @@ input, textarea, select {
   --tt-gold: linear-gradient(180deg, #3d321c, #4d3d1c);
   --podium-2: #48424a;
   --podium-3: #4e3b31;
-  /* 🪜 سُلّم السور */
+  /* 🪜 سُلّم حفظي */
   --sl-sky: linear-gradient(180deg, #1f2a3a 0%, #2a2233 60%, #2d2228 100%);
   --sl-todo-bg: #2f262ccc;
   --sl-todo-bd: #5a4852;
@@ -325,7 +325,7 @@ input, textarea, select {
 }
 
 
-/* ================== 🪜 سُلّم السور ================== */
+/* ================== 🪜 سُلّم حفظي ================== */
 .sl-sky { background: var(--sl-sky, linear-gradient(180deg, #cfeafc 0%, #e6f2fb 32%, #fbeef3 72%, #fff6e6 100%)); }
 .sl-cloud { position: absolute; background: var(--sl-cloud, #fff); border-radius: 40px; animation: sl-drift linear infinite; }
 .sl-cloud::before, .sl-cloud::after { content: ""; position: absolute; background: inherit; border-radius: 50%; }
