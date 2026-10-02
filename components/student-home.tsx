@@ -51,6 +51,7 @@ import { ThemeToggle } from "./theme-toggle";
 import { AppTour, hasSeenTour } from "./app-tour";
 import { BookQuotes } from "./book-quotes";
 import { PlanConfirmGate } from "./plan-confirm";
+import { MemorizePanel } from "./memorize-panel";
 import { ReciteLogger, SessionVerdictChip, VerdictChip } from "./recite-log";
 import { MotivationPanel } from "./motivation-panel";
 import { computeProgress, partVerdict, sessionVerdict } from "@/lib/progress";
@@ -70,6 +71,7 @@ type StudentTab = (typeof STUDENT_TABS)[number]["key"] | "notifications";
 // أقسام تبويب القرآن — كل شاشة خفيفة ومريحة
 const QURAN_SECTIONS = [
   { key: "today", icon: "📌", label: "وِردي" },
+  { key: "listen", icon: "🎧", label: "مسمّعي" },
   { key: "journey", icon: "🧭", label: "رحلتي" },
   { key: "plan", icon: "📅", label: "خطتي" },
 ] as const;
@@ -500,7 +502,7 @@ export function StudentHome() {
                 key={s.key}
                 type="button"
                 onClick={() => setQuranSec(s.key)}
-                className={`flex flex-1 items-center justify-center gap-1 rounded-xl py-2 font-kufi text-sm font-bold transition ${
+                className={`flex flex-1 items-center justify-center gap-0.5 rounded-xl px-0.5 py-2 font-kufi text-[13px] font-bold transition ${
                   quranSec === s.key
                     ? "bg-white text-plum-800 shadow-sm"
                     : "text-silver-600"
@@ -604,9 +606,13 @@ export function StudentHome() {
             ))}
 
           {/* مسمّعي — تحفيظ الورد بالاستماع والتكرار */}
-          <Link
-            href="/memorize"
-            className="mb-4 flex items-center gap-3 rounded-2xl p-4 text-white shadow transition active:scale-[0.99]"
+          <button
+            type="button"
+            onClick={() => {
+              setQuranSec("listen");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            className="mb-4 flex w-full items-center gap-3 rounded-2xl p-4 text-start text-white shadow transition active:scale-[0.99]"
             style={{ background: "linear-gradient(135deg,#5d3f4e,#8a5d75)" }}
           >
             <span className="text-3xl">🎧</span>
@@ -621,12 +627,15 @@ export function StudentHome() {
               </span>
             </span>
             <span className="text-xl text-white/70">‹</span>
-          </Link>
+          </button>
 
           {/* سجلّ التسميع بعد كل لقاء — يظهر فقط إن كانت الطالبة هي من تسجّل */}
           {settings.studentRecite && <ReciteLogger student={me} halaqa={halaqa} />}
             </>
           )}
+
+          {/* 🎧 مسمّعي — الاستماع والتكرار */}
+          {quranSec === "listen" && <MemorizePanel />}
 
           {/* رحلتي — الخريطة والتحفيز كاملاً */}
           {quranSec === "journey" && (

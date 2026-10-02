@@ -270,244 +270,209 @@ export function Memorizer({
     );
   }
 
+  const page = pageOf(cur.surah, cur.ayah);
+  const reciterName = RECITERS.find((r) => r.id === reciter)?.name ?? "";
+  const progressPct = ((idx + (rep + 1) / perAyah) / ayahs.length) * 100;
+
+  /** أزرار التشغيل — مشتركة بين العرض العادي وملء الشاشة */
+  const controls = (big: boolean) => (
+    <div className="flex items-center justify-center gap-5">
+      <button
+        type="button"
+        onClick={() => jump(1)}
+        className={`card flex items-center justify-center rounded-full text-plum-700 ${big ? "h-12 w-12 text-xl" : "h-11 w-11 text-lg"}`}
+        aria-label="الآية التالية"
+      >
+        ⏭
+      </button>
+      <button
+        type="button"
+        onClick={toggle}
+        className={`flex items-center justify-center rounded-full bg-plum-600 text-white shadow-lg transition active:scale-95 ${big ? "h-16 w-16 text-2xl" : "h-14 w-14 text-2xl"}`}
+        aria-label={playing ? "إيقاف" : "تشغيل"}
+      >
+        {playing ? "⏸" : "▶️"}
+      </button>
+      <button
+        type="button"
+        onClick={() => jump(-1)}
+        className={`card flex items-center justify-center rounded-full text-plum-700 ${big ? "h-12 w-12 text-xl" : "h-11 w-11 text-lg"}`}
+        aria-label="الآية السابقة"
+      >
+        ⏮
+      </button>
+    </div>
+  );
+
   return (
     <div>
       <audio ref={audioRef} onEnded={onEnded} onError={onError} preload="auto" />
 
-      {/* طريقة العرض */}
-      <div className="mb-2.5 flex gap-1 rounded-2xl bg-cream p-1">
-        {(
-          [
-            { v: "page", label: "📖 صفحة المصحف" },
-            { v: "text", label: "🔤 الآية مكبّرة" },
-          ] as const
-        ).map((o) => (
+      {/* ① النص: صفحة المصحف أو الآية مكبّرة — مع أزرار صغيرة للتبديل والتكبير */}
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex gap-1 rounded-full bg-cream p-0.5">
+          {(
+            [
+              { v: "page", label: "📖 المصحف" },
+              { v: "text", label: "🔤 الآية" },
+            ] as const
+          ).map((o) => (
+            <button
+              key={o.v}
+              type="button"
+              onClick={() => {
+                setView(o.v);
+                savePrefs({ view: o.v });
+              }}
+              className={`rounded-full px-3 py-1 text-xs font-bold transition ${
+                view === o.v ? "bg-white text-plum-800 shadow-sm" : "text-silver-600"
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+        {view === "page" && (
           <button
-            key={o.v}
             type="button"
-            onClick={() => {
-              setView(o.v);
-              savePrefs({ view: o.v });
-            }}
-            className={`flex-1 rounded-xl py-2 font-kufi text-sm font-bold transition ${
-              view === o.v ? "bg-white text-plum-800 shadow-sm" : "text-silver-600"
-            }`}
+            onClick={() => setFull(true)}
+            className="rounded-full bg-cream px-3 py-1 text-xs font-bold text-plum-700"
           >
-            {o.label}
+            ⛶ تكبير
           </button>
-        ))}
+        )}
       </div>
 
-      {/* الآية الحالية */}
-      <div className={view === "page" ? "text-center" : "card rounded-2xl p-5 text-center"}>
-        <p className="mb-3 flex items-center justify-center gap-2 text-[11px] font-bold text-silver-600">
-          <span className="rounded-full bg-plum-100 px-2.5 py-0.5 text-plum-700">
-            آية {ar(idx + 1)} من {ar(ayahs.length)}
-          </span>
-          <span className="rounded-full bg-plum-100 px-2.5 py-0.5 text-plum-700">
-            تكرار {ar(Math.min(rep + 1, perAyah))} / {ar(perAyah)}
-          </span>
-        </p>
-        {view === "page" ? (
-          <>
-            <MushafPage
-              page={pageOf(cur.surah, cur.ayah)}
-              currentKey={`${cur.surah}:${cur.ayah}`}
-              wardKeys={wardKeys}
-              onPick={goTo}
-            />
-            <button
-              type="button"
-              onClick={() => setFull(true)}
-              className="mx-auto mt-2 flex items-center gap-1.5 rounded-full bg-plum-600 px-4 py-2 font-kufi text-sm font-bold text-white shadow"
-            >
-              ⛶ تكبير الصفحة على الشاشة
-            </button>
-            {full && (
-              <div className="fixed inset-0 z-[80] flex flex-col bg-cream px-2 pb-[max(env(safe-area-inset-bottom),8px)] pt-[max(env(safe-area-inset-top),8px)]">
-                <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
-                  <button
-                    type="button"
-                    onClick={() => setFull(false)}
-                    className="rounded-full bg-white px-3 py-1.5 text-sm font-bold text-plum-700 shadow-sm"
-                    aria-label="إغلاق ملء الشاشة"
-                  >
-                    ✕ تصغير
-                  </button>
-                  <span className="text-[11px] font-bold text-silver-600">
-                    آية {ar(idx + 1)} من {ar(ayahs.length)} · تكرار {ar(Math.min(rep + 1, perAyah))}/{ar(perAyah)}
-                  </span>
-                </div>
-                <div className="min-h-0 flex-1">
-                  <MushafPage
-                    fill
-                    page={pageOf(cur.surah, cur.ayah)}
-                    currentKey={`${cur.surah}:${cur.ayah}`}
-                    wardKeys={wardKeys}
-                    onPick={goTo}
-                  />
-                </div>
-                <div className="mt-2 flex items-center justify-center gap-4">
-                  <button type="button" onClick={() => jump(1)} className="card flex h-11 w-11 items-center justify-center rounded-full text-lg text-plum-700" aria-label="الآية التالية">
-                    ⏭
-                  </button>
-                  <button
-                    type="button"
-                    onClick={toggle}
-                    className="flex h-14 w-14 items-center justify-center rounded-full bg-plum-600 text-2xl text-white shadow-lg transition active:scale-95"
-                    aria-label={playing ? "إيقاف" : "تشغيل"}
-                  >
-                    {playing ? "⏸" : "▶️"}
-                  </button>
-                  <button type="button" onClick={() => jump(-1)} className="card flex h-11 w-11 items-center justify-center rounded-full text-lg text-plum-700" aria-label="الآية السابقة">
-                    ⏮
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
-        ) : (
-          <p
-            className="font-body text-2xl font-medium leading-[2.3] text-ink"
-            dir="rtl"
-          >
+      {view === "page" ? (
+        <MushafPage page={page} currentKey={`${cur.surah}:${cur.ayah}`} wardKeys={wardKeys} onPick={goTo} />
+      ) : (
+        <div className="card rounded-2xl px-5 py-6 text-center">
+          <p className="font-body text-2xl font-medium leading-[2.3] text-ink" dir="rtl">
             {cur.text}
           </p>
-        )}
-        <p className="mt-3 font-kufi text-sm font-bold text-plum-700">
-          {refLabel(cur.surah, cur.ayah)}
-        </p>
+        </div>
+      )}
+
+      {/* ② المشغّل — يبقى ظاهراً أسفل الشاشة أثناء قراءة الصفحة */}
+      <div className="card sticky bottom-3 z-20 mt-3 rounded-2xl p-3 shadow-lg">
+        <div className="flex items-center justify-between gap-2 text-xs font-bold">
+          <span className="font-kufi text-sm text-plum-800">{refLabel(cur.surah, cur.ayah)}</span>
+          <span className="text-silver-600">
+            آية {ar(idx + 1)} من {ar(ayahs.length)}
+            {perAyah > 1 && ` · تكرار ${ar(Math.min(rep + 1, perAyah))}/${ar(perAyah)}`}
+          </span>
+        </div>
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-cream-dark">
+          <div className="h-full rounded-full bg-plum-600 transition-all" style={{ width: `${progressPct}%` }} />
+        </div>
         {echoing && (
-          <p className="mt-2 animate-pulse rounded-xl bg-plum-600 px-3 py-2 font-kufi text-sm font-bold text-white">
+          <p className="mt-3 animate-pulse rounded-xl bg-plum-600 px-3 py-2 text-center font-kufi text-sm font-bold text-white">
             🎤 ردّدي الآن…
           </p>
         )}
         {finished && (
-          <div className="mt-3 rounded-xl bg-emerald-50 px-3 py-2.5">
-            <p className="font-kufi text-sm font-bold text-emerald-700">
-              🎉 أتممتِ وردك — بوركتِ! أعيديه أو سمّعيه لمعلّمتك
-            </p>
-            <button
-              type="button"
-              onClick={restart}
-              className="mt-1.5 text-sm font-bold text-plum-700 underline"
-            >
-              🔄 إعادة الورد من أوله
+          <div className="mt-3 rounded-xl bg-emerald-50 px-3 py-2.5 text-center">
+            <p className="font-kufi text-sm font-bold text-emerald-700">🎉 أتممتِ وردكِ — بوركتِ!</p>
+            <button type="button" onClick={restart} className="mt-1 text-sm font-bold text-plum-700 underline">
+              🔄 إعادة من أوله
             </button>
           </div>
         )}
+        <div className="mt-3">{controls(false)}</div>
       </div>
 
-      {/* شريط التقدّم عبر الورد */}
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-cream-dark">
-        <div
-          className="h-full rounded-full bg-plum-600 transition-all"
-          style={{
-            width: `${((idx + (rep + 1) / perAyah) / ayahs.length) * 100}%`,
-          }}
-        />
-      </div>
-
-      {/* أزرار التشغيل */}
-      <div className="mt-4 flex items-center justify-center gap-4">
-        <button
-          type="button"
-          onClick={() => jump(1)}
-          className="card flex h-12 w-12 items-center justify-center rounded-full text-xl text-plum-700"
-          aria-label="الآية التالية"
-        >
-          ⏭
-        </button>
-        <button
-          type="button"
-          onClick={toggle}
-          className="flex h-16 w-16 items-center justify-center rounded-full bg-plum-600 text-2xl text-white shadow-lg transition active:scale-95"
-          aria-label={playing ? "إيقاف" : "تشغيل"}
-        >
-          {playing ? "⏸" : "▶️"}
-        </button>
-        <button
-          type="button"
-          onClick={() => jump(-1)}
-          className="card flex h-12 w-12 items-center justify-center rounded-full text-xl text-plum-700"
-          aria-label="الآية السابقة"
-        >
-          ⏮
-        </button>
-      </div>
-
-      {/* الإعدادات */}
-      <div className="card mt-4 grid gap-3 rounded-2xl p-4">
-        <label className="block">
-          <span className="mb-1 block text-xs font-bold text-plum-700">
-            🎙️ القارئ
+      {/* ③ إعدادات التلاوة — مطويّة */}
+      <details className="card group mt-3 rounded-2xl">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3">
+          <span className="text-sm font-bold text-plum-800">⚙️ إعدادات التلاوة</span>
+          <span className="text-xs font-bold text-silver-600">
+            {reciterName} · ×{ar(perAyah)}
+            {echo && " · 🎤"} <span className="inline-block transition group-open:rotate-180">▾</span>
           </span>
-          <select
-            className="w-full rounded-xl border border-cream-dark bg-white px-3 py-2.5 text-sm font-bold text-ink"
-            value={reciter}
-            onChange={(e) => {
-              const r = e.target.value as ReciterId;
-              setReciter(r);
-              savePrefs({ reciter: r });
-            }}
-          >
-            {RECITERS.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div>
-          <span className="mb-1 block text-xs font-bold text-plum-700">
-            🔁 تكرار كل آية
-          </span>
-          <div className="flex gap-1.5">
-            {REPEATS.map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => {
-                  setPerAyah(n);
-                  savePrefs({ perAyah: n });
-                }}
-                className={`flex-1 rounded-xl py-2 text-sm font-bold transition ${
-                  perAyah === n
-                    ? "bg-plum-600 text-white"
-                    : "bg-cream text-silver-600"
-                }`}
-              >
-                ×{ar(n)}
-              </button>
-            ))}
+        </summary>
+        <div className="grid gap-3 border-t border-cream-dark px-4 pb-4 pt-3">
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold text-plum-700">🎙️ القارئ</span>
+            <select
+              className="w-full rounded-xl border border-cream-dark bg-white px-3 py-2.5 text-sm font-bold text-ink"
+              value={reciter}
+              onChange={(e) => {
+                const r = e.target.value as ReciterId;
+                setReciter(r);
+                savePrefs({ reciter: r });
+              }}
+            >
+              {RECITERS.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div>
+            <span className="mb-1 block text-xs font-bold text-plum-700">🔁 تكرار كل آية</span>
+            <div className="flex gap-1.5">
+              {REPEATS.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => {
+                    setPerAyah(n);
+                    savePrefs({ perAyah: n });
+                  }}
+                  className={`flex-1 rounded-xl py-2 text-sm font-bold transition ${
+                    perAyah === n ? "bg-plum-600 text-white" : "bg-cream text-silver-600"
+                  }`}
+                >
+                  ×{ar(n)}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            setEcho(!echo);
-            savePrefs({ echo: !echo });
-          }}
-          className={`flex items-center justify-between rounded-xl border-2 px-3 py-2.5 text-sm font-bold transition ${
-            echo
-              ? "border-plum-600 bg-plum-50 text-plum-800"
-              : "border-cream-dark text-silver-600"
-          }`}
-        >
-          <span>🎤 وضع «ردّدي بعدي» — يصمت بعد كل آية لتردّدي</span>
-          <span
-            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 text-xs ${
-              echo
-                ? "border-plum-600 bg-plum-600 text-white"
-                : "border-silver-400 text-transparent"
+          <button
+            type="button"
+            onClick={() => {
+              setEcho(!echo);
+              savePrefs({ echo: !echo });
+            }}
+            className={`flex items-center justify-between gap-2 rounded-xl border-2 px-3 py-2.5 text-start text-sm font-bold transition ${
+              echo ? "border-plum-600 bg-plum-50 text-plum-800" : "border-cream-dark text-silver-600"
             }`}
           >
-            ✓
-          </span>
-        </button>
-      </div>
+            <span>🎤 «ردّدي بعدي» — يصمت بعد كل آية لتردّديها</span>
+            <span
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 text-xs ${
+                echo ? "border-plum-600 bg-plum-600 text-white" : "border-silver-400 text-transparent"
+              }`}
+            >
+              ✓
+            </span>
+          </button>
+        </div>
+      </details>
+
+      {/* ⛶ ملء الشاشة */}
+      {full && (
+        <div className="fixed inset-0 z-[80] flex flex-col bg-cream px-2 pb-[max(env(safe-area-inset-bottom),8px)] pt-[max(env(safe-area-inset-top),8px)]">
+          <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
+            <button
+              type="button"
+              onClick={() => setFull(false)}
+              className="rounded-full bg-white px-3 py-1.5 text-sm font-bold text-plum-700 shadow-sm"
+              aria-label="إغلاق ملء الشاشة"
+            >
+              ✕ تصغير
+            </button>
+            <span className="text-[11px] font-bold text-silver-600">
+              {refLabel(cur.surah, cur.ayah)} · آية {ar(idx + 1)} من {ar(ayahs.length)}
+            </span>
+          </div>
+          <div className="min-h-0 flex-1">
+            <MushafPage fill page={page} currentKey={`${cur.surah}:${cur.ayah}`} wardKeys={wardKeys} onPick={goTo} />
+          </div>
+          <div className="mt-2">{controls(false)}</div>
+        </div>
+      )}
     </div>
   );
 }
