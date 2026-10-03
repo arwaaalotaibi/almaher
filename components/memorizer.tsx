@@ -45,6 +45,10 @@ export function Memorizer({
   // 🙈 اختبري نفسك: إخفاء آيات الورد (كاملة أو إلا أول كلمة) وكشفها بالضغط
   const [hide, setHide] = useState<false | "all" | "first">(false);
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
+  // ↩️ أكملي من حيث توقفتِ: آخر آية لكل مقطع (محفوظة على الجهاز)
+  const posKey = `almaher-mem-pos:${from.surah}:${from.ayah}-${to.surah}:${to.ayah}`;
+  const [resume, setResume] = useState<number | null>(null);
+  const started = useRef(false);
   const [playing, setPlaying] = useState(false);
   const [echoing, setEchoing] = useState(false); // فترة «ردّدي الآن»
   const [finished, setFinished] = useState(false);
@@ -117,6 +121,34 @@ export function Memorizer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startAt?.n, ayahs]);
 
+  /* ↩️ بعد تحميل الورد: هل توقفت الطالبة في منتصفه سابقاً؟ */
+  useEffect(() => {
+    started.current = false;
+    setResume(null);
+    if (!ayahs || startAt) return;
+    try {
+      const p = JSON.parse(window.localStorage.getItem(posKey) ?? "null") as { surah: number; ayah: number } | null;
+      if (!p) return;
+      const i = ayahs.findIndex((a) => a.surah === p.surah && a.ayah === p.ayah);
+      if (i > 0) setResume(i);
+    } catch {
+      /* نتجاهل */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ayahs]);
+
+  // حفظ الموضع عند كل آية جديدة (بعد أن تبدأ الطالبة فعلاً)
+  useEffect(() => {
+    if (!ayahs || !started.current) return;
+    const a = ayahs[idx];
+    try {
+      if (finished) window.localStorage.removeItem(posKey);
+      else if (a) window.localStorage.setItem(posKey, JSON.stringify({ surah: a.surah, ayah: a.ayah }));
+    } catch {
+      /* نتجاهل */
+    }
+  }, [idx, finished, ayahs, posKey]);
+
   /* 🔗 التلاوة المتصلة: ملف واحد يجمع آيات الورد بتكرارها وربطها وصمت «ردّدي بعدي»،
      فتستمر والشاشة مقفلة. الآية الجارية تُعرف من موضع التشغيل. */
   type Track = { url: string; steps: Step[]; lastHead: number; complete: boolean; sig: string };
@@ -174,6 +206,8 @@ export function Memorizer({
 
   /** الانتقال إلى آية جديدة: داخل الملف الحالي إن أمكن، وإلا يُجهَّز من جديد */
   const seekHead = (h: number) => {
+    started.current = true;
+    setResume(null);
     const el = audioRef.current;
     const t = track.current;
     setFinished(false);
@@ -312,6 +346,8 @@ export function Memorizer({
       return;
     }
     setFinished(false);
+    started.current = true;
+    setResume(null);
     const t = track.current;
     if (t && t.sig === sig && el.src === t.url) {
       void el.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
@@ -338,8 +374,23 @@ export function Memorizer({
     if (!el) return;
     setFinished(false);
     setLoopNo(0);
+    started.current = true;
     unlock(el);
     void build(0, 0, true);
+  };
+
+  /** ↩️ أكملي من آخر موضع وشغّلي */
+  const resumeGo = () => {
+    const el = audioRef.current;
+    if (resume === null || !el) return;
+    started.current = true;
+    setResume(null);
+    setIdx(resume);
+    setRep(0);
+    setPhase("new");
+    setFinished(false);
+    unlock(el);
+    void build(resume, 0, true);
   };
 
   actionsRef.current = { toggle, jump };
@@ -424,6 +475,34 @@ export function Memorizer({
         }}
         preload="auto"
       />
+
+      {/* ↩️ أكملي من حيث توقفتِ */}
+      {resume !== null && ayahs[resume] && (
+        <div className="mb-3 flex items-center justify-between gap-2 rounded-2xl border-2 border-plum-200 bg-plum-50 px-3 py-2.5">
+          <span className="text-xs font-bold text-plum-800">
+            ↩️ توقفتِ عند <span className="font-kufi">{refLabel(ayahs[resume].surah, ayahs[resume].ayah)}</span>
+          </span>
+          <span className="flex shrink-0 gap-1.5">
+            <button type="button" onClick={resumeGo} className="rounded-full bg-plum-600 px-3 py-1.5 text-xs font-bold text-white shadow">
+              ▶️ أكملي
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setResume(null);
+                try {
+                  window.localStorage.removeItem(posKey);
+                } catch {
+                  /* نتجاهل */
+                }
+              }}
+              className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-plum-700"
+            >
+              من البداية
+            </button>
+          </span>
+        </div>
+      )}
 
       {/* ① النص: صفحة المصحف أو الآية مكبّرة — مع أزرار صغيرة للتبديل والتكبير */}
       <div className="mb-2 flex items-center justify-between gap-2">
