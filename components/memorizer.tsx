@@ -40,6 +40,7 @@ export function Memorizer({
   const [echo, setEcho] = useState(false);
   const [view, setView] = useState<"page" | "text">("page"); // 📖 صفحة المصحف أو الآية مكبّرة
   const [full, setFull] = useState(false); // ⛶ الصفحة على كامل الشاشة
+  const [browse, setBrowse] = useState<number | null>(null); // 📖 صفحة تتصفّحها الطالبة (غير صفحة التلاوة)
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const echoTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -116,6 +117,9 @@ export function Memorizer({
     const m = blobs.current;
     return () => m.forEach((u) => URL.revokeObjectURL(u));
   }, []);
+
+  // عند انتقال التلاوة لآية أخرى تعود الصفحة إلى موضعها
+  useEffect(() => setBrowse(null), [idx]);
 
   // ⛶ إيقاف تمرير الصفحة خلف وضع ملء الشاشة، والخروج بزر الرجوع/Escape
   useEffect(() => {
@@ -282,7 +286,10 @@ export function Memorizer({
     );
   }
 
-  const page = pageOf(cur.surah, cur.ayah);
+  const readPage = pageOf(cur.surah, cur.ayah);
+  const page = browse ?? readPage;
+  const turn = (d: 1 | -1) => setBrowse(Math.min(604, Math.max(1, page + d)));
+  const back = page !== readPage ? () => setBrowse(null) : undefined;
   const reciterName = RECITERS.find((r) => r.id === reciter)?.name ?? "";
   const progressPct = ((idx + (rep + 1) / perAyah) / ayahs.length) * 100;
 
@@ -364,7 +371,7 @@ export function Memorizer({
       </div>
 
       {view === "page" ? (
-        <MushafPage page={page} currentKey={`${cur.surah}:${cur.ayah}`} wardKeys={wardKeys} onPick={goTo} />
+        <MushafPage page={page} currentKey={`${cur.surah}:${cur.ayah}`} wardKeys={wardKeys} onPick={goTo} onTurn={turn} onBack={back} />
       ) : (
         <div className="card rounded-2xl px-5 py-6 text-center">
           <p className="font-body text-2xl font-medium leading-[2.3] text-ink" dir="rtl">
@@ -509,7 +516,7 @@ export function Memorizer({
             </span>
           </div>
           <div className="min-h-0 flex-1">
-            <MushafPage fill page={page} currentKey={`${cur.surah}:${cur.ayah}`} wardKeys={wardKeys} onPick={goTo} />
+            <MushafPage fill page={page} currentKey={`${cur.surah}:${cur.ayah}`} wardKeys={wardKeys} onPick={goTo} onTurn={turn} onBack={back} />
           </div>
           <div className="mt-2">{controls(false)}</div>
         </div>

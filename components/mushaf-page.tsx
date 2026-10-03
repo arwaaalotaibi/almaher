@@ -15,6 +15,8 @@ export function MushafPage({
   wardKeys,
   onPick,
   fill = false,
+  onTurn,
+  onBack,
 }: {
   page: number;
   currentKey: string; // «سورة:آية»
@@ -22,6 +24,10 @@ export function MushafPage({
   onPick?: (key: string) => void;
   /** ⛶ ملء الشاشة: الصفحة تملأ الطول والعرض المتاحين */
   fill?: boolean;
+  /** قلب الصفحة: +1 التالية (يساراً كالمصحف)، −1 السابقة */
+  onTurn?: (d: 1 | -1) => void;
+  /** تظهر «العودة لصفحة التلاوة» إن كانت الطالبة تتصفّح صفحة أخرى */
+  onBack?: () => void;
 }) {
   const [lines, setLines] = useState<MushafLine[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -79,25 +85,67 @@ export function MushafPage({
   const fs = fit ?? BASE;
   const lineH = fill ? fs * 1.75 : Math.max(fs * 1.75, 30);
 
+  // 👆 السحب بالإصبع: من اليسار لليمين = الصفحة التالية (كقلب ورقة المصحف)
+  const touch = useRef<{ x: number; y: number } | null>(null);
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touch.current = { x: t.clientX, y: t.clientY };
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const s0 = touch.current;
+    touch.current = null;
+    if (!s0 || !onTurn) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - s0.x;
+    const dy = t.clientY - s0.y;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) onTurn(dx > 0 ? 1 : -1);
+  };
+  const arrow = "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-cream-dark bg-white text-xl font-bold text-plum-700 shadow-sm disabled:opacity-30";
+
   const firstWords = lines?.find((l) => l.kind === "words")?.words[0];
   const pageSurah = firstWords ? Number(firstWords.key.split(":")[0]) : 0;
 
   return (
     <div className={fill ? "flex h-full min-h-0 flex-col" : ""}>
       {/* جهة الصفحة في المصحف */}
-      <div className="mb-2 flex items-center justify-center gap-2">
-        <span className="flex h-6 overflow-hidden rounded-md border-2 border-plum-600" aria-hidden>
-          <span className={`w-3.5 ${right ? "bg-amber-300" : "bg-white"}`} />
-          <span className="w-0.5 bg-plum-600" />
-          <span className={`w-3.5 ${right ? "bg-white" : "bg-amber-300"}`} />
+      <div className="mb-2 flex items-center justify-between gap-2">
+        {onTurn ? (
+          <button type="button" onClick={() => onTurn(-1)} disabled={page <= 1} className={arrow} aria-label="الصفحة السابقة">
+            ›
+          </button>
+        ) : (
+          <span />
+        )}
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="flex h-6 shrink-0 overflow-hidden rounded-md border-2 border-plum-600" aria-hidden>
+            <span className={`w-3.5 ${right ? "bg-amber-300" : "bg-white"}`} />
+            <span className="w-0.5 bg-plum-600" />
+            <span className={`w-3.5 ${right ? "bg-white" : "bg-amber-300"}`} />
+          </span>
+          <span className="truncate text-xs font-bold text-plum-800">
+            صفحة {ar(page)} — <span className="text-amber-700">{right ? "الجهة اليمنى" : "الجهة اليسرى"}</span>
+          </span>
         </span>
-        <span className="text-xs font-bold text-plum-800">
-          صفحة {ar(page)} — <span className="text-amber-700">{right ? "الجهة اليمنى من المصحف" : "الجهة اليسرى من المصحف"}</span>
-        </span>
+        {onTurn ? (
+          <button type="button" onClick={() => onTurn(1)} disabled={page >= 604} className={arrow} aria-label="الصفحة التالية">
+            ‹
+          </button>
+        ) : (
+          <span />
+        )}
       </div>
+      {onBack && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="mx-auto mb-2 block rounded-full bg-amber-100 px-4 py-1.5 text-xs font-bold text-amber-800"
+        >
+          ↩️ العودة لصفحة التلاوة
+        </button>
+      )}
 
       {/* الورقة: ظلّ الكعب في الجهة الداخلية كالمصحف المفتوح */}
-      <div key={page} className={`mushaf-sheet mushaf-turn ${right ? "mushaf-right" : "mushaf-left"} ${fill ? "flex min-h-0 flex-1 flex-col" : ""}`}>
+      <div key={page} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} className={`mushaf-sheet mushaf-turn ${right ? "mushaf-right" : "mushaf-left"} ${fill ? "flex min-h-0 flex-1 flex-col" : ""}`}>
         <div className={`mushaf-frame ${fill ? "flex min-h-0 flex-1 flex-col" : ""}`}>
           {/* ترويسة الصفحة كما في المصحف: السورة يميناً والجزء يساراً */}
           <div className="mushaf-running flex items-center justify-between px-3 pt-1.5 font-kufi text-[11px] font-bold">
@@ -167,7 +215,7 @@ export function MushafPage({
         </div>
       </div>
       {!fill && <p className="mt-2 text-center text-[10px] font-bold text-silver-600">
-        المظلّل = الآية التي تسمعينها · اضغطي آية من وردكِ للانتقال إليها
+        المظلّل = الآية التي تسمعينها · اسحبي الصفحة أو استعملي ‹ › للتقليب
       </p>}
     </div>
   );
