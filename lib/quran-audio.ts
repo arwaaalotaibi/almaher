@@ -195,3 +195,61 @@ export function fetchMushafPage(page: number): Promise<MushafLine[]> {
   }
   return p;
 }
+
+/* ================== 🔍 البحث في القرآن ==================
+   نص إملائي بلا تشكيل (quran-simple-clean) يُجلب مرة عند أول بحث، ويُطبَّع
+   مع كلمة البحث (الهمزات والألف المقصورة والتاء المربوطة) ليطابق ما تكتبه الطالبة. */
+
+export interface SearchHit {
+  surah: number;
+  ayah: number;
+  text: string;
+}
+
+export function normalizeArabic(s: string): string {
+  return s
+    .replace(/[ؐ-ًؚ-ٰٟۖ-ۭـ]/g, "") // تشكيل وعلامات وقف وتطويل
+    .replace(/[أإآٱ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/ؤ/g, "و")
+    .replace(/ئ/g, "ي")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+let searchIndex: Promise<{ surah: number; ayah: number; text: string; norm: string }[]> | null = null;
+function loadSearchIndex() {
+  if (!searchIndex) {
+    searchIndex = fetch("https://api.alquran.cloud/v1/quran/quran-simple-clean")
+      .then((res) => {
+        if (!res.ok) throw new Error("search-api");
+        return res.json() as Promise<{ data?: { surahs?: { number: number; ayahs: ApiAyah[] }[] } }>;
+      })
+      .then((json) => {
+        const out: { surah: number; ayah: number; text: string; norm: string }[] = [];
+        for (const su of json.data?.surahs ?? [])
+          for (const a of su.ayahs) out.push({ surah: su.number, ayah: a.numberInSurah, text: a.text, norm: normalizeArabic(a.text) });
+        return out;
+      });
+    searchIndex.catch(() => {
+      searchIndex = null;
+    });
+  }
+  return searchIndex;
+}
+
+/** آيات فيها الكلمة/العبارة (أول limit نتيجة) والعدد الكلي */
+export async function searchQuran(q: string, limit = 40): Promise<{ hits: SearchHit[]; total: number }> {
+  const nq = normalizeArabic(q);
+  if (nq.length < 2) return { hits: [], total: 0 };
+  const idx = await loadSearchIndex();
+  const hits: SearchHit[] = [];
+  let total = 0;
+  for (const a of idx) {
+    if (!a.norm.includes(nq)) continue;
+    total++;
+    if (hits.length < limit) hits.push({ surah: a.surah, ayah: a.ayah, text: a.text });
+  }
+  return { hits, total };
+}

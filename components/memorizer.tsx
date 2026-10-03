@@ -23,9 +23,12 @@ const RATES = [0.75, 1, 1.25, 1.5]; // سرعة التلاوة
 export function Memorizer({
   from,
   to,
+  startAt,
 }: {
   from: { surah: number; ayah: number };
   to: { surah: number; ayah: number };
+  /** 🔍 البدء من آية معيّنة (من البحث) — n يميّز كل طلب */
+  startAt?: { surah: number; ayah: number; n: number } | null;
 }) {
   const [ayahs, setAyahs] = useState<WardAyah[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -93,6 +96,21 @@ export function Memorizer({
   }, [from, to]);
 
   const cur = ayahs?.[idx];
+
+  /* 🔍 الانتقال إلى آية من البحث بعد تحميل الورد */
+  useEffect(() => {
+    if (!startAt || !ayahs) return;
+    const i = ayahs.findIndex((a) => a.surah === startAt.surah && a.ayah === startAt.ayah);
+    if (i < 0) return;
+    clearTimeout(echoTimer.current);
+    setEchoing(false);
+    setFinished(false);
+    setRep(0);
+    setIdx(i);
+    const el = audioRef.current;
+    if (el) el.removeAttribute("src");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startAt?.n, ayahs]);
 
   /* ⚡ الصوت: الآيات القادمة تُحمَّل مسبقاً على الجهاز فتتصل التلاوة بلا انتظار بين الآيات */
   const blobs = useRef(new Map<string, string>()); // «قارئ:رقم» ← رابط محلي

@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { STUDENT_PICK_KEY, useApp } from "@/lib/store";
 import { computeProgress } from "@/lib/progress";
-import { refLabel } from "@/lib/mushaf";
+import { pageOf, pageStart, refLabel } from "@/lib/mushaf";
+import { searchQuran, type SearchHit } from "@/lib/quran-audio";
 import { ayahCount, SURAHS } from "@/lib/surahs";
 import { useHydrated } from "@/components/ui";
 import { Memorizer } from "./memorizer";
@@ -22,6 +23,11 @@ export function MemorizePanel() {
   const [preset, setPreset] = useState<Preset>("hifz");
   const [cFrom, setCFrom] = useState<Pos>({ surah: 1, ayah: 1 });
   const [cTo, setCTo] = useState<Pos>({ surah: 114, ayah: 6 }); // افتراضياً: المصحف كاملاً من الفاتحة إلى الناس
+  // 🔍 البحث: كلمة من القرآن أو رقم صفحة
+  const [q, setQ] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [found, setFound] = useState<{ hits: SearchHit[]; total: number; msg?: string } | null>(null);
+  const [startAt, setStartAt] = useState<{ surah: number; ayah: number; n: number } | null>(null);
 
   useEffect(() => {
     setMyId(window.localStorage.getItem(STUDENT_PICK_KEY));
@@ -59,8 +65,88 @@ export function MemorizePanel() {
     { key: "custom", label: "✏️ أختار" },
   ];
 
+  /** الانتقال إلى آية: المصحف كاملاً في «أختار» والبدء منها */
+  const goTo = (pos: Pos) => {
+    setPreset("custom");
+    if (cFrom.surah !== 1 || cFrom.ayah !== 1) setCFrom({ surah: 1, ayah: 1 });
+    if (cTo.surah !== 114 || cTo.ayah !== 6) setCTo({ surah: 114, ayah: 6 });
+    setStartAt({ ...pos, n: Date.now() });
+    setFound(null);
+    // بعد تحميل الصفحة: انزلي إليها
+    window.setTimeout(() => {
+      const el = document.querySelector(".mushaf-sheet");
+      if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 110, behavior: "smooth" });
+    }, 900);
+  };
+
+  const runSearch = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const text = q.trim().replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));
+    if (!text) return;
+    if (/^\d+$/.test(text)) {
+      const n = Number(text);
+      if (n >= 1 && n <= 604) goTo(pageStart(n));
+      else setFound({ hits: [], total: 0, msg: "رقم الصفحة من ١ إلى ٦٠٤" });
+      return;
+    }
+    setBusy(true);
+    try {
+      const r = await searchQuran(text);
+      setFound(r.total ? r : { ...r, msg: "لا توجد نتائج — جرّبي كلمة أخرى" });
+    } catch {
+      setFound({ hits: [], total: 0, msg: "📡 تعذّر البحث — تأكدي من الإنترنت" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div>
+      {/* 🔍 البحث */}
+      <form onSubmit={runSearch} className="mb-3 flex gap-1.5">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="🔍 كلمة من القرآن أو رقم صفحة"
+          className="min-w-0 flex-1 rounded-xl border border-cream-dark bg-white px-3 py-2.5 text-sm font-bold text-ink"
+          inputMode="search"
+          enterKeyHint="search"
+        />
+        <button type="submit" className="shrink-0 rounded-xl bg-plum-600 px-4 text-sm font-bold text-white" disabled={busy}>
+          {busy ? "…" : "بحث"}
+        </button>
+      </form>
+      {found && (
+        <div className="card mb-3 rounded-2xl p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-bold text-plum-800">
+              {found.msg ?? `${ar(found.total)} آية${found.total > found.hits.length ? ` — أول ${ar(found.hits.length)}` : ""}`}
+            </span>
+            <button type="button" onClick={() => setFound(null)} className="text-xs font-bold text-silver-600">
+              ✕ إغلاق
+            </button>
+          </div>
+          {found.hits.length > 0 && (
+            <div className="grid max-h-80 gap-1.5 overflow-y-auto">
+              {found.hits.map((h) => (
+                <button
+                  key={`${h.surah}:${h.ayah}`}
+                  type="button"
+                  onClick={() => goTo(h)}
+                  className="rounded-xl bg-cream/70 px-3 py-2 text-start active:scale-[0.99]"
+                >
+                  <span className="flex items-center justify-between gap-2 text-[11px] font-bold text-plum-700">
+                    <span>📖 {refLabel(h.surah, h.ayah)}</span>
+                    <span className="text-silver-600">صفحة {ar(pageOf(h.surah, h.ayah))}</span>
+                  </span>
+                  <span className="mt-0.5 line-clamp-2 text-sm text-ink">{h.text}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ماذا أسمع؟ */}
       <div className="mb-2 flex gap-1 rounded-2xl bg-cream p-1">
         {presets.map((p) => (
@@ -135,6 +221,7 @@ export function MemorizePanel() {
           key={`${preset}-${range.from.surah}-${range.from.ayah}-${range.to.surah}-${range.to.ayah}`}
           from={range.from}
           to={range.to}
+          startAt={preset === "custom" ? startAt : null}
         />
       ) : preset !== "custom" ? (
         <div className="card rounded-2xl p-8 text-center">
