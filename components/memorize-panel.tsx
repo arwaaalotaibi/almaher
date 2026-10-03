@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { STUDENT_PICK_KEY, useApp } from "@/lib/store";
+import { partOn, STUDENT_PICK_KEY, useApp } from "@/lib/store";
 import { computeProgress } from "@/lib/progress";
 import { pageOf, pageStart, refLabel } from "@/lib/mushaf";
 import { searchQuran, type SearchHit } from "@/lib/quran-audio";
@@ -12,7 +12,7 @@ import { Memorizer } from "./memorizer";
 const ar = (n: number) => n.toLocaleString("ar-EG");
 
 type Pos = { surah: number; ayah: number };
-type Preset = "hifz" | "muraja" | "custom";
+type Preset = "hifz" | "tathbit" | "muraja" | "custom";
 
 /** 🎧 مسمّعي: تحفيظ الورد بالاستماع والتكرار — يعرف وردك القادم تلقائياً.
     يُعرض في تبويب «مسمّعي» بصفحة الطالبة، وفي صفحة /memorize */
@@ -34,6 +34,12 @@ export function MemorizePanel() {
   }, []);
 
   const me = students.find((s) => s.id === myId);
+  // من أُلغي عنها الحفظ تبدأ بأول قسم متاح لها
+  useEffect(() => {
+    if (me && !partOn(me.plan, "hifz") && preset === "hifz")
+      setPreset(partOn(me.plan, "tathbit") ? "tathbit" : partOn(me.plan, "murajaah") ? "muraja" : "custom");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me?.id]);
   const halaqa = me ? halaqas.find((h) => h.id === me.halaqaId) : undefined;
   const prog = useMemo(
     () => (me ? computeProgress(me, recitations, halaqa) : null),
@@ -44,6 +50,7 @@ export function MemorizePanel() {
   // التقدّم في اتجاه حفظ الطالبة (صاعداً أو نازلاً)، وكلاهما بترتيب المصحف
   const hifzRange = prog?.nextHifzRange ?? null;
   const murRange = prog?.nextMurRange ?? null;
+  const tathRange = prog?.nextTathbitRange ?? null;
 
   if (!hydrated) return null;
 
@@ -52,6 +59,8 @@ export function MemorizePanel() {
       ? hifzRange
       : preset === "muraja"
         ? murRange
+        : preset === "tathbit"
+          ? tathRange
         : cFrom.surah > cTo.surah ||
             (cFrom.surah === cTo.surah && cFrom.ayah > cTo.ayah)
           ? null
@@ -59,11 +68,18 @@ export function MemorizePanel() {
 
   const rangeText = (r: { from: Pos; to: Pos } | null) =>
     r ? `${refLabel(r.from.surah, r.from.ayah)} ← ${refLabel(r.to.surah, r.to.ayah)}` : "";
-  const presets: { key: Preset; label: string }[] = [
-    { key: "hifz", label: "📖 وردي القادم" },
-    { key: "muraja", label: "🔁 مراجعتي" },
+  const presets = [
+    { key: "hifz", label: "📖 الحفظ" },
+    { key: "tathbit", label: "📌 التثبيت" },
+    { key: "muraja", label: "🔁 المراجعة" },
     { key: "custom", label: "✏️ أختار" },
-  ];
+  ].filter(
+    // الأقسام الملغاة عن الطالبة هذا الفصل لا تظهر
+    (p) =>
+      (p.key !== "tathbit" || partOn(me?.plan, "tathbit")) &&
+      (p.key !== "muraja" || partOn(me?.plan, "murajaah")) &&
+      (p.key !== "hifz" || partOn(me?.plan, "hifz"))
+  ) as { key: Preset; label: string }[];
 
   /** الانتقال إلى آية: المصحف كاملاً في «أختار» والبدء منها */
   const goTo = (pos: Pos) => {
@@ -227,7 +243,7 @@ export function MemorizePanel() {
         <div className="card rounded-2xl p-8 text-center">
           <p className="text-3xl">🌱</p>
           <p className="mt-2 font-kufi font-bold text-plum-800">
-            {preset === "muraja" ? "لا توجد مراجعة في خطتكِ" : "لم يُحدَّد وردكِ بعد"}
+            {preset === "muraja" ? "لا توجد مراجعة في خطتكِ" : preset === "tathbit" ? "لا يوجد تثبيت بعد — يظهر بعد أول تسميع" : "لم يُحدَّد وردكِ بعد"}
           </p>
           <p className="mt-1 text-sm text-silver-600">
             اختاري «✏️ أختار» لتسمعي أي مقطع تريدينه

@@ -484,6 +484,8 @@ export interface Progress {
   // مقطعا الورد القادم بدقة الآية (للمسمّع) — بترتيب المصحف دائماً
   nextHifzRange: PosRange | null;
   nextMurRange: PosRange | null;
+  // 📌 ورد التثبيت القادم (حفظ آخر لقاء/لقاءات سُمّعت) — بترتيب المصحف، للمسمّع
+  nextTathbitRange: PosRange | null;
   // موضعا الاستئناف (لبدء فصل جديد من حيث وصلت) — حافة الحفظ في اتجاهها
   nextHifzFrom: { surah: number; ayah: number } | null;
   nextMurFrom: { surah: number; ayah: number } | null;
@@ -731,6 +733,7 @@ export function computeProgress(
   // إسقاط الخطة على اللقاءات المتبقية من الموضع الفعلي —
   // كل لقاء قادم يبدأ حيث ينتهي سابقه (لا من الخطة الثابتة)
   const projected: Progress["projected"] = {};
+  let nextTathbitRange: PosRange | null = null;
   if (schedule && nextIdx > 0) {
     let hFrom: Pos | null = nextHifzFrom;
     let mFrom: Pos | null = nextMurFrom;
@@ -749,6 +752,15 @@ export function computeProgress(
       .slice(0, kT)
       .reverse()
       .map((r) => ({ range: toRange(r.tasmi), label: recitePartLabel(r.tasmi) }));
+    // مدى التثبيت القادم: من أول ما في النافذة إلى آخره بترتيب المصحف
+    if (partOn(plan, "tathbit")) {
+      const rs = recent.map((x) => x.range).filter((r): r is PosRange => !!r);
+      if (rs.length) {
+        const all = rs.flatMap((r) => [r.from, r.to]);
+        all.sort((a, b) => a.surah - b.surah || a.ayah - b.ayah);
+        nextTathbitRange = { from: all[0], to: all[all.length - 1] };
+      }
+    }
     const tathbitOf = (): string => {
       if (!partOn(plan, "tathbit")) return "";
       const span = recent.slice(-kT);
@@ -844,6 +856,7 @@ export function computeProgress(
     nextHifzLabel,
     nextHifzRange: nh.range,
     nextMurRange: nm.range,
+    nextTathbitRange,
     currentTasmiLabel: lastTasmi
       ? refLabel(lastTasmi.surah, lastTasmi.ayah)
       : "",
