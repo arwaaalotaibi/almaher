@@ -13,9 +13,11 @@ import { pageOf, refLabel } from "@/lib/mushaf";
 import { MushafPage } from "./mushaf-page";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
+const rateLabel = (r: number) => (r === 1 ? "عادية" : r < 1 ? `🐢 ${ar(r)}×` : `${ar(r)}×`);
 
 const PREFS_KEY = "almaher-memorizer";
 const REPEATS = [1, 3, 5, 7];
+const RATES = [0.75, 1, 1.25, 1.5]; // سرعة التلاوة
 
 /** 🎧 مسمّعي: تشغيل الورد آيةً آية مع تكرار كل آية ووضع «ردّدي بعدي» */
 export function Memorizer({
@@ -34,6 +36,7 @@ export function Memorizer({
   const [finished, setFinished] = useState(false);
   const [reciter, setReciter] = useState<ReciterId>("ar.alafasy");
   const [perAyah, setPerAyah] = useState(3);
+  const [rate, setRate] = useState(1);
   const [echo, setEcho] = useState(false);
   const [view, setView] = useState<"page" | "text">("page"); // 📖 صفحة المصحف أو الآية مكبّرة
   const [full, setFull] = useState(false); // ⛶ الصفحة على كامل الشاشة
@@ -50,6 +53,7 @@ export function Memorizer({
       const p = JSON.parse(window.localStorage.getItem(PREFS_KEY) ?? "{}");
       if (RECITERS.some((r) => r.id === p.reciter)) setReciter(p.reciter);
       if (REPEATS.includes(p.perAyah)) setPerAyah(p.perAyah);
+      if (RATES.includes(p.rate)) setRate(p.rate);
       if (typeof p.echo === "boolean") setEcho(p.echo);
       if (p.view === "page" || p.view === "text") setView(p.view);
     } catch {
@@ -125,6 +129,14 @@ export function Memorizer({
       window.removeEventListener("keydown", k);
     };
   }, [full]);
+
+  // ⏩ السرعة: الافتراضية تبقى مع تغيّر مصدر الآية، والحالية للآية الجارية
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    el.defaultPlaybackRate = rate;
+    el.playbackRate = rate;
+  }, [rate, ayahs]);
 
   /** تعذّر المصدر ⇒ الرابط الاحتياطي (مرة واحدة لكل آية) */
   const onError = () => {
@@ -306,7 +318,15 @@ export function Memorizer({
 
   return (
     <div>
-      <audio ref={audioRef} onEnded={onEnded} onError={onError} preload="auto" />
+      <audio
+        ref={audioRef}
+        onEnded={onEnded}
+        onError={onError}
+        onPlay={(e) => {
+          if (e.currentTarget.playbackRate !== rate) e.currentTarget.playbackRate = rate;
+        }}
+        preload="auto"
+      />
 
       {/* ① النص: صفحة المصحف أو الآية مكبّرة — مع أزرار صغيرة للتبديل والتكبير */}
       <div className="mb-2 flex items-center justify-between gap-2">
@@ -387,6 +407,7 @@ export function Memorizer({
           <span className="text-sm font-bold text-plum-800">⚙️ إعدادات التلاوة</span>
           <span className="text-xs font-bold text-silver-600">
             {reciterName} · ×{ar(perAyah)}
+            {rate !== 1 && ` · ${rateLabel(rate)}`}
             {echo && " · 🎤"} <span className="inline-block transition group-open:rotate-180">▾</span>
           </span>
         </summary>
@@ -425,6 +446,26 @@ export function Memorizer({
                   }`}
                 >
                   ×{ar(n)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <span className="mb-1 block text-xs font-bold text-plum-700">⏩ سرعة التلاوة</span>
+            <div className="flex gap-1.5">
+              {RATES.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => {
+                    setRate(r);
+                    savePrefs({ rate: r });
+                  }}
+                  className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${
+                    rate === r ? "bg-plum-600 text-white" : "bg-cream text-silver-600"
+                  }`}
+                >
+                  {rateLabel(r)}
                 </button>
               ))}
             </div>
