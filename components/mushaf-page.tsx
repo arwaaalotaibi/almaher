@@ -17,6 +17,9 @@ export function MushafPage({
   fill = false,
   onTurn,
   onBack,
+  hide,
+  revealed,
+  onReveal,
 }: {
   page: number;
   currentKey: string; // «سورة:آية»
@@ -28,6 +31,10 @@ export function MushafPage({
   onTurn?: (d: 1 | -1) => void;
   /** تظهر «العودة لصفحة التلاوة» إن كانت الطالبة تتصفّح صفحة أخرى */
   onBack?: () => void;
+  /** 🙈 اختبري نفسك: آيات الورد مخفية كاملة أو إلا أول كلمة، وتُكشف بالضغط */
+  hide?: "all" | "first";
+  revealed?: Set<string>;
+  onReveal?: (key: string) => void;
 }) {
   const [lines, setLines] = useState<MushafLine[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -101,6 +108,19 @@ export function MushafPage({
     if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) onTurn(dx > 0 ? 1 : -1);
   };
   const arrow = "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-cream-dark bg-white text-xl font-bold text-plum-700 shadow-sm disabled:opacity-30";
+
+  // أول كلمة في كل آية (لتلميح «أول كلمة»)
+  const firstOf = new Set<string>();
+  if (hide === "first" && lines) {
+    const seen = new Set<string>();
+    for (const l of lines)
+      l.words.forEach((w, i) => {
+        if (!w.end && !seen.has(w.key)) {
+          seen.add(w.key);
+          firstOf.add(`${l.n}:${i}`);
+        }
+      });
+  }
 
   const firstWords = lines?.find((l) => l.kind === "words")?.words[0];
   const pageSurah = firstWords ? Number(firstWords.key.split(":")[0]) : 0;
@@ -191,6 +211,18 @@ export function MushafPage({
                 {l.words.map((w, i) => {
                   const isCur = w.key === currentKey;
                   const inWard = wardKeys.has(w.key);
+                  const hidden =
+                    !!hide && inWard && !w.end && !revealed?.has(w.key) && !(hide === "first" && firstOf.has(`${l.n}:${i}`));
+                  if (hidden)
+                    return (
+                      <span
+                        key={i}
+                        onClick={onReveal ? () => onReveal(w.key) : undefined}
+                        className={`mushaf-hidden cursor-pointer rounded ${isCur ? "mushaf-cur" : ""}`}
+                      >
+                        {w.code}
+                      </span>
+                    );
                   return (
                     <span
                       key={i}

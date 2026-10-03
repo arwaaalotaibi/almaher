@@ -398,3 +398,7 @@ input, textarea, select {
   --mushaf-head-in: #2a2125;
   --mushaf-cur: #8a6a1fcc;
 }
+/* 🙈 اختبري نفسك: الكلمة تبقى بمكانها (فيبقى شكل السطر) لكن لا تُقرأ */
+.mushaf-hidden { color: transparent !important; background: var(--mushaf-hide, #efe6ec); box-shadow: 0 0 0 1px var(--mushaf-hide, #efe6ec); }
+:root[data-theme="dark"] { --mushaf-hide: #3b3037; }
+.mushaf-hidden.mushaf-cur { background: var(--mushaf-cur, #fde68ab3); box-shadow: 0 0 0 2px var(--mushaf-cur, #fde68ab3); }
