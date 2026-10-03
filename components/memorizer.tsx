@@ -1,9 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  audioUrl,
-  audioUrlFallback,
   fetchWardAyahs,
   RECITERS,
   type ReciterId,
@@ -11,6 +9,7 @@ import {
 } from "@/lib/quran-audio";
 import { pageOf, refLabel } from "@/lib/mushaf";
 import { MushafPage } from "./mushaf-page";
+import { buildTrack, silence, stepAt, type Step } from "@/lib/ward-audio";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 const rateLabel = (r: number) => (r === 1 ? "عادية" : r < 1 ? `🐢 ${ar(r)}×` : `${ar(r)}×`);
@@ -58,11 +57,7 @@ export function Memorizer({
   const [browse, setBrowse] = useState<number | null>(null); // 📖 صفحة تتصفّحها الطالبة (غير صفحة التلاوة)
 
   const audioRef = useRef<HTMLAudioElement>(null);
-  const echoTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  // مراجع حيّة للقيم المستخدمة داخل معالج «انتهى الصوت»
   const playIdx = phase === "link" ? linkPos : idx; // الآية التي تُسمع الآن
-  const live = useRef({ idx: 0, rep: 0, perAyah: 3, echo: false, len: 0, mode: "each", phase: "new", linkPos: 0, loops: 1, loopNo: 0, playIdx: 0 });
-  live.current = { idx, rep, perAyah, echo, len: ayahs?.length ?? 0, mode, phase, linkPos, loops, loopNo, playIdx };
 
   /* التفضيلات المحفوظة */
   useEffect(() => {
@@ -118,41 +113,125 @@ export function Memorizer({
   useEffect(() => {
     if (!startAt || !ayahs) return;
     const i = ayahs.findIndex((a) => a.surah === startAt.surah && a.ayah === startAt.ayah);
-    if (i < 0) return;
-    clearTimeout(echoTimer.current);
-    setEchoing(false);
-    setFinished(false);
-    setRep(0);
-    setPhase("new");
-    setIdx(i);
-    const el = audioRef.current;
-    if (el) el.removeAttribute("src");
+    if (i >= 0) seekHead(i);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startAt?.n, ayahs]);
 
-  /* ⚡ الصوت: الآيات القادمة تُحمَّل مسبقاً على الجهاز فتتصل التلاوة بلا انتظار بين الآيات */
-  const blobs = useRef(new Map<string, string>()); // «قارئ:رقم» ← رابط محلي
-  const pending = useRef(new Set<string>());
-  const srcOf = (a: WardAyah) =>
-    blobs.current.get(`${reciter}:${a.n}`) ?? audioUrl(reciter, a.surah, a.ayah);
-  useEffect(() => {
-    if (!ayahs) return;
-    for (let i = playIdx; i < Math.min(ayahs.length, Math.max(playIdx, idx) + 4); i++) {
-      const a = ayahs[i];
-      const k = `${reciter}:${a.n}`;
-      if (blobs.current.has(k) || pending.current.has(k)) continue;
-      pending.current.add(k);
-      fetch(audioUrl(reciter, a.surah, a.ayah))
-        .then((r) => (r.ok ? r.blob() : Promise.reject(new Error("audio"))))
-        .then((b) => blobs.current.set(k, URL.createObjectURL(b)))
-        .catch(() => {})
-        .finally(() => pending.current.delete(k));
+  /* 🔗 التلاوة المتصلة: ملف واحد يجمع آيات الورد بتكرارها وربطها وصمت «ردّدي بعدي»،
+     فتستمر والشاشة مقفلة. الآية الجارية تُعرف من موضع التشغيل. */
+  type Track = { url: string; steps: Step[]; lastHead: number; complete: boolean; sig: string };
+  const track = useRef<Track | null>(null);
+  const stepIdx = useRef(-1);
+  const [preparing, setPreparing] = useState(false);
+  const sig = `${reciter}|${perAyah}|${mode}|${echo}|${loops}|${ayahs?.length ?? 0}|${ayahs?.[0]?.n ?? 0}`;
+  const buildSeq = useRef(0);
+
+  const applyStep = (k: number) => {
+    const s = track.current?.steps[k];
+    if (!s) return;
+    stepIdx.current = k;
+    setIdx(s.head);
+    setRep(s.rep);
+    setLoopNo(s.loop);
+    setPhase(s.link ? "link" : "new");
+    if (s.link) setLinkPos(s.i);
+    setEchoing(s.kind === "silence");
+  };
+
+  /** تجهيز الملف من آية معيّنة ودورة معيّنة؛ ثم التشغيل إن طُلب */
+  const build = async (head: number, loop: number, play: boolean) => {
+    const el = audioRef.current;
+    if (!el || !ayahs) return;
+    const my = ++buildSeq.current;
+    setPreparing(true);
+    try {
+      const t = await buildTrack(reciter, ayahs, {
+        len: ayahs.length, head, loopNo: loop, perAyah, mode, linkMax: LINK_MAX, echo, loops,
+      });
+      if (my !== buildSeq.current) {
+        URL.revokeObjectURL(t.url);
+        return;
+      }
+      if (track.current) URL.revokeObjectURL(track.current.url);
+      track.current = { ...t, sig };
+      el.src = t.url;
+      el.defaultPlaybackRate = rate;
+      el.playbackRate = rate;
+      applyStep(0);
+      if (play) {
+        await el.play();
+        setPlaying(true);
+      }
+    } catch {
+      if (my === buildSeq.current) {
+        setPlaying(false);
+        setFailed(true);
+      }
+    } finally {
+      if (my === buildSeq.current) setPreparing(false);
     }
-  }, [playIdx, idx, reciter, ayahs]);
+  };
+
+  /** الانتقال إلى آية جديدة: داخل الملف الحالي إن أمكن، وإلا يُجهَّز من جديد */
+  const seekHead = (h: number) => {
+    const el = audioRef.current;
+    const t = track.current;
+    setFinished(false);
+    if (el && t && t.sig === sig) {
+      const curLoop = t.steps[Math.max(0, stepIdx.current)]?.loop ?? 0;
+      let k = t.steps.findIndex((s) => s.kind === "new" && s.head === h && s.rep === 0 && s.loop === curLoop);
+      if (k < 0) k = t.steps.findIndex((s) => s.kind === "new" && s.head === h && s.rep === 0);
+      if (k >= 0) {
+        el.currentTime = t.steps[k].t0 + 0.001;
+        applyStep(k);
+        return;
+      }
+    }
+    setIdx(h);
+    setRep(0);
+    setPhase("new");
+    setEchoing(false);
+    void build(h, loopNo, playing);
+  };
+
+  const onTime = () => {
+    const el = audioRef.current;
+    const t = track.current;
+    if (!el || !t || el.src !== t.url) return;
+    const k = stepAt(t.steps, el.currentTime);
+    if (k !== stepIdx.current) applyStep(k);
+  };
+
+  /** نهاية الملف: انتهى الورد، أو تُجهَّز النافذة/الدورة التالية */
+  const onEnded = () => {
+    const t = track.current;
+    const el = audioRef.current;
+    if (!t || !ayahs || !el || el.src !== t.url) return; // صمت الفتح أو ملف قديم
+    if (t.complete) {
+      setPlaying(false);
+      setEchoing(false);
+      setFinished(true);
+      return;
+    }
+    const lastLoop = t.steps[t.steps.length - 1]?.loop ?? 0;
+    if (t.lastHead < ayahs.length - 1) void build(t.lastHead + 1, lastLoop, true);
+    else void build(0, lastLoop + 1, true);
+  };
+
+  // تغيّرت الإعدادات أثناء التشغيل ⇒ يُعاد التجهيز من الآية الحالية
   useEffect(() => {
-    const m = blobs.current;
-    return () => m.forEach((u) => URL.revokeObjectURL(u));
-  }, []);
+    if (!track.current || track.current.sig === sig || !ayahs) return;
+    if (playing) void build(idx, loopNo, true);
+    else track.current = { ...track.current, sig: "" };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sig]);
+
+  useEffect(
+    () => () => {
+      if (track.current) URL.revokeObjectURL(track.current.url);
+    },
+    []
+  );
 
   // عند انتقال التلاوة لآية أخرى تعود الصفحة إلى موضعها
   useEffect(() => setBrowse(null), [playIdx]);
@@ -177,94 +256,6 @@ export function Memorizer({
     el.defaultPlaybackRate = rate;
     el.playbackRate = rate;
   }, [rate, ayahs]);
-
-  /** تعذّر المصدر ⇒ الرابط الاحتياطي (مرة واحدة لكل آية) */
-  const onError = () => {
-    const el = audioRef.current;
-    const a = ayahs?.[live.current.playIdx];
-    if (!el || !a) return;
-    const fb = audioUrlFallback(reciter, a.n);
-    if (el.src === fb) return;
-    el.src = fb;
-    if (playing) void el.play().catch(() => setPlaying(false));
-  };
-
-  /** الخطوة التالية بعد انتهاء صوت آية:
-      كل آية وحدها: تكرار الآية ثم التالية.
-      🔗 تراكمي: تكرار الآية الجديدة، ثم ربطها بما قبلها (حتى LINK_MAX آيات)، ثم الجديدة التالية.
-      وفي آخر الورد: يُعاد من أوله حسب «تكرار الورد». */
-  const advance = useCallback(() => {
-    const v = live.current;
-    const el = audioRef.current;
-    const replay = () => {
-      if (!el) return;
-      el.currentTime = 0;
-      void el.play();
-    };
-    const goHead = (h: number) => {
-      setPhase("new");
-      setRep(0);
-      setIdx(h);
-      if (h === v.playIdx) replay(); // المصدر نفسه — لا يتغيّر فلا يُعاد تلقائياً
-    };
-    if (v.phase === "new") {
-      if (v.rep + 1 < v.perAyah) {
-        setRep(v.rep + 1);
-        replay();
-        return;
-      }
-      if (v.mode === "link") {
-        const base = Math.max(0, v.idx - (LINK_MAX - 1));
-        if (v.idx > base) {
-          setLinkPos(base);
-          setPhase("link");
-          return;
-        }
-      }
-    } else if (v.linkPos < v.idx) {
-      setLinkPos(v.linkPos + 1);
-      return;
-    }
-    if (v.idx + 1 < v.len) {
-      goHead(v.idx + 1);
-      return;
-    }
-    if (v.loops === 0 || v.loopNo + 1 < v.loops) {
-      setLoopNo(v.loopNo + 1);
-      goHead(0);
-      return;
-    }
-    setPlaying(false);
-    setFinished(true);
-  }, []);
-
-  /** عند انتهاء الصوت: إمّا ترديد صامت ثم متابعة، أو متابعة فورية */
-  const onEnded = useCallback(() => {
-    const el = audioRef.current;
-    if (live.current.echo && el && isFinite(el.duration)) {
-      setEchoing(true);
-      echoTimer.current = setTimeout(
-        () => {
-          setEchoing(false);
-          advance();
-        },
-        Math.max(1500, el.duration * 1000)
-      );
-    } else {
-      advance();
-    }
-  }, [advance]);
-
-  /* تشغيل تلقائي عند تغيّر الآية أثناء التشغيل + تجهيز التالية */
-  useEffect(() => {
-    if (!cur) return;
-    const el = audioRef.current;
-    if (el && playing && !echoing) {
-      el.src = srcOf(cur);
-      void el.play().catch(() => setPlaying(false));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playIdx, reciter, ayahs]);
 
   /* 📱 شاشة القفل: اسم الآية والقارئ وأزرار التشغيل/الإيقاف/التالية/السابقة */
   const actionsRef = useRef<{ toggle: () => void; jump: (d: number) => void }>({ toggle: () => {}, jump: () => {} });
@@ -305,63 +296,50 @@ export function Memorizer({
     };
   }, []);
 
-  /* تنظيف مؤقّت الترديد */
-  useEffect(
-    () => () => clearTimeout(echoTimer.current),
-    []
-  );
+  /** صمت قصير يُشغَّل فوراً داخل ضغطة المستخدمة — يفتح الصوت على الآيفون قبل اكتمال التجهيز */
+  const unlock = (el: HTMLAudioElement) => {
+    const h = new Uint8Array([0xff, 0xfb, 0x90, 0x64]);
+    el.src = URL.createObjectURL(new Blob([silence(h, 0.1).frames as BlobPart], { type: "audio/mpeg" }));
+    void el.play().catch(() => {});
+  };
 
   const toggle = () => {
     const el = audioRef.current;
-    if (!el || !cur) return;
+    if (!el || !cur || preparing) return;
     if (playing) {
       el.pause();
-      clearTimeout(echoTimer.current);
-      setEchoing(false);
       setPlaying(false);
-    } else {
-      setFinished(false);
-      if (!el.src) el.src = srcOf(cur);
-      void el.play().catch(() => setPlaying(false));
-      setPlaying(true);
+      return;
     }
+    setFinished(false);
+    const t = track.current;
+    if (t && t.sig === sig && el.src === t.url) {
+      void el.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+      return;
+    }
+    unlock(el);
+    void build(idx, loopNo, true);
   };
 
   const jump = (d: number) => {
     if (!ayahs) return;
-    clearTimeout(echoTimer.current);
-    setEchoing(false);
-    setFinished(false);
-    const n = Math.max(0, Math.min(ayahs.length - 1, idx + d));
-    setRep(0);
-    setPhase("new");
-    setIdx(n);
-    const el = audioRef.current;
-    if (el && ayahs[n]) {
-      el.src = srcOf(ayahs[n]);
-      if (playing) void el.play().catch(() => setPlaying(false));
-    }
+    seekHead(Math.max(0, Math.min(ayahs.length - 1, idx + d)));
   };
 
   /** الانتقال إلى آية بالضغط عليها في صفحة المصحف */
   const goTo = (key: string) => {
     if (!ayahs) return;
     const n = ayahs.findIndex((a) => `${a.surah}:${a.ayah}` === key);
-    if (n >= 0) jump(n - idx);
+    if (n >= 0) seekHead(n);
   };
 
   const restart = () => {
-    setIdx(0);
-    setRep(0);
-    setPhase("new");
-    setLoopNo(0);
-    setFinished(false);
     const el = audioRef.current;
-    if (el && ayahs?.[0]) {
-      el.src = srcOf(ayahs[0]);
-      void el.play().catch(() => setPlaying(false));
-      setPlaying(true);
-    }
+    if (!el) return;
+    setFinished(false);
+    setLoopNo(0);
+    unlock(el);
+    void build(0, 0, true);
   };
 
   actionsRef.current = { toggle, jump };
@@ -418,7 +396,7 @@ export function Memorizer({
         className={`flex items-center justify-center rounded-full bg-plum-600 text-white shadow-lg transition active:scale-95 ${big ? "h-16 w-16 text-2xl" : "h-14 w-14 text-2xl"}`}
         aria-label={playing ? "إيقاف" : "تشغيل"}
       >
-        {playing ? "⏸" : "▶️"}
+        {preparing ? <span className="animate-pulse text-base">⏳</span> : playing ? "⏸" : "▶️"}
       </button>
       <button
         type="button"
@@ -436,7 +414,11 @@ export function Memorizer({
       <audio
         ref={audioRef}
         onEnded={onEnded}
-        onError={onError}
+        onTimeUpdate={onTime}
+        onPause={() => {
+          const el = audioRef.current;
+          if (el && !el.ended && track.current && el.src === track.current.url) setPlaying(false);
+        }}
         onPlay={(e) => {
           if (e.currentTarget.playbackRate !== rate) e.currentTarget.playbackRate = rate;
         }}
@@ -558,6 +540,9 @@ export function Memorizer({
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-cream-dark">
           <div className="h-full rounded-full bg-plum-600 transition-all" style={{ width: `${progressPct}%` }} />
         </div>
+        {preparing && (
+          <p className="mt-2 text-center text-[11px] font-bold text-silver-600">⏳ جارٍ تجهيز التلاوة المتصلة…</p>
+        )}
         {echoing && (
           <p className="mt-3 animate-pulse rounded-xl bg-plum-600 px-3 py-2 text-center font-kufi text-sm font-bold text-white">
             🎤 ردّدي الآن…
