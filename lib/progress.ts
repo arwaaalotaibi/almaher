@@ -605,7 +605,7 @@ export function computeProgress(
       if (plan.startSurah && totalH > 0) {
         const gp = advance(startPage, totalH);
         termGoalJuz = juzOfPage(gp);
-        termGoalSurah = (desc ? pageStart(gp) : pageEnd(gp)).surah;
+        if (Number.isFinite(gp)) termGoalSurah = (desc ? pageStart(gp) : pageEnd(gp)).surah;
       }
     }
   }

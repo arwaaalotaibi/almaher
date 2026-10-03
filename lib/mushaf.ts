@@ -33,12 +33,15 @@ export function pageOf(surah: number, ayah: number): number {
 
 /** موضع بداية صفحة معيّنة */
 export function pageStart(page: number): { surah: number; ayah: number } {
-  const r = PAGE_STARTS[Math.min(Math.max(1, page), MUSHAF_PAGES) - 1];
+  const p = Number.isFinite(page) ? Math.floor(page) : 1;
+  const r = PAGE_STARTS[Math.min(Math.max(1, p), MUSHAF_PAGES) - 1];
   return { surah: r[0], ayah: r[1] };
 }
 
 /** آخر موضع في صفحة معيّنة (= قبل بداية الصفحة التالية) */
 export function pageEnd(page: number): { surah: number; ayah: number } {
+  if (!Number.isFinite(page) || page < 1) page = 1; // بيانات ناقصة لا تُسقط الصفحة
+  page = Math.floor(page);
   if (page >= MUSHAF_PAGES) return { surah: 114, ayah: SURAH_AYAHS[113] };
   const next = PAGE_STARTS[page]; // بداية الصفحة التالية
   if (next[1] > 1) return { surah: next[0], ayah: next[1] - 1 };
