@@ -39,21 +39,55 @@ export interface WardAyah {
   text: string;
 }
 
-/** جلب نصوص آيات الورد (من إلى) — سورة واحدة أو أكثر، بطلب واحد لكل سورة */
+type ApiAyah = { numberInSurah: number; number: number; text: string };
+
+const surahCache = new Map<number, Promise<ApiAyah[]>>();
+function fetchSurah(s: number): Promise<ApiAyah[]> {
+  let p = surahCache.get(s);
+  if (!p) {
+    p = fetch(`https://api.alquran.cloud/v1/surah/${s}/quran-uthmani`)
+      .then((res) => {
+        if (!res.ok) throw new Error("audio-api");
+        return res.json() as Promise<{ data?: { ayahs?: ApiAyah[] } }>;
+      })
+      .then((json) => json.data?.ayahs ?? []);
+    p.catch(() => surahCache.delete(s));
+    surahCache.set(s, p);
+  }
+  return p;
+}
+
+/** المصحف كاملاً بطلب واحد (~٤٠٠ ك.ب مضغوطاً) — للمقاطع الطويلة بدل عشرات الطلبات */
+let wholeQuran: Promise<ApiAyah[][]> | null = null;
+function fetchWholeQuran(): Promise<ApiAyah[][]> {
+  if (!wholeQuran) {
+    wholeQuran = fetch("https://api.alquran.cloud/v1/quran/quran-uthmani")
+      .then((res) => {
+        if (!res.ok) throw new Error("audio-api");
+        return res.json() as Promise<{ data?: { surahs?: { number: number; ayahs: ApiAyah[] }[] } }>;
+      })
+      .then((json) => {
+        const out: ApiAyah[][] = [];
+        for (const su of json.data?.surahs ?? []) out[su.number - 1] = su.ayahs;
+        return out;
+      });
+    wholeQuran.catch(() => {
+      wholeQuran = null;
+    });
+  }
+  return wholeQuran;
+}
+
+/** جلب نصوص آيات الورد (من إلى) — سورة أو بضع سور بطلب لكل سورة، وما زاد بطلب المصحف كاملاً */
 export async function fetchWardAyahs(
   from: { surah: number; ayah: number },
   to: { surah: number; ayah: number }
 ): Promise<WardAyah[]> {
   const out: WardAyah[] = [];
+  const many = to.surah - from.surah + 1 > 3;
+  const all = many ? await fetchWholeQuran() : null;
   for (let s = from.surah; s <= to.surah; s++) {
-    const res = await fetch(
-      `https://api.alquran.cloud/v1/surah/${s}/quran-uthmani`
-    );
-    if (!res.ok) throw new Error("audio-api");
-    const json = (await res.json()) as {
-      data?: { ayahs?: { numberInSurah: number; number: number; text: string }[] };
-    };
-    const ayahs = json.data?.ayahs ?? [];
+    const ayahs = all ? (all[s - 1] ?? []) : await fetchSurah(s);
     const first = s === from.surah ? from.ayah : 1;
     const last = s === to.surah ? to.ayah : SURAH_AYAHS[s - 1];
     for (const a of ayahs) {

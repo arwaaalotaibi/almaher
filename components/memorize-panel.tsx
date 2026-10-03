@@ -21,7 +21,7 @@ export function MemorizePanel() {
   const [myId, setMyId] = useState<string | null>(null);
   const [preset, setPreset] = useState<Preset>("hifz");
   const [cFrom, setCFrom] = useState<Pos>({ surah: 1, ayah: 1 });
-  const [cTo, setCTo] = useState<Pos>({ surah: 1, ayah: 7 });
+  const [cTo, setCTo] = useState<Pos>({ surah: 114, ayah: 6 }); // افتراضياً: المصحف كاملاً من الفاتحة إلى الناس
 
   useEffect(() => {
     setMyId(window.localStorage.getItem(STUDENT_PICK_KEY));
