@@ -18,6 +18,7 @@ import {
   type Student,
 } from "@/lib/store";
 import { TermTrack } from "./term-track";
+import { Mascot } from "./surah-ladder";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 
@@ -161,25 +162,33 @@ function TermRaceCard({
   if (tp.remMur > 0) recipe.push(`${facesPlain(tp.needMur)} مراجعةً`);
 
   return (
-    <div className="card mb-2.5 overflow-hidden rounded-2xl">
-      <div className="flex items-center justify-between bg-gradient-to-l from-plum-500 to-plum-700 px-4 py-2.5">
-        <span className="font-kufi text-sm font-bold text-white">
-          🏁 سباق خطة الفصل
-        </span>
-        <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-sm font-bold text-white">
+    <div className="card mb-3 overflow-hidden rounded-3xl">
+      <div className="flex items-center justify-between px-4 pt-3.5">
+        <span className="font-kufi text-sm font-bold text-plum-800">🏁 سباق خطة الفصل</span>
+        <span className="rounded-full bg-gradient-to-l from-amber-400 to-pink-400 px-3 py-0.5 text-sm font-bold text-white shadow-sm">
           {tp.pct.toLocaleString("ar-EG")}٪
         </span>
       </div>
-      <div className="p-4">
-        {/* مسار السباق */}
-        <div className="relative h-3.5 overflow-hidden rounded-full bg-cream-dark">
+      <div className="px-4 pb-4 pt-2">
+        {/* مسار السباق: النجمة تتقدّم نحو راية النهاية */}
+        <div className="relative h-12">
+          <div className="absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 rounded-full bg-cream-dark" />
           <div
-            className="h-full rounded-full transition-all duration-700"
-            style={{
-              width: `${tp.pct}%`,
-              background: "linear-gradient(90deg,#5d3f4e,#a8894f)",
-            }}
+            className="rj-grow absolute right-0 top-1/2 h-3 -translate-y-1/2 rounded-full"
+            style={{ width: `${Math.max(4, tp.pct)}%`, background: "linear-gradient(270deg,#f3b13a,#d97ba6)" }}
           />
+          <span className="absolute left-0 top-1/2 -translate-y-1/2 text-xl" aria-hidden>
+            🏁
+          </span>
+          <span
+            className="absolute top-1/2 -translate-y-1/2 translate-x-1/2"
+            style={{ right: `${Math.min(92, Math.max(4, tp.pct))}%` }}
+            aria-hidden
+          >
+            <span className="sl-bob inline-block">
+              <Mascot size={34} />
+            </span>
+          </span>
         </div>
 
         {/* المتبقي */}
@@ -269,37 +278,135 @@ export function MotivationPanel({
     );
   }
 
-  const badges = badgesFor(p);
   const jl = juzLabel(p.juz);
+  const firstName = student.name.split(" ")[0];
+  const stars = recitations.filter((r) => r.studentId === student.id && r.star).length;
+
+  // 🏅 أوسمتي: أوسمة قريبة المنال أولاً ثم الكبرى
+  const medals = [
+    { key: "start", icon: "🌱", label: "أول لقاء", on: true },
+    { key: "s3", icon: "🔥", label: "٣ متتالية", on: p.streak >= 3 },
+    { key: "star", icon: "⭐", label: "ماهرة", on: stars >= 1 },
+    { key: "s5", icon: "⚡", label: "٥ متتالية", on: p.streak >= 5 },
+    ...badgesFor(p).map((b) => ({ key: b.key, icon: b.icon, label: b.label, on: b.unlocked })),
+  ];
+  const earned = medals.filter((m) => m.on).length;
+
+  // 💬 رسالة اليوم: أهم ما تحتاج سماعه الآن (رسالة واحدة واضحة)
+  const msg: { icon: string; title: string; body: string; tone: "gold" | "green" | "plum" } =
+    p.pagesToJuzEnd === 0
+      ? { icon: "🎉", title: `أتممتِ ${jl}!`, body: "ما شاء الله تبارك الله — انطلقي للجزء التالي بإذن الله", tone: "gold" }
+      : p.nearJuzEnd
+        ? {
+            icon: "🎯",
+            title: `على وشك ختم ${jl}!`,
+            body: `باقي ${facesPlain(p.pagesToJuzEnd)} فقط${p.sessionsToJuzEnd <= 1 ? " — أنجزيها في اللقاء القادم!" : ` — بينكِ وبين الختم ${meetingsLabel(p.sessionsToJuzEnd)}`}`,
+            tone: "gold",
+          }
+        : p.expectedPage > 0 && p.aheadPages > 0
+          ? { icon: "🌟", title: `متقدّمة ${byFaces(p.aheadPages)} عن خطتكِ!`, body: `أحسنتِ يا ${firstName} — باقي ${facesPlain(p.pagesToJuzEnd)} لإتمام ${jl}`, tone: "green" }
+          : p.expectedPage > 0 && p.aheadPages < 0
+            ? {
+                icon: "💪",
+                title: `أضيفي ${facesAcc(-p.aheadPages)} وتعودين للمقدّمة`,
+                body: p.sessionsToJuzEndBoost < p.sessionsToJuzEnd ? `ولو زدتِ وجهين كل لقاء تختمين ${jl} في ${meetingsLabel(p.sessionsToJuzEndBoost)}` : `باقي ${facesPlain(p.pagesToJuzEnd)} لإتمام ${jl}`,
+                tone: "plum",
+              }
+            : {
+                icon: "✅",
+                title: "أنتِ على الخطة تماماً — واصلي!",
+                body: `باقي ${facesPlain(p.pagesToJuzEnd)} لإتمام ${jl} — يكفيكِ ${meetingsLabel(p.sessionsToJuzEnd)}`,
+                tone: "green",
+              };
+  const toneCls = { gold: "rj-msg-gold", green: "rj-msg-green", plum: "rj-msg-plum" }[msg.tone];
+
+  // حلقة التقدّم
+  const R = 46;
+  const C = 2 * Math.PI * R;
 
   return (
     <div className="mb-4">
-      <div className="ribbon mx-auto mb-3 w-fit rounded-xl px-8 py-2">
-        <span className="font-kufi text-base font-semibold text-white">
-          🧭 رحلتي مع القرآن
-        </span>
+      {/* ① البطل: حلقة الجزء + أين وصلتِ */}
+      <div className="rj-hero relative mb-3 overflow-hidden rounded-3xl p-4">
+        <span className="rj-twinkle absolute right-6 top-3 text-xs text-amber-300">✦</span>
+        <span className="rj-twinkle absolute bottom-4 left-1/2 text-[10px] text-pink-300" style={{ animationDelay: "1s" }}>✦</span>
+        <div className="relative flex items-center gap-4">
+          <div className="relative h-[120px] w-[120px] shrink-0">
+            <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
+              <defs>
+                <linearGradient id="rj-g" x1="0" x2="1">
+                  <stop offset="0" stopColor="#f3b13a" />
+                  <stop offset="1" stopColor="#d97ba6" />
+                </linearGradient>
+              </defs>
+              <circle cx="60" cy="60" r={R} fill="none" stroke="var(--rj-track, #ffffffb3)" strokeWidth="11" />
+              <circle
+                cx="60"
+                cy="60"
+                r={R}
+                fill="none"
+                stroke="url(#rj-g)"
+                strokeWidth="11"
+                strokeLinecap="round"
+                strokeDasharray={C}
+                strokeDashoffset={C * (1 - p.juzPct / 100)}
+                className="rj-ring"
+                style={{ ["--rj-c" as string]: `${C}` }}
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="font-kufi text-2xl font-bold leading-none text-plum-800">{ar(p.juzPct)}٪</span>
+              <span className="mt-1 text-[11px] font-bold text-plum-600">{jl}</span>
+            </div>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-kufi text-lg font-bold leading-snug text-plum-800">رحلتكِ مع القرآن يا {firstName} 🌸</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <span className="rj-chip rounded-full px-2.5 py-1 text-[11px] font-bold text-plum-700">
+                📍 {p.desc ? `قطعتِ ${ar(p.pagesReached)} صفحة` : `صفحة ${ar(p.currentPage)}`} من ٦٠٤
+              </span>
+              <span className="rj-chip rounded-full px-2.5 py-1 text-[11px] font-bold text-plum-700">📖 المصحف {ar(p.mushafPct)}٪</span>
+              {p.termPlan && (
+                <span className="rj-chip rounded-full px-2.5 py-1 text-[11px] font-bold text-plum-700">🎯 خطة الفصل {ar(p.termPlan.pct)}٪</span>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* تشجيع بارز: على وشك ختم الجزء */}
-      {p.nearJuzEnd && (
-        <div
-          className="mb-2.5 rounded-2xl p-4 text-center text-white shadow"
-          style={{ background: "linear-gradient(135deg,#5d3f4e,#a8894f)" }}
-        >
-          <p className="text-2xl">🎯</p>
-          <p className="mt-1 font-kufi text-base font-bold">
-            على وشك ختم {jl}!
+      {/* ② رسالة اليوم — النجمة تحدّثها */}
+      <div className="mb-3 flex items-end gap-2">
+        <span className="sl-bob mb-1 inline-block shrink-0">
+          <Mascot size={52} />
+        </span>
+        <div className={`relative flex-1 rounded-3xl rounded-bl-md border-2 px-4 py-3 ${toneCls}`}>
+          <p className="font-kufi text-[15px] font-bold leading-snug text-plum-800">
+            {msg.icon} {msg.title}
           </p>
-          <p className="mt-1 text-sm">
-            باقي {facesPlain(p.pagesToJuzEnd)} فقط
-            {p.sessionsToJuzEnd <= 1
-              ? " — أنجزيها في اللقاء القادم واختمي الجزء! 🎉"
-              : ` — بينكِ وبين الختم ${meetingsLabel(p.sessionsToJuzEnd)}`}
-          </p>
+          <p className="mt-1 text-xs font-bold leading-relaxed text-plum-700">{msg.body}</p>
+          {(p.hasMurPlan || p.termSessionsLeft > 0) && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {p.hasMurPlan && (
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                    p.aheadMurPages >= 0 ? "rj-chip text-emerald-600" : "rj-chip text-plum-700"
+                  }`}
+                >
+                  🔁 المراجعة:{" "}
+                  {p.aheadMurPages > 0 ? `متقدّمة ${byFaces(p.aheadMurPages)}` : p.aheadMurPages === 0 ? "على الخطة ✓" : `متأخّرة ${byFaces(-p.aheadMurPages)}`}
+                </span>
+              )}
+              {p.termSessionsLeft > 0 && (
+                <span className="rj-chip rounded-full px-2.5 py-0.5 text-[11px] font-bold text-plum-700">
+                  🏁 باقي {meetingsLabel(p.termSessionsLeft)}
+                </span>
+              )}
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
-      {/* درب الحفظ — خريطة الرحلة المتحركة عبر الأجزاء */}
+      {/* ③ سُلّم حفظي / الدرب / البستان */}
       <JourneyMap
         juz={p.juz}
         juzPct={p.juzPct}
@@ -312,131 +419,43 @@ export function MotivationPanel({
         {track}
       </JourneyMap>
 
-      {/* تقدّم الجزء */}
-      <div className="card mb-2.5 rounded-2xl p-4">
-        <div className="flex items-center justify-between">
-          <span className="font-kufi text-sm font-bold text-plum-800">
-            📖 {jl}
-          </span>
-          <span className="text-sm font-bold text-plum-700">
-            {ar(p.juzPct)}٪
-          </span>
-        </div>
-        <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-cream-dark">
-          <div
-            className="h-full rounded-full bg-plum-600"
-            style={{ width: `${p.juzPct}%` }}
-          />
-        </div>
-        <p className="mt-2 text-[11px] font-bold text-silver-600">
-          {p.desc
-            ? `⬇️ تحفظين من الناس نزولاً · قطعتِ ${ar(p.pagesReached)} من ${ar(604)} صفحة`
-            : `وصلتِ صفحة ${ar(p.currentPage)} من ${ar(604)}`}{" "}
-          · المصحف {ar(p.mushafPct)}٪
-        </p>
-      </div>
-
-      {/* مقارنة بالخطة + عدّادات الإنهاء */}
-      <div className="card mb-2.5 grid gap-2 rounded-2xl p-4">
-        {p.expectedPage > 0 && (
-          <div
-            className={`rounded-xl px-3 py-2.5 text-sm font-bold ${
-              p.aheadPages >= 0
-                ? "bg-emerald-50 text-emerald-700"
-                : "bg-plum-50 text-plum-700"
-            }`}
-          >
-            {p.aheadPages > 0
-              ? `🌟 حفظكِ متقدّم ${byFaces(p.aheadPages)} عن الخطة — أحسنتِ!`
-              : p.aheadPages === 0
-                ? "✅ حفظكِ على الخطة تماماً — واصلي!"
-                : `💪 حفظكِ متأخّر ${byFaces(-p.aheadPages)} — أضيفي ${facesAcc(-p.aheadPages)} لتعودي للمقدّمة`}
-          </div>
-        )}
-
-        {/* المراجعة مقابل خطتها — الزيادة التراكمية تبقى مرئية دائماً */}
-        {p.hasMurPlan && (
-          <div
-            className={`rounded-xl px-3 py-2.5 text-sm font-bold ${
-              p.aheadMurPages >= 0
-                ? "bg-emerald-50 text-emerald-700"
-                : "bg-plum-50 text-plum-700"
-            }`}
-          >
-            {p.aheadMurPages > 0
-              ? `🌟 مراجعتكِ متقدّمة ${byFaces(p.aheadMurPages)} عن الخطة — أحسنتِ!`
-              : p.aheadMurPages === 0
-                ? "✅ مراجعتكِ على الخطة تماماً — واصلي!"
-                : `💪 مراجعتكِ متأخّرة ${byFaces(-p.aheadMurPages)} — عوّضيها في اللقاءات القادمة`}
-          </div>
-        )}
-
-        {p.pagesToJuzEnd === 0 ? (
-          <div className="rounded-xl bg-emerald-50 px-3 py-2.5 text-sm font-bold text-emerald-700">
-            🎉 أتممتِ {jl}! انطلقي للجزء التالي بإذن الله
-          </div>
-        ) : !p.nearJuzEnd ? (
-          <div className="rounded-xl bg-plum-600 px-3 py-2.5 text-sm font-bold text-white">
-            📖 باقي {facesPlain(p.pagesToJuzEnd)} لإتمام {jl} — يكفيكِ{" "}
-            {meetingsLabel(p.sessionsToJuzEnd)}!
-          </div>
-        ) : null}
-
-        {p.termSessionsLeft > 0 && (
-          <div className="rounded-xl bg-cream px-3 py-2.5 text-sm font-bold text-plum-700">
-            🏁 باقي {meetingsLabel(p.termSessionsLeft)} على نهاية الفصل
-          </div>
-        )}
-      </div>
-
-      {/* سباق خطة الفصل — إتمام الخطة كاملة قبل نهاية الفصل */}
+      {/* ④ سباق خطة الفصل */}
       {p.termPlan && <TermRaceCard tp={p.termPlan} />}
 
-      {/* محفّز «لو زدتِ» */}
-      {p.pagesToJuzEnd > 0 && p.sessionsToJuzEndBoost < p.sessionsToJuzEnd && (
-        <div className="card mb-2.5 rounded-2xl p-4">
-          <p className="font-kufi text-sm font-bold text-plum-800">
-            ✨ لو زدتِ وجهين كل لقاء
-          </p>
-          <p className="mt-1 text-xs text-silver-600">
-            تختمين {jl} في {meetingsLabel(p.sessionsToJuzEndBoost)} بدل{" "}
-            {meetingsLabel(p.sessionsToJuzEnd)}
-            {p.termSessionsLeft > 0 &&
-            p.sessionsToJuzEndBoost <= p.termSessionsLeft &&
-            p.sessionsToJuzEnd > p.termSessionsLeft
-              ? " — أي تختمينه قبل نهاية الفصل بإذن الله! 🎉"
-              : ` — أبكر ${byMeetings(
-                  p.sessionsToJuzEnd - p.sessionsToJuzEndBoost
-                )} بإذن الله! 🎉`}
-          </p>
-        </div>
-      )}
+      {/* ⑤ أرقامي */}
+      <div className="mb-3 grid grid-cols-3 gap-2">
+        {[
+          { icon: "🔥", v: ar(p.streak), l: "لقاءات متتالية", bg: "rj-tile-1", c: "text-orange-600" },
+          { icon: "🏅", v: ar(p.personalBest), l: "أفضل إنجاز (وجه)", bg: "rj-tile-2", c: "text-indigo-500" },
+          { icon: "⭐", v: ar(stars), l: "نجوم ماهرة", bg: "rj-tile-3", c: "text-amber-600" },
+        ].map((x, i) => (
+          <div key={x.l} className={`rj-pop rounded-2xl ${x.bg} px-1 py-3 text-center`} style={{ animationDelay: `${0.1 + i * 0.1}s` }}>
+            <p className="text-2xl leading-none">{x.icon}</p>
+            <p className={`mt-1.5 font-kufi text-2xl font-bold leading-none ${x.c}`}>{x.v}</p>
+            <p className="mt-1 text-[10px] font-bold text-silver-600">{x.l}</p>
+          </div>
+        ))}
+      </div>
 
-      {/* تنافس مع النفس */}
-      <div className="card rounded-2xl p-4">
-        <p className="mb-2 font-kufi text-sm font-bold text-plum-800">
-          🏆 تنافسي مع نفسكِ
-        </p>
-        <div className="mb-3 flex flex-wrap gap-2">
-          <span className="rounded-full bg-plum-50 px-3 py-1 text-xs font-bold text-plum-700">
-            🔥 سلسلتكِ: {meetingsLabel(p.streak)}
-          </span>
-          <span className="rounded-full bg-plum-50 px-3 py-1 text-xs font-bold text-plum-700">
-            🏅 أفضل إنجازكِ: {facesLabel(p.personalBest)}
+      {/* ⑥ أوسمتي */}
+      <div className="card rounded-3xl p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <p className="font-kufi text-sm font-bold text-plum-800">🏅 أوسمتي</p>
+          <span className="rounded-full bg-plum-50 px-2.5 py-0.5 text-[11px] font-bold text-plum-700">
+            {ar(earned)} من {ar(medals.length)}
           </span>
         </div>
         <div className="grid grid-cols-4 gap-2">
-          {badges.map((b) => (
-            <div
-              key={b.key}
-              className={`rounded-xl py-2 text-center ${
-                b.unlocked ? "bg-plum-50" : "bg-cream opacity-45"
-              }`}
-            >
-              <p className="text-xl">{b.unlocked ? b.icon : "🔒"}</p>
-              <p className="mt-0.5 text-[10px] font-bold text-plum-700">
-                {b.label}
-              </p>
+          {medals.map((m) => (
+            <div key={m.key} className="text-center">
+              <div
+                className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full text-2xl ${
+                  m.on ? "rj-medal" : "bg-cream grayscale opacity-50"
+                }`}
+              >
+                {m.on ? m.icon : "🔒"}
+              </div>
+              <p className={`mt-1 text-[10px] font-bold leading-tight ${m.on ? "text-plum-800" : "text-silver-500"}`}>{m.label}</p>
             </div>
           ))}
         </div>

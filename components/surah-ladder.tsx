@@ -47,9 +47,9 @@ type Row =
   | { kind: "todo"; k: number; fade: number; goal: boolean }
   | { kind: "fold"; n: number; fade: number };
 
-function Mascot() {
+export function Mascot({ size = 46 }: { size?: number }) {
   return (
-    <svg viewBox="-60 -60 120 120" width="46" height="46" aria-hidden>
+    <svg viewBox="-60 -60 120 120" width={size} height={size} aria-hidden>
       <defs>
         <radialGradient id="sl-g" cx="40%" cy="35%">
           <stop offset="0" stopColor="#fff6c4" />

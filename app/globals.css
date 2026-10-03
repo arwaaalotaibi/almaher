@@ -402,3 +402,32 @@ input, textarea, select {
 .mushaf-hidden { color: transparent !important; background: var(--mushaf-hide, #efe6ec); box-shadow: 0 0 0 1px var(--mushaf-hide, #efe6ec); }
 :root[data-theme="dark"] { --mushaf-hide: #3b3037; }
 .mushaf-hidden.mushaf-cur { background: var(--mushaf-cur, #fde68ab3); box-shadow: 0 0 0 2px var(--mushaf-cur, #fde68ab3); }
+
+/* ================== 🧭 رحلتي ================== */
+.rj-hero { background: var(--rj-hero, linear-gradient(135deg, #fdeef5 0%, #fff4e0 60%, #eef6ff 100%)); box-shadow: 0 10px 24px #5d3f4e14; }
+.rj-ring { animation: rj-ring 1.4s cubic-bezier(.3,.7,.2,1) both; }
+@keyframes rj-ring { from { stroke-dashoffset: var(--rj-c); } }
+.rj-twinkle { animation: sl-twinkle 2.4s ease-in-out infinite; }
+.rj-pop { animation: sl-in 0.5s cubic-bezier(.34,1.56,.64,1) both; }
+.rj-medal { background: radial-gradient(circle at 35% 30%, #fffbe8, #ffe39a 70%, #f3c25a); box-shadow: 0 0 0 3px #fff, 0 0 0 5px #f3d38a, 0 6px 14px #e8b04a55; }
+:root[data-theme="dark"] {
+  --rj-hero: linear-gradient(135deg, #3a2633 0%, #3a3122 60%, #22303d 100%);
+  --rj-track: #ffffff22;
+}
+@media (prefers-reduced-motion: reduce) { .rj-ring, .rj-pop { animation: none; } }
+.rj-grow { animation: rj-grow 1.2s cubic-bezier(.3,.7,.2,1) both; transform-origin: right; }
+@keyframes rj-grow { from { clip-path: inset(0 0 0 100%); } to { clip-path: inset(0 0 0 0); } }
+.rj-chip { background: var(--rj-chip, #ffffffcc); }
+.rj-msg-gold { background: var(--rj-gold, linear-gradient(270deg, #fffbeb, #fef3c7)); border-color: var(--rj-gold-b, #fde68a); }
+.rj-msg-green { background: var(--rj-green, linear-gradient(270deg, #ecfdf5, #f0fdfa)); border-color: var(--rj-green-b, #a7f3d0); }
+.rj-msg-plum { background: var(--rj-plum, linear-gradient(270deg, #f7f2f5, #fdf2f8)); border-color: var(--rj-plum-b, #d9c8d1); }
+.rj-tile-1 { background: var(--rj-t1, linear-gradient(180deg, #fff7ed, #fffbeb)); }
+.rj-tile-2 { background: var(--rj-t2, linear-gradient(180deg, #f0f9ff, #eef2ff)); }
+.rj-tile-3 { background: var(--rj-t3, linear-gradient(180deg, #fefce8, #fffbeb)); }
+:root[data-theme="dark"] {
+  --rj-chip: #ffffff14;
+  --rj-gold: linear-gradient(270deg, #3a3122, #33291c); --rj-gold-b: #6b5424;
+  --rj-green: linear-gradient(270deg, #1f3329, #1c2e2b); --rj-green-b: #2f5a46;
+  --rj-plum: linear-gradient(270deg, #2d232a, #33232d); --rj-plum-b: #4d3d47;
+  --rj-t1: #33261c; --rj-t2: #1f2633; --rj-t3: #332c1a;
+}
