@@ -70,10 +70,9 @@ type StudentTab = (typeof STUDENT_TABS)[number]["key"] | "notifications";
 
 // أقسام تبويب القرآن — كل شاشة خفيفة ومريحة
 const QURAN_SECTIONS = [
-  { key: "today", icon: "📌", label: "وِردي" },
+  { key: "plan", icon: "📅", label: "خطتي" },
   { key: "listen", icon: "🎧", label: "مسمّعي" },
   { key: "journey", icon: "🧭", label: "رحلتي" },
-  { key: "plan", icon: "📅", label: "خطتي" },
 ] as const;
 type QuranSec = (typeof QURAN_SECTIONS)[number]["key"];
 
@@ -94,7 +93,7 @@ export function StudentHome() {
   const [myId, setMyId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState<StudentTab>("quran");
-  const [quranSec, setQuranSec] = useState<QuranSec>("today");
+  const [quranSec, setQuranSec] = useState<QuranSec>("plan");
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [quizFor, setQuizFor] = useState<string | null>(null); // درس الأسئلة المفتوح
   const [settingsOpen, setSettingsOpen] = useState(false); // ورقة الإعدادات ⚙️
@@ -514,7 +513,8 @@ export function StudentHome() {
             ))}
           </div>
 
-          {quranSec === "today" && (
+          {/* 📅 خطتي (أولاً): الترحيب ثم مطلوب اللقاء القادم ثم سجلّ التسميع، وبعدها خطة الفصل أدناه */}
+          {quranSec === "plan" && (
             <>
           {/* ترحيب بالفصل الجديد — يظهر حتى أول تسجيل تسميع فيه */}
           {(() => {
@@ -596,6 +596,16 @@ export function StudentHome() {
                       )}
                     </div>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQuranSec("listen");
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className="mx-auto mt-3 flex items-center gap-1.5 rounded-full bg-plum-600 px-4 py-2 font-kufi text-sm font-bold text-white shadow active:scale-95"
+                    >
+                      🎧 اسمعيه في مسمّعي
+                    </button>
                   </div>
                 );
               })()
@@ -604,30 +614,6 @@ export function StudentHome() {
                 🎉 اكتمل الفصل — أحسنتِ!
               </div>
             ))}
-
-          {/* مسمّعي — تحفيظ الورد بالاستماع والتكرار */}
-          <button
-            type="button"
-            onClick={() => {
-              setQuranSec("listen");
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-            className="mb-4 flex w-full items-center gap-3 rounded-2xl p-4 text-start text-white shadow transition active:scale-[0.99]"
-            style={{ background: "linear-gradient(135deg,#5d3f4e,#8a5d75)" }}
-          >
-            <span className="text-3xl">🎧</span>
-            <span className="min-w-0 flex-1">
-              <span className="block font-kufi text-base font-bold">
-                مسمّعي — احفظي وردك بالتكرار
-              </span>
-              <span className="mt-0.5 block truncate text-xs text-white/85">
-                {prog.nextHifzLabel
-                  ? `وردك القادم: ${prog.nextHifzLabel}`
-                  : "استمعي آيةً آية وردّدي حتى يثبت الحفظ"}
-              </span>
-            </span>
-            <span className="text-xl text-white/70">‹</span>
-          </button>
 
           {/* سجلّ التسميع بعد كل لقاء — يظهر فقط إن كانت الطالبة هي من تسجّل */}
           {settings.studentRecite && <ReciteLogger student={me} halaqa={halaqa} />}
