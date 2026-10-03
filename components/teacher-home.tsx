@@ -21,6 +21,7 @@ export function TeacherHome() {
   }, []);
 
   const logout = async () => {
+    window.localStorage.removeItem("almaher-login-link"); // الأيقونة لا تُدخل أحداً بعد الخروج
     window.localStorage.removeItem(PICK_KEY);
     window.localStorage.removeItem(TEACHER_CLAIMED_KEY);
     try {

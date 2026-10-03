@@ -25,6 +25,7 @@ import {
 } from "@/lib/store";
 import { inputCls, PrimaryBtn } from "./ui";
 import { BottomNav } from "./bottom-nav";
+import { applyManifestLink, LOGIN_LINK_KEY } from "./manifest-link";
 
 const RoleContext = createContext<Role>("student");
 
@@ -219,6 +220,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
     if (claimErr) return "تعذّر الاتصال، حاولي لاحقاً";
     if (typeof sid !== "string" || !sid) return "الرمز غير صحيح";
     window.localStorage.setItem(STUDENT_PICK_KEY, sid);
+    window.localStorage.setItem(LOGIN_LINK_KEY, `?code=${code}`);
+    applyManifestLink();
     setStatus("loading");
     void init("student");
     return null;
@@ -240,6 +243,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
     window.localStorage.setItem(TEACHER_PICK_KEY, tid);
     window.localStorage.setItem(TEACHER_CLAIMED_KEY, "1");
     window.localStorage.removeItem(STUDENT_PICK_KEY);
+    window.localStorage.setItem(LOGIN_LINK_KEY, `?teacher=${code}`);
+    applyManifestLink();
     setStatus("loading");
     void init("teacher");
     return null;
@@ -299,6 +304,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   if (status === "login") {
     const isAdmin = role === "admin";
+    // التطبيق مفتوح من أيقونة الشاشة الرئيسية (ذاكرته منفصلة عن Safari)
+    const standalone =
+      typeof window !== "undefined" &&
+      (window.matchMedia?.("(display-mode: standalone)").matches ||
+        (navigator as Navigator & { standalone?: boolean }).standalone === true);
     return (
       <main className="flex min-h-dvh items-center justify-center px-4 py-8">
         <div className="card w-full max-w-sm rounded-3xl p-6 text-center">
@@ -335,6 +345,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
             {error && <p className="mb-3 text-sm font-bold text-red-600">{error}</p>}
             <PrimaryBtn type="submit">{busy ? "لحظة…" : "دخول"}</PrimaryBtn>
           </form>
+          {!isAdmin && standalone && (
+            <p className="mt-4 rounded-2xl bg-plum-50 px-3 py-2.5 text-xs font-bold leading-relaxed text-plum-700">
+              📲 فتحتِ التطبيق من أيقونة الشاشة؟ اكتبي رمزكِ هنا مرة واحدة فقط — ويبقى التطبيق داخلاً بعدها
+            </p>
+          )}
         </div>
       </main>
     );

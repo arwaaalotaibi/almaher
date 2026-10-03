@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Amiri, Noto_Naskh_Arabic } from "next/font/google";
 import { AuthGate } from "@/components/auth-gate";
 import { ThemeWatcher } from "@/components/theme-toggle";
+import { ManifestLink } from "@/components/manifest-link";
 import { THEME_BOOT } from "@/lib/theme";
 import "./globals.css";
 
@@ -49,6 +50,7 @@ export default function RootLayout({
         {/* 🌙 المظهر (فاتح/داكن/تلقائي) قبل رسم أي محتوى — بلا وميض */}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
         <ThemeWatcher />
+        <ManifestLink />
         {/* سكربت طوارئ بصيغة قديمة يعمل على أي متصفح: إن بقيت شاشة «جاري التحميل»
             ٢٠ ثانية (كود التطبيق لم يشتغل أو الاتصال معلّق) يُظهر رسالة وزر إعادة التحميل */}
         <script

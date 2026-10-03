@@ -144,6 +144,7 @@ export function StudentHome() {
   const me = students.find((s) => s.id === myId);
 
   const logout = async () => {
+    window.localStorage.removeItem("almaher-login-link"); // الأيقونة لا تُدخل أحداً بعد الخروج
     window.localStorage.removeItem(STUDENT_PICK_KEY);
     // فكّ ربط هذا الجهاز بالطالبة قبل إنهاء الجلسة
     try {
