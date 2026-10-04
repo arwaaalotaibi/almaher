@@ -13,6 +13,7 @@ import {
 } from "@/lib/store";
 import { inputCls, PageHeader, useHydrated } from "@/components/ui";
 import { RoleOnly } from "@/components/admin-only";
+import { StudentSheet } from "@/components/student-sheet";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 
@@ -35,6 +36,7 @@ function SupportInner() {
   const hydrated = useHydrated();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("new");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [openId, setOpenId] = useState<string | null>(null); // 👤 ملف الطالبة المفتوح
 
   if (!hydrated) return <main className="mx-auto max-w-2xl px-4 pt-10" />;
 
@@ -109,9 +111,15 @@ function SupportInner() {
             return (
               <div key={m.id} className="card rounded-2xl p-4">
                 <div className="mb-1 flex items-center justify-between gap-2">
-                  <span className="min-w-0 truncate text-sm font-bold text-plum-800">
-                    🌸 {studentLabel(m.studentId)}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setOpenId(m.studentId)}
+                    disabled={!students.some((x) => x.id === m.studentId)}
+                    className="min-w-0 truncate text-start text-sm font-bold text-plum-800 underline decoration-plum-200 decoration-dotted underline-offset-4"
+                    title="فتح ملف الطالبة"
+                  >
+                    🌸 {studentLabel(m.studentId)} ‹
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -186,6 +194,7 @@ function SupportInner() {
           })}
         </div>
       )}
+      <StudentSheet student={students.find((x) => x.id === openId) ?? null} onClose={() => setOpenId(null)} />
     </main>
   );
 }
