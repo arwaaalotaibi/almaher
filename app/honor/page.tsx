@@ -6,7 +6,9 @@ import { useApp } from "@/lib/store";
 import { Field, inputCls, PageHeader, PrimaryBtn, useHydrated } from "@/components/ui";
 
 const TITLE_CHIPS = [
-  "لوحة الشرف",
+  "لوحة الشرف الأولى",
+  "لوحة الشرف الثانية",
+  "لوحة الشرف الثالثة",
   "متميزات الأسبوع الأول",
   "متميزات الأسبوع الثاني",
   "متميزات الأسبوع الثالث",
