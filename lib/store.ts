@@ -660,6 +660,20 @@ export const DEFAULT_SETTINGS: AppSettings = {
   teacherShares: {},
 };
 
+/* ================== 🏅 متميزة اللقاء + 🏆 لوحة الشرف (v21) ==================
+   week : period = تاريخ اللقاء — طالبة واحدة لكل معلّمة في الحلقة واللقاء
+   month: period = yyyy-mm — طالبة أو أكثر */
+export type HonorKind = "week" | "month";
+export interface Honor {
+  id: string;
+  kind: HonorKind;
+  period: string;
+  halaqaId: string;
+  teacherId: string; // "" = الإدارة
+  studentId: string;
+  createdAt: string;
+}
+
 export interface AppState {
   halaqas: Halaqa[];
   teachers: Teacher[];
@@ -673,6 +687,8 @@ export interface AppState {
   tajweedResults: TajweedResult[];
   readingProgress: ReadingProgress[];
   support: SupportMsg[];
+  /** 🏅🏆 اختيارات المعلّمات (v21) — غير موجودة قبل تشغيل الملف */
+  honors?: Honor[];
   settings: AppSettings;
   /** هل جدول رموز المعلّمات موجود (v12 مُشغَّل)؟ قبل ذلك لا نحاول الكتابة فيه */
   teacherCodesReady?: boolean;
@@ -1032,6 +1048,7 @@ function load(): AppState {
           ? parsed.readingProgress
           : [],
         support: Array.isArray(parsed.support) ? parsed.support : [],
+        honors: Array.isArray(parsed.honors) ? parsed.honors : [],
         settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
       };
     } else {
@@ -1182,7 +1199,7 @@ export async function fetchSessionHistory(
 }
 
 export async function pullRemote(): Promise<void> {
-  const [h, t, s, a, b, r, sess, trm, tj, tjr, rdp, sup, codes, setg, tcodes] = await Promise.all([
+  const [h, t, s, a, b, r, sess, trm, tj, tjr, rdp, sup, codes, setg, tcodes, hon] = await Promise.all([
     supabase
       .from("almaher_halaqas")
       // «*» لا «أعمدة محدّدة»: يعمل قبل إضافة عمودَي السرد/الاختبار وبعدها
@@ -1232,6 +1249,8 @@ export async function pullRemote(): Promise<void> {
     supabase.from("almaher_settings").select("key,value"),
     // رموز المعلّمات — للإدارة فقط (قبل تشغيل v12 يعيد خطأ يُتجاهل)
     supabase.from("almaher_teacher_codes").select("teacher_id,code"),
+    // 🏅🏆 متميزات اللقاء ولوحة الشرف (v21 — قبل تشغيله يعيد خطأ يُتجاهل)
+    supabase.from("almaher_honors").select("id,kind,period,halaqa_id,teacher_id,student_id,created_at"),
   ]);
   const teacherCodeMap = new Map(
     ((tcodes.data ?? []) as { teacher_id: string; code: string }[]).map((x) => [x.teacher_id, x.code])
@@ -1400,6 +1419,17 @@ export async function pullRemote(): Promise<void> {
       createdAt: (row.created_at as string) ?? "",
       repliedAt: (row.replied_at as string) ?? undefined,
     })),
+    honors: hon.error
+      ? (getState().honors ?? [])
+      : (hon.data ?? []).map((row) => ({
+          id: row.id as string,
+          kind: (row.kind as HonorKind) ?? "week",
+          period: (row.period as string) ?? "",
+          halaqaId: (row.halaqa_id as string) ?? "",
+          teacherId: (row.teacher_id as string) ?? "",
+          studentId: row.student_id as string,
+          createdAt: (row.created_at as string) ?? "",
+        })),
     settings,
     teacherCodesReady: !tcodes.error,
   });
@@ -2063,6 +2093,57 @@ export const actions = {
         score,
         total,
         answered_at: res.answeredAt,
+      })
+    );
+  },
+
+  /* ===== 🏅 متميزة اللقاء (واحدة لكل معلّمة في الحلقة واللقاء) ===== */
+  setWeekHonor(halaqaId: string, date: string, teacherId: string, studentId: string | null) {
+    const honor: Honor | null = studentId
+      ? { id: uid(), kind: "week", period: date, halaqaId, teacherId, studentId, createdAt: new Date().toISOString() }
+      : null;
+    setState((s) => ({
+      ...s,
+      honors: [
+        ...(s.honors ?? []).filter(
+          (x) => !(x.kind === "week" && x.period === date && x.halaqaId === halaqaId && x.teacherId === teacherId)
+        ),
+        ...(honor ? [honor] : []),
+      ],
+    }));
+    run(async () => {
+      let del = supabase.from("almaher_honors").delete().eq("kind", "week").eq("period", date).eq("halaqa_id", halaqaId);
+      del = teacherId ? del.eq("teacher_id", teacherId) : del.is("teacher_id", null);
+      const r = await del;
+      if (r.error || !honor) return r;
+      return supabase.from("almaher_honors").insert({
+        id: honor.id,
+        kind: "week",
+        period: date,
+        halaqa_id: halaqaId,
+        teacher_id: teacherId || null,
+        student_id: honor.studentId,
+      });
+    });
+  },
+  /* ===== 🏆 لوحة الشرف الشهرية (طالبة أو أكثر) ===== */
+  toggleMonthHonor(halaqaId: string, month: string, teacherId: string, studentId: string) {
+    const cur = (getState().honors ?? []).find((x) => x.kind === "month" && x.period === month && x.studentId === studentId);
+    if (cur) {
+      setState((s) => ({ ...s, honors: (s.honors ?? []).filter((x) => x.id !== cur.id) }));
+      run(() => supabase.from("almaher_honors").delete().eq("id", cur.id));
+      return;
+    }
+    const honor: Honor = { id: uid(), kind: "month", period: month, halaqaId, teacherId, studentId, createdAt: new Date().toISOString() };
+    setState((s) => ({ ...s, honors: [...(s.honors ?? []), honor] }));
+    run(() =>
+      supabase.from("almaher_honors").insert({
+        id: honor.id,
+        kind: "month",
+        period: month,
+        halaqa_id: halaqaId,
+        teacher_id: teacherId || null,
+        student_id: studentId,
       })
     );
   },

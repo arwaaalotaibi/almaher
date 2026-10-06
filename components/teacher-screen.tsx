@@ -14,6 +14,7 @@ import {
   type Teacher,
 } from "@/lib/store";
 import { StudentSheet } from "./student-sheet";
+import { HonorMonthCard } from "./honor-month-card";
 import { QuickSession } from "./quick-session";
 import { NotificationsCard } from "./notifications-card";
 import { ThemeToggle } from "./theme-toggle";
@@ -202,11 +203,15 @@ export function TeacherScreen({ teacher, onLogout }: { teacher: Teacher; onLogou
                 defaultOpen
                 initialDate={f?.date}
                 simple
+                honorTeacherId={teacher.id}
               />
             )}
           </section>
         );
       })}
+
+      {/* 🏆 لوحة الشرف الشهرية */}
+      <HonorMonthCard teacherId={teacher.id} sections={herHalaqas.map((h) => ({ halaqa: h, list: mine(h) }))} />
 
       <NotificationsCard halaqaIds={teacher.halaqaIds} />
 

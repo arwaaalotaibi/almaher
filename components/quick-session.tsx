@@ -89,6 +89,7 @@ export function QuickSession({
   defaultOpen = false,
   initialDate,
   simple = false,
+  honorTeacherId,
 }: {
   halaqa: Halaqa;
   groups: { key: string; title: string; list: Student[] }[];
@@ -100,8 +101,10 @@ export function QuickSession({
   initialDate?: string;
   /** واجهة مبسّطة للمعلّمة: بلا خيارات الترتيب وزر الإشعار والشرح الطويل */
   simple?: boolean;
+  /** 🏅 المعلّمة التي تختار «متميزة اللقاء» (شاشة المعلّمة) — بدونها لا يظهر الاختيار */
+  honorTeacherId?: string;
 }) {
-  const { recitations } = useApp();
+  const { recitations, honors } = useApp();
   const termRows = useMemo(() => buildSchedule(halaqa, EMPTY_PLAN), [halaqa]);
   const [open, setOpen] = useState(defaultOpen);
   const [groupKey, setGroupKey] = useState<string>("all");
@@ -822,6 +825,43 @@ export function QuickSession({
               </div>
             ))}
           </div>
+
+          {/* 🏅 متميزة اللقاء — طالبة واحدة تختارها المعلّمة، تُحفظ فوراً */}
+          {honorTeacherId !== undefined && (() => {
+            const pick = (honors ?? []).find(
+              (x) => x.kind === "week" && x.period === date && x.halaqaId === halaqa.id && x.teacherId === honorTeacherId
+            );
+            const pool = shown.flatMap((g) => g.list).filter((s) => info[s.id]?.gap == null);
+            if (!pool.length) return null;
+            return (
+              <div className="mt-3 rounded-2xl border-2 border-amber-200 bg-amber-50/70 p-3">
+                <p className="font-kufi text-sm font-bold text-amber-900">🏅 متميزة اللقاء {sessionNo ? ar(sessionNo) : ""}</p>
+                <p className="mb-2 text-[11px] font-bold text-amber-800/80">
+                  {pick ? "✓ محفوظة — اضغطي اسماً آخر للتغيير، أو اسمها لإلغائها" : "اختاري طالبة واحدة تميّزت في هذا اللقاء"}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {pool.map((s) => {
+                    const on = pick?.studentId === s.id;
+                    const absent = info[s.id]?.existing ? !info[s.id]!.existing!.attended : false;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        disabled={absent}
+                        onClick={() => actions.setWeekHonor(halaqa.id, date, honorTeacherId, on ? null : s.id)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-bold transition disabled:opacity-35 ${
+                          on ? "bg-amber-500 text-white shadow" : "bg-white text-plum-800 ring-1 ring-amber-200"
+                        }`}
+                      >
+                        {on ? "🏅 " : ""}
+                        {s.name.split(" ").slice(0, 2).join(" ")}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="mt-3">
             <PrimaryBtn onClick={saveAll}>

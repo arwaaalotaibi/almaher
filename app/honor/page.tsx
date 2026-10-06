@@ -53,6 +53,7 @@ async function fileToSmallDataUrl(file: File): Promise<string> {
 }
 
 import { RoleOnly } from "@/components/admin-only";
+import { HonorList } from "@/components/honor-list";
 
 export default function HonorPage() {
   return (
@@ -65,6 +66,7 @@ export default function HonorPage() {
 function HonorInner() {
   const { halaqas, students } = useApp();
   const hydrated = useHydrated();
+  const [tab, setTab] = useState<"list" | "design">("list"); // 📋 اختيارات المعلّمات أو 🎨 الإعلان
 
   const [title, setTitle] = useState("لوحة الشرف");
   const [subtitle, setSubtitle] = useState("الدورة الصيفية ١٤٤٨ هـ / ٢٠٢٦ م");
@@ -90,7 +92,7 @@ function HonorInner() {
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
-  }, [hydrated]);
+  }, [hydrated, tab]);
 
   // ارتفاع البوستر الفعلي (يتغيّر مع عدد الأسماء)
   useEffect(() => {
@@ -100,7 +102,7 @@ function HonorInner() {
     ro.observe(node);
     setPosterH(node.offsetHeight);
     return () => ro.disconnect();
-  }, [hydrated]);
+  }, [hydrated, tab]);
 
   const halaqa = halaqas.find((h) => h.id === halaqaId) ?? halaqas[0];
   const pool = useMemo(
@@ -170,9 +172,48 @@ function HonorInner() {
     }
   };
 
+  const tabs = (
+    <div className="mb-4 flex gap-1 rounded-2xl bg-cream p-1">
+      {(
+        [
+          { k: "list", l: "📋 اختيارات المعلّمات" },
+          { k: "design", l: "🎨 صمّمي إعلاناً" },
+        ] as const
+      ).map((o) => (
+        <button
+          key={o.k}
+          type="button"
+          onClick={() => setTab(o.k)}
+          className={`flex-1 rounded-xl py-2 font-kufi text-sm font-bold ${tab === o.k ? "bg-white text-plum-800 shadow-sm" : "text-silver-600"}`}
+        >
+          {o.l}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (tab === "list")
+    return (
+      <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
+        <PageHeader title="لوحة الشرف" back="/" />
+        {tabs}
+        <HonorList
+          onDesign={(hid, ids, t) => {
+            setHalaqaId(hid);
+            setPicked(ids);
+            setTitle(t);
+            setOutlined(t.includes("متميزات"));
+            setTab("design");
+            window.scrollTo({ top: 0 });
+          }}
+        />
+      </main>
+    );
+
   return (
     <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
       <PageHeader title="لوحة الشرف" back="/" />
+      {tabs}
       <p className="mb-5 -mt-2 text-sm text-silver-600">
         اختاري الحلقة والأسماء، ويطلع لك إعلان جاهز بهوية الجمعية 🎨
       </p>
