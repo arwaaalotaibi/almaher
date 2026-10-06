@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { halaqaTitle, useApp, type Halaqa } from "@/lib/store";
+import { actions, halaqaTitle, useApp, type Halaqa } from "@/lib/store";
 import { boardRange, currentBoard, honorBoards } from "./honor-month-card";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
@@ -11,7 +11,8 @@ const dayLabel = (d: string) =>
 
 /** 📋 اختيارات المعلّمات للإدارة: لوحة الشرف (الأولى/الثانية/الثالثة) ومتميزات لقاءاتها — عرض وطباعة ونسخ */
 export function HonorList({ onDesign }: { onDesign: (halaqaId: string, studentIds: string[], title: string) => void }) {
-  const { honors, students, teachers, halaqas } = useApp();
+  const { honors, students, teachers, halaqas, settings } = useApp();
+  const openN = settings.honorOpen ?? 0;
   const all = useMemo(() => honors ?? [], [honors]);
   const maxBoards = Math.max(1, ...halaqas.map((h) => honorBoards(h).length));
   const defaultN = useMemo(() => {
@@ -19,7 +20,7 @@ export function HonorList({ onDesign }: { onDesign: (halaqaId: string, studentId
     return ns.length ? Math.max(...ns) : 1;
   }, [halaqas]);
   const [boardN, setBoardN] = useState<number | null>(null);
-  const n = boardN ?? defaultN;
+  const n = boardN ?? (openN || defaultN);
   const [hid, setHid] = useState("");
 
   const nameOf = (id: string) => students.find((s) => s.id === id)?.name ?? "—";
@@ -91,7 +92,37 @@ export function HonorList({ onDesign }: { onDesign: (halaqaId: string, studentId
 
   return (
     <div>
+      {/* 🔓 اللوحة المفتوحة للمعلّمات — تتحكّم بها الإدارة */}
+      <div className="card mb-4 rounded-2xl border-2 border-amber-200 p-3">
+        <p className="font-kufi text-sm font-bold text-plum-800">🔓 المفتوحة للمعلّمات الآن</p>
+        <p className="mb-2 text-[11px] font-bold text-silver-600">
+          المعلّمة ترى اللوحة المفتوحة فقط وتختار أسماءها — افتحيها متى احتجتِ الأسماء، وأقفليها بعد الاكتمال
+        </p>
+        <div className="flex gap-1 rounded-xl bg-cream p-1">
+          {[0, ...Array.from({ length: maxBoards }, (_, i) => i + 1)].map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => {
+                if (k === openN) return;
+                const label = k ? `لوحة الشرف ${ORD[k - 1] ?? ar(k)}` : "";
+                if (window.confirm(k ? `فتح «${label}» لكل المعلّمات؟` : "إقفال لوحة الشرف عن المعلّمات؟")) {
+                  actions.setHonorOpen(k);
+                  if (k) setBoardN(k);
+                }
+              }}
+              className={`flex-1 rounded-lg py-2 text-xs font-bold ${
+                openN === k ? (k ? "bg-emerald-600 text-white shadow" : "bg-silver-600 text-white shadow") : "text-plum-700"
+              }`}
+            >
+              {k ? `🏆 ${ORD[k - 1] ?? ar(k)}` : "🔒 مقفلة"}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* اللوحة والحلقة */}
+      <p className="mb-1.5 text-xs font-bold text-plum-700">📋 عرض اختيارات:</p>
       <div className="mb-3 flex gap-1 rounded-2xl bg-cream p-1">
         {Array.from({ length: maxBoards }, (_, i) => i + 1).map((k) => (
           <button

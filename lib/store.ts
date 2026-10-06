@@ -650,6 +650,8 @@ export interface AppSettings {
   hidePlanConfirm: boolean; // إخفاء شاشة «تأكيد الخطة» عند الطالبة (تبقى علاماتها للإدارة)
   /** 👭 معلّمة ← معلّمات تشاركهنّ طالباتهنّ: تراهنّ وتسجّل لهنّ من رابطها (مثل حلقة مشتركة) */
   teacherShares: Record<string, string[]>;
+  /** 🏆 لوحة الشرف المفتوحة للمعلّمات (تفتحها الإدارة): ٠ = مقفلة، ١ = الأولى … */
+  honorOpen?: number;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -1269,6 +1271,7 @@ export async function pullRemote(): Promise<void> {
   const reciteRow = settingsRows.find((x) => x.key === "student_recite");
   const tabsRow = settingsRows.find((x) => x.key === "student_tabs");
   const sharesRow = settingsRows.find((x) => x.key === "teacher_shares");
+  const honorRow = settingsRows.find((x) => x.key === "honor_open");
   const settings: AppSettings = {
     ...DEFAULT_SETTINGS,
     ...(reciteRow && typeof reciteRow.value?.enabled === "boolean"
@@ -1281,6 +1284,7 @@ export async function pullRemote(): Promise<void> {
           hidePlanConfirm: tabsRow.value?.hidePlanConfirm === true,
         }
       : {}),
+    ...(honorRow && typeof honorRow.value?.n === "number" ? { honorOpen: honorRow.value.n as number } : {}),
     ...(sharesRow && sharesRow.value && typeof sharesRow.value === "object"
       ? {
           teacherShares: Object.fromEntries(
@@ -1609,6 +1613,13 @@ export const actions = {
         value: next,
         updated_at: new Date().toISOString(),
       })
+    );
+  },
+  /** 🏆 الإدارة تفتح لوحة شرف للمعلّمات (٠ = إقفال) */
+  setHonorOpen(n: number) {
+    setState((s) => ({ ...s, settings: { ...s.settings, honorOpen: n } }));
+    run(() =>
+      supabase.from("almaher_settings").upsert({ key: "honor_open", value: { n }, updated_at: new Date().toISOString() })
     );
   },
   /** تأكيد خطة الفصل من الطالبة («صحيحة») عبر الدالة الآمنة — يعيد true عند النجاح */
