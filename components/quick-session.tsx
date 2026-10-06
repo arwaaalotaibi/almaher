@@ -551,7 +551,7 @@ export function QuickSession({
                         st.attended ? "border-cream-dark bg-white" : "border-red-200 bg-red-50"
                       }`}
                     >
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
                         <button
                           type="button"
                           onClick={() => onOpenStudent?.(s)}
@@ -566,7 +566,8 @@ export function QuickSession({
                             </span>
                           )}
                         </button>
-                        <span className="flex shrink-0 items-center gap-1.5">
+                        {/* الأزرار تنزل لسطر ثانٍ في الشاشات الضيقة بدل أن تدفع الصفحة جانبياً */}
+                        <span className="ms-auto flex flex-wrap items-center justify-end gap-1.5">
                           <button
                             type="button"
                             onClick={() => setRow(s.id, { attended: !st.attended }, st)}
