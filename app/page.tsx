@@ -117,7 +117,7 @@ export default function Home() {
         >
           <span className="text-2xl">🏅</span>
           <span className="font-kufi text-sm font-bold text-plum-800">لوحة الشرف</span>
-          <span className="text-[11px] text-silver-600">صمّمي إعلاناً</span>
+          <span className="text-[11px] text-silver-600">المتميزات والإعلان</span>
         </Link>
         <Link
           href="/books"
