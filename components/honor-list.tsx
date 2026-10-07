@@ -22,6 +22,7 @@ export function HonorList({ onDesign }: { onDesign: (halaqaId: string, studentId
   const n = boardN ?? defaultN;
   const [hid, setHid] = useState("");
 
+  const todayKey = new Date().toLocaleDateString("en-CA"); // yyyy-mm-dd محلياً
   const nameOf = (id: string) => students.find((s) => s.id === id)?.name ?? "—";
   const teacherOf = (id: string) => (id ? teachers.find((t) => t.id === id)?.name ?? "" : "الإدارة");
   const teachersIn = (h: Halaqa) =>
@@ -107,7 +108,7 @@ export function HonorList({ onDesign }: { onDesign: (halaqaId: string, studentId
                 <span className="truncate text-plum-800">{halaqaTitle(h)}</span>
                 <span className="shrink-0 text-end">
                   <span className={ob ? "text-emerald-700" : "text-silver-600"}>{ob ? `🏆 ${ob.title.replace("لوحة الشرف ", "")}` : "🔒 لم تُفتح"}</span>
-                  {next && <span className="block text-[10px] text-silver-600">التالية: {dayLabel(next.endDate)}</span>}
+                  {next && <span className="block text-[10px] text-silver-600">التالية تُفتح: {dayLabel(next.endDate)}</span>}
                 </span>
               </div>
             );
@@ -157,7 +158,7 @@ export function HonorList({ onDesign }: { onDesign: (halaqaId: string, studentId
             ) : (
               <>
                 <p className="mb-3 text-[11px] font-bold text-silver-600">
-                  {boardRange(b)} · تنتهي {dayLabel(b.endDate)}
+                  {boardRange(b)} · {b.endDate <= todayKey ? "فُتحت للمعلّمات" : "تُفتح للمعلّمات"} {dayLabel(b.endDate)}
                 </p>
                 {/* 🏆 اللوحة */}
                 <div className="mb-3 rounded-xl bg-amber-50 p-3">
