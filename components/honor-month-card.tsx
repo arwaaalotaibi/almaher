@@ -51,8 +51,8 @@ export function honorBoards(h: Pick<Halaqa, "day" | "termStart" | "termSessions"
 
 export const boardRange = (b: HonorBoard) => (b.from === b.to ? `لقاء ${ar(b.from)}` : `اللقاءات ${ar(b.from)}–${ar(b.to)}`);
 
-/** اللوحة المفتوحة للاختيار: آخر لوحة انتهت لقاءاتها — تبقى مفتوحة حتى تنتهي التي بعدها.
-    قبل انتهاء الأولى: لا لوحة مفتوحة */
+/** اللوحة المفتوحة للاختيار: آخر لوحة حلّ يوم آخر لقاء فيها (بالتاريخ، لا بالتسجيل) —
+    تبقى مفتوحة حتى يحلّ موعد التي بعدها. قبل يوم اللقاء ٤: لا لوحة مفتوحة */
 export function openBoard(boards: HonorBoard[], today = dateKey(new Date())): HonorBoard | undefined {
   return [...boards].reverse().find((b) => b.endDate <= today);
 }
@@ -61,8 +61,11 @@ export function currentBoard(boards: HonorBoard[], today = dateKey(new Date())):
   return openBoard(boards, today) ?? boards[0];
 }
 
-/** 🏆 لوحة الشرف — لوحة واحدة مفتوحة فقط، تفتحها الإدارة متى شاءت (وتقفلها).
-    غيرها لا يظهر للمعلّمة. بجانب كل اسم عدد مرات «متميزة اللقاء» في لقاءاتها. */
+const dayLabel = (d: string) =>
+  new Date(`${d}T00:00:00`).toLocaleDateString("ar-u-ca-gregory-nu-arab", { weekday: "long", day: "numeric", month: "long" });
+
+/** 🏆 لوحة الشرف — لوحة واحدة مفتوحة فقط: تُفتح تلقائياً يوم آخر لقاء فيها
+    (الأولى يوم اللقاء ٤، الثانية يوم ٨، الثالثة يوم الأخير) وتبقى حتى تُفتح التي بعدها. بجانب كل اسم عدد مرات «متميزة اللقاء» في لقاءاتها. */
 export function HonorMonthCard({
   teacherId,
   sections,
@@ -70,26 +73,29 @@ export function HonorMonthCard({
   teacherId: string;
   sections: { halaqa: Halaqa; list: Student[] }[];
 }) {
-  const { honors, settings } = useApp();
+  const { honors } = useApp();
   const [open, setOpen] = useState(false);
   const all = honors ?? [];
-  const openN = settings.honorOpen ?? 0; // تفتحها الإدارة
+  // تُفتح تلقائياً يوم آخر لقاء فيها (الرابع، الثامن، الأخير) — دون اشتراط تسجيل اللقاءات
   const rows = sections
     .filter((s) => s.list.length)
     .map((s) => {
       const boards = honorBoards(s.halaqa);
-      return { ...s, boards, board: boards.find((b) => b.n === openN) };
+      return { ...s, boards, board: openBoard(boards) };
     })
     .filter((s) => s.boards.length);
   if (!rows.length) return null;
   const live = rows.filter((s) => s.board);
 
-  // لا لوحة مفتوحة الآن: سطر صغير فقط
+  // لم تُفتح الأولى بعد: موعد فتحها فقط
   if (!live.length) {
+    const first = rows[0].boards[0];
     return (
       <div className="card mb-4 rounded-2xl px-4 py-3">
-        <p className="font-kufi text-sm font-bold text-plum-800">🏆 لوحة الشرف</p>
-        <p className="text-xs font-bold text-silver-600">🔒 تُفتح للاختيار عندما تفتحها الإدارة</p>
+        <p className="font-kufi text-sm font-bold text-plum-800">🏆 {first.title}</p>
+        <p className="text-xs font-bold text-silver-600">
+          🔒 تُفتح للاختيار يوم اللقاء {ar(first.to)} — {dayLabel(first.endDate)}
+        </p>
       </div>
     );
   }

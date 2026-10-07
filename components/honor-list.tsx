@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { actions, halaqaTitle, useApp, type Halaqa } from "@/lib/store";
-import { boardRange, currentBoard, honorBoards } from "./honor-month-card";
+import { halaqaTitle, useApp, type Halaqa } from "@/lib/store";
+import { boardRange, currentBoard, honorBoards, openBoard } from "./honor-month-card";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 const ORD = ["الأولى", "الثانية", "الثالثة", "الرابعة", "الخامسة"];
@@ -11,8 +11,7 @@ const dayLabel = (d: string) =>
 
 /** 📋 اختيارات المعلّمات للإدارة: لوحة الشرف (الأولى/الثانية/الثالثة) ومتميزات لقاءاتها — عرض وطباعة ونسخ */
 export function HonorList({ onDesign }: { onDesign: (halaqaId: string, studentIds: string[], title: string) => void }) {
-  const { honors, students, teachers, halaqas, settings } = useApp();
-  const openN = settings.honorOpen ?? 0;
+  const { honors, students, teachers, halaqas } = useApp();
   const all = useMemo(() => honors ?? [], [honors]);
   const maxBoards = Math.max(1, ...halaqas.map((h) => honorBoards(h).length));
   const defaultN = useMemo(() => {
@@ -20,7 +19,7 @@ export function HonorList({ onDesign }: { onDesign: (halaqaId: string, studentId
     return ns.length ? Math.max(...ns) : 1;
   }, [halaqas]);
   const [boardN, setBoardN] = useState<number | null>(null);
-  const n = boardN ?? (openN || defaultN);
+  const n = boardN ?? defaultN;
   const [hid, setHid] = useState("");
 
   const nameOf = (id: string) => students.find((s) => s.id === id)?.name ?? "—";
@@ -92,32 +91,27 @@ export function HonorList({ onDesign }: { onDesign: (halaqaId: string, studentId
 
   return (
     <div>
-      {/* 🔓 اللوحة المفتوحة للمعلّمات — تتحكّم بها الإدارة */}
+      {/* 🔓 المفتوحة للمعلّمات الآن — تلقائياً بالتاريخ */}
       <div className="card mb-4 rounded-2xl border-2 border-amber-200 p-3">
         <p className="font-kufi text-sm font-bold text-plum-800">🔓 المفتوحة للمعلّمات الآن</p>
         <p className="mb-2 text-[11px] font-bold text-silver-600">
-          المعلّمة ترى اللوحة المفتوحة فقط وتختار أسماءها — افتحيها متى احتجتِ الأسماء، وأقفليها بعد الاكتمال
+          تُفتح تلقائياً: الأولى يوم اللقاء ٤ · الثانية يوم اللقاء ٨ · الثالثة يوم آخر لقاء — دون اشتراط تسجيل اللقاءات
         </p>
-        <div className="flex gap-1 rounded-xl bg-cream p-1">
-          {[0, ...Array.from({ length: maxBoards }, (_, i) => i + 1)].map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => {
-                if (k === openN) return;
-                const label = k ? `لوحة الشرف ${ORD[k - 1] ?? ar(k)}` : "";
-                if (window.confirm(k ? `فتح «${label}» لكل المعلّمات؟` : "إقفال لوحة الشرف عن المعلّمات؟")) {
-                  actions.setHonorOpen(k);
-                  if (k) setBoardN(k);
-                }
-              }}
-              className={`flex-1 rounded-lg py-2 text-xs font-bold ${
-                openN === k ? (k ? "bg-emerald-600 text-white shadow" : "bg-silver-600 text-white shadow") : "text-plum-700"
-              }`}
-            >
-              {k ? `🏆 ${ORD[k - 1] ?? ar(k)}` : "🔒 مقفلة"}
-            </button>
-          ))}
+        <div className="grid gap-1">
+          {halaqas.map((h) => {
+            const boards = honorBoards(h);
+            const ob = openBoard(boards);
+            const next = boards.find((x) => !ob || x.n === ob.n + 1);
+            return (
+              <div key={h.id} className="flex items-center justify-between gap-2 rounded-lg bg-cream/70 px-2.5 py-1.5 text-[11px] font-bold">
+                <span className="truncate text-plum-800">{halaqaTitle(h)}</span>
+                <span className="shrink-0 text-end">
+                  <span className={ob ? "text-emerald-700" : "text-silver-600"}>{ob ? `🏆 ${ob.title.replace("لوحة الشرف ", "")}` : "🔒 لم تُفتح"}</span>
+                  {next && <span className="block text-[10px] text-silver-600">التالية: {dayLabel(next.endDate)}</span>}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
 
