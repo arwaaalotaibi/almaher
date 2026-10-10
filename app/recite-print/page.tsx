@@ -25,9 +25,16 @@ import { RoleOnly } from "@/components/admin-only";
 const ar = (n: number) => n.toLocaleString("ar-EG");
 const fmt = (n: number) => (Number.isInteger(n) ? ar(n) : n.toLocaleString("ar-EG", { maximumFractionDigits: 2 }));
 const dayLabel = (d: string) =>
-  new Date(`${d}T00:00:00`).toLocaleDateString("ar-u-ca-gregory-nu-arab", { weekday: "long", day: "numeric", month: "long" });
+  new Date(`${d}T00:00:00`).toLocaleDateString("ar-u-ca-gregory-nu-arab", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 const shortDate = (d: string) =>
-  new Date(`${d}T00:00:00`).toLocaleDateString("ar-u-ca-gregory-nu-arab", { day: "numeric", month: "numeric" });
+  new Date(`${d}T00:00:00`).toLocaleDateString("ar-u-ca-gregory-nu-arab", {
+    day: "numeric",
+    month: "numeric",
+  });
 const shortName = (name: string) => name.split(/\s+/).slice(0, 3).join(" ");
 
 type Mode = "detail" | "grid";
@@ -67,7 +74,10 @@ function faceOf(log: RecitationLog, s: Student) {
 
 /** لقاءات الفصل الفائتة (حتى اليوم) + أي تاريخ سُجّل خارج الجدول */
 function meetingsOf(h: Halaqa, logs: RecitationLog[], today: string): Meeting[] {
-  const sched = (buildSchedule(h, EMPTY_PLAN) ?? []).map((r) => ({ n: r.n, date: dateKey(r.date) }));
+  const sched = (buildSchedule(h, EMPTY_PLAN) ?? []).map((r) => ({
+    n: r.n,
+    date: dateKey(r.date),
+  }));
   const past = sched.filter((m) => m.date <= today);
   const known = new Set(past.map((m) => m.date));
   const extra = [...new Set(logs.map((l) => l.date))]
@@ -90,25 +100,24 @@ function RecitePrint() {
   const [halaqaId, setHalaqaId] = useState(initHalaqa?.id ?? "");
   const [by, setBy] = useState<"halaqa" | "teacher">("halaqa");
   const [teacherId, setTeacherId] = useState("");
+  const [tHalaqaId, setTHalaqaId] = useState(""); // حلقة من حلقات المعلّمة ("" = كلها)
   const [mode, setMode] = useState<Mode>("detail");
   const cur = sortedHalaqas.find((h) => h.id === halaqaId) ?? sortedHalaqas[0];
   const today = dateKey(new Date());
   // 👩‍🏫 بالمعلّمة: كل طالباتها في كل حلقاتها (كل حلقة في ورقة)
   const teacher = by === "teacher" ? teachers.find((t) => t.id === teacherId) : undefined;
   const sortedTeachers = useMemo(() => [...teachers].sort((a, b) => a.name.localeCompare(b.name, "ar")), [teachers]);
-  const chosen =
-    by === "teacher"
-      ? teacher
-        ? sortedHalaqas.filter((h) => students.some((s) => s.teacherId === teacher.id && s.halaqaId === h.id))
-        : []
-      : cur
-        ? [cur]
-        : [];
+  const teacherHalaqas = teacher
+    ? sortedHalaqas.filter((h) => students.some((s) => s.teacherId === teacher.id && s.halaqaId === h.id))
+    : [];
+  const chosen = by === "teacher" ? teacherHalaqas.filter((h) => !tHalaqaId || h.id === tHalaqaId) : cur ? [cur] : [];
 
   const blocks = useMemo(
     () =>
       chosen.flatMap((h) => {
-        const list = students.filter((s) => s.halaqaId === h.id && (!teacher || s.teacherId === teacher.id)).sort((a, b) => a.name.localeCompare(b.name, "ar"));
+        const list = students
+          .filter((s) => s.halaqaId === h.id && (!teacher || s.teacherId === teacher.id))
+          .sort((a, b) => a.name.localeCompare(b.name, "ar"));
         if (teacher && !list.length) return [];
         const ids = new Set(list.map((s) => s.id));
         const logs = recitations.filter((r) => ids.has(r.studentId) && (!h.termStart || r.date >= h.termStart) && r.date <= today);
@@ -215,14 +224,33 @@ function RecitePrint() {
               ))}
             </select>
           ) : (
-            <select value={teacher?.id ?? ""} onChange={(e) => setTeacherId(e.target.value)} aria-label="المعلّمة">
-              <option value="">👩‍🏫 اختاري المعلّمة</option>
-              {sortedTeachers.map((t) => (
-                <option key={t.id} value={t.id}>
-                  👩‍🏫 {t.name} ({ar(students.filter((s) => s.teacherId === t.id).length)} طالبة)
-                </option>
-              ))}
-            </select>
+            <>
+              <select
+                value={teacher?.id ?? ""}
+                onChange={(e) => {
+                  setTeacherId(e.target.value);
+                  setTHalaqaId("");
+                }}
+                aria-label="المعلّمة"
+              >
+                <option value="">👩‍🏫 اختاري المعلّمة</option>
+                {sortedTeachers.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    👩‍🏫 {t.name} ({ar(students.filter((s) => s.teacherId === t.id).length)} طالبة)
+                  </option>
+                ))}
+              </select>
+              {teacher && (
+                <select value={tHalaqaId} onChange={(e) => setTHalaqaId(e.target.value)} aria-label="المسجد">
+                  <option value="">🕌 كل مساجدها ({ar(teacherHalaqas.length)})</option>
+                  {teacherHalaqas.map((h) => (
+                    <option key={h.id} value={h.id}>
+                      🕌 {halaqaTitle(h)}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </>
           )}
         </div>
         <div className="row">
@@ -241,7 +269,11 @@ function RecitePrint() {
       </div>
 
       <div className="sheet">
-        {!blocks.length && <p className="empty">{by === "teacher" ? (teacher ? "لا طالبات مسجّلات لهذه المعلّمة" : "اختاري المعلّمة من القائمة 👆") : "لا توجد حلقات"}</p>}
+        {!blocks.length && (
+          <p className="empty">
+            {by === "teacher" ? (teacher ? "لا طالبات مسجّلات لهذه المعلّمة" : "اختاري المعلّمة من القائمة 👆") : "لا توجد حلقات"}
+          </p>
+        )}
         {blocks.map(({ h, list, meetings, cell, tNames }) => {
           const totals = list.map((s) => {
             let hifz = 0,
@@ -282,7 +314,9 @@ function RecitePrint() {
                   return (
                     <div key={m.date} className="meet">
                       <div className="mt">
-                        <span>{m.n ? `اللقاء ${ar(m.n)}` : "لقاء إضافي"} — {dayLabel(m.date)}</span>
+                        <span>
+                          {m.n ? `اللقاء ${ar(m.n)}` : "لقاء إضافي"} — {dayLabel(m.date)}
+                        </span>
                         <span>
                           حضور {ar(present)} من {ar(list.length)}
                         </span>
