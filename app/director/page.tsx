@@ -439,6 +439,12 @@ function DirectorInner() {
         </div>
       </Section>
 
+      <Link
+        href={halaqaId ? `/recite-print?halaqa=${halaqaId}` : "/recite-print"}
+        className="mb-2 block rounded-xl bg-plum-600 py-2.5 text-center font-kufi text-sm font-bold text-white"
+      >
+        🖨️ طباعة سجل التسميع (لكل لقاء)
+      </Link>
       <div className="grid grid-cols-2 gap-2">
         <button type="button" onClick={exportCsv} className="rounded-xl bg-emerald-600 py-2.5 font-kufi text-sm font-bold text-white">
           ⬇️ تصدير Excel
