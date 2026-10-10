@@ -28,21 +28,12 @@ const dayLabel = (d: string) =>
   new Date(`${d}T00:00:00`).toLocaleDateString("ar-u-ca-gregory-nu-arab", { weekday: "long", day: "numeric", month: "long" });
 const shortDate = (d: string) =>
   new Date(`${d}T00:00:00`).toLocaleDateString("ar-u-ca-gregory-nu-arab", { day: "numeric", month: "numeric" });
-/** مطابقة الأسماء دون تشكيل ومع توحيد الهمزات والتاء المربوطة */
-const norm = (t: string) =>
-  t
-    .replace(/[\u064B-\u0652\u0640]/g, "")
-    .replace(/[أإآ]/g, "ا")
-    .replace(/ة/g, "ه")
-    .replace(/ى/g, "ي")
-    .replace(/\s+/g, " ")
-    .trim();
 const shortName = (name: string) => name.split(/\s+/).slice(0, 3).join(" ");
 
 type Mode = "detail" | "grid";
 
 /** 🖨️ سجل تسميع الحلقة — ما سمّعته كل طالبة في كل لقاء فائت من الفصل،
-    لحلقة واحدة (المسجد واليوم)، أو بالبحث عن معلّمة: كل طالباتها في كل حلقاتها. «تفصيلي» = جدول لكل لقاء بالمقاطع،
+    لحلقة واحدة (المسجد واليوم)، أو باختيار معلّمة: كل طالباتها في كل حلقاتها. «تفصيلي» = جدول لكل لقاء بالمقاطع،
     «مختصر» = جدول واحد بالأوجه (الطالبات × اللقاءات) بالعرض. */
 export default function RecitePrintPage() {
   return (
@@ -98,14 +89,13 @@ function RecitePrint() {
   const sortedHalaqas = useMemo(() => [...halaqas].sort((a, b) => halaqaTitle(a).localeCompare(halaqaTitle(b), "ar")), [halaqas]);
   const [halaqaId, setHalaqaId] = useState(initHalaqa?.id ?? "");
   const [by, setBy] = useState<"halaqa" | "teacher">("halaqa");
-  const [q, setQ] = useState("");
   const [teacherId, setTeacherId] = useState("");
   const [mode, setMode] = useState<Mode>("detail");
   const cur = sortedHalaqas.find((h) => h.id === halaqaId) ?? sortedHalaqas[0];
   const today = dateKey(new Date());
   // 👩‍🏫 بالمعلّمة: كل طالباتها في كل حلقاتها (كل حلقة في ورقة)
   const teacher = by === "teacher" ? teachers.find((t) => t.id === teacherId) : undefined;
-  const found = q.trim() ? teachers.filter((t) => norm(t.name).includes(norm(q))).sort((a, b) => a.name.localeCompare(b.name, "ar")) : [];
+  const sortedTeachers = useMemo(() => [...teachers].sort((a, b) => a.name.localeCompare(b.name, "ar")), [teachers]);
   const chosen =
     by === "teacher"
       ? teacher
@@ -160,14 +150,6 @@ function RecitePrint() {
         .rp .bar{position:sticky;top:0;z-index:10;background:#f2efec;padding:10px 12px;border-bottom:1px solid #e0d6dc;display:flex;flex-direction:column;gap:8px}
         .rp .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
         .rp select{font-family:inherit;font-size:16px;font-weight:700;border:1px solid #d9c8d1;border-radius:10px;padding:8px 10px;background:#fff;color:#5d3f4e;flex:1;min-width:140px}
-        .rp .find{flex:1;min-width:200px}
-        .rp .find input{width:100%;font-family:inherit;font-size:16px;font-weight:700;border:1px solid #d9c8d1;border-radius:10px;padding:8px 10px;background:#fff;color:#4d3340}
-        .rp .hits{margin-top:6px;background:#fff;border:1px solid #e0d6dc;border-radius:12px;overflow:hidden}
-        .rp .hits button{display:flex;width:100%;justify-content:space-between;gap:8px;font-family:inherit;font-size:16px;font-weight:700;border:none;border-bottom:1px solid #f0e8ec;background:#fff;color:#4d3340;padding:9px 12px;cursor:pointer;text-align:start}
-        .rp .hits button span{color:#8b7c84;font-size:14px;font-weight:600}
-        .rp .nohit{padding:9px 12px;color:#8b7c84;font-size:15px}
-        .rp .chip{flex:1;display:flex;align-items:center;justify-content:space-between;background:#fff;border:2px solid #7d5a6c;border-radius:10px;padding:6px 12px;font-size:17px;font-weight:700;color:#4d3340}
-        .rp .chip button{border:none;background:#efe6eb;color:#5d3f4e;border-radius:8px;width:30px;height:30px;font-size:15px;cursor:pointer}
         .rp .seg{display:flex;background:#e8dfe4;border-radius:12px;padding:3px;flex:1}
         .rp .seg button{flex:1;font-family:inherit;font-size:15px;font-weight:700;border:none;border-radius:9px;padding:7px 8px;background:transparent;color:#7d5a6c;cursor:pointer}
         .rp .seg button.on{background:#fff;color:#4d3340;box-shadow:0 1px 3px #0001}
@@ -232,38 +214,15 @@ function RecitePrint() {
                 </option>
               ))}
             </select>
-          ) : teacher ? (
-            <div className="chip">
-              <span>👩‍🏫 {teacher.name}</span>
-              <button
-                type="button"
-                aria-label="تغيير المعلّمة"
-                onClick={() => {
-                  setTeacherId("");
-                  setQ("");
-                }}
-              >
-                ✕
-              </button>
-            </div>
           ) : (
-            <div className="find">
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 اكتبي اسم المعلّمة" autoFocus />
-              {q.trim() !== "" && (
-                <div className="hits">
-                  {found.length === 0 && <p className="nohit">لا توجد معلّمة بهذا الاسم</p>}
-                  {found.map((t) => {
-                    const n = students.filter((s) => s.teacherId === t.id).length;
-                    return (
-                      <button key={t.id} type="button" onClick={() => setTeacherId(t.id)}>
-                        👩‍🏫 {t.name}
-                        <span>{ar(n)} طالبة</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            <select value={teacher?.id ?? ""} onChange={(e) => setTeacherId(e.target.value)} aria-label="المعلّمة">
+              <option value="">👩‍🏫 اختاري المعلّمة</option>
+              {sortedTeachers.map((t) => (
+                <option key={t.id} value={t.id}>
+                  👩‍🏫 {t.name} ({ar(students.filter((s) => s.teacherId === t.id).length)} طالبة)
+                </option>
+              ))}
+            </select>
           )}
         </div>
         <div className="row">
@@ -282,7 +241,7 @@ function RecitePrint() {
       </div>
 
       <div className="sheet">
-        {!blocks.length && <p className="empty">{by === "teacher" ? (teacher ? "لا طالبات مسجّلات لهذه المعلّمة" : "اكتبي اسم المعلّمة واختاريها من القائمة 👆") : "لا توجد حلقات"}</p>}
+        {!blocks.length && <p className="empty">{by === "teacher" ? (teacher ? "لا طالبات مسجّلات لهذه المعلّمة" : "اختاري المعلّمة من القائمة 👆") : "لا توجد حلقات"}</p>}
         {blocks.map(({ h, list, meetings, cell, tNames }) => {
           const totals = list.map((s) => {
             let hifz = 0,
