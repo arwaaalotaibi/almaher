@@ -88,16 +88,24 @@ function RecitePrint() {
   const mosques = useMemo(() => [...new Set(halaqas.map((h) => h.mosque))].sort((a, b) => a.localeCompare(b, "ar")), [halaqas]);
   const [mosque, setMosque] = useState(initHalaqa?.mosque ?? "");
   const [halaqaId, setHalaqaId] = useState(initHalaqa?.id ?? "");
+  const [teacherId, setTeacherId] = useState("");
   const [mode, setMode] = useState<Mode>("detail");
   const curMosque = mosque || mosques[0] || "";
   const mosqueHalaqas = halaqas.filter((h) => h.mosque === curMosque);
   const chosen = halaqaId ? mosqueHalaqas.filter((h) => h.id === halaqaId) : mosqueHalaqas;
   const today = dateKey(new Date());
+  // معلّمات النطاق المختار: من تُسند لها الحلقة أو لها طالبات فيها
+  const scopeIds = new Set(chosen.map((h) => h.id));
+  const scopeTeachers = teachers
+    .filter((t) => t.halaqaIds.some((id) => scopeIds.has(id)) || students.some((s) => s.teacherId === t.id && scopeIds.has(s.halaqaId)))
+    .sort((a, b) => a.name.localeCompare(b.name, "ar"));
+  const teacher = scopeTeachers.find((t) => t.id === teacherId);
 
   const blocks = useMemo(
     () =>
-      chosen.map((h) => {
-        const list = students.filter((s) => s.halaqaId === h.id).sort((a, b) => a.name.localeCompare(b.name, "ar"));
+      chosen.flatMap((h) => {
+        const list = students.filter((s) => s.halaqaId === h.id && (!teacher || s.teacherId === teacher.id)).sort((a, b) => a.name.localeCompare(b.name, "ar"));
+        if (teacher && !list.length) return [];
         const ids = new Set(list.map((s) => s.id));
         const logs = recitations.filter((r) => ids.has(r.studentId) && (!h.termStart || r.date >= h.termStart) && r.date <= today);
         const meetings = meetingsOf(h, logs, today);
@@ -106,11 +114,11 @@ function RecitePrint() {
           if (!log || !log.attended) return { log, hifz: 0, tathbit: 0, mur: 0 };
           return { log, ...faceOf(log, s) };
         };
-        const tNames = teachers.filter((t) => t.halaqaIds.includes(h.id)).map((t) => t.name);
-        return { h, list, meetings, cell, tNames };
+        const tNames = teacher ? [teacher.name] : teachers.filter((t) => t.halaqaIds.includes(h.id)).map((t) => t.name);
+        return [{ h, list, meetings, cell, tNames }];
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [chosen.map((h) => h.id).join(), students, recitations, teachers, today]
+    [chosen.map((h) => h.id).join(), teacher?.id, students, recitations, teachers, today]
   );
 
   if (!hydrated) return <main className="p-8" />;
@@ -189,6 +197,7 @@ function RecitePrint() {
             onChange={(e) => {
               setMosque(e.target.value);
               setHalaqaId("");
+              setTeacherId("");
             }}
             aria-label="المسجد"
           >
@@ -198,11 +207,26 @@ function RecitePrint() {
               </option>
             ))}
           </select>
-          <select value={halaqaId} onChange={(e) => setHalaqaId(e.target.value)} aria-label="الحلقة">
+          <select
+            value={halaqaId}
+            onChange={(e) => {
+              setHalaqaId(e.target.value);
+              setTeacherId("");
+            }}
+            aria-label="الحلقة"
+          >
             <option value="">كل حلقات المسجد ({ar(mosqueHalaqas.length)})</option>
             {mosqueHalaqas.map((h) => (
               <option key={h.id} value={h.id}>
                 {h.day || halaqaTitle(h)}
+              </option>
+            ))}
+          </select>
+          <select value={teacher ? teacherId : ""} onChange={(e) => setTeacherId(e.target.value)} aria-label="المعلّمة">
+            <option value="">👩‍🏫 كل المعلّمات ({ar(scopeTeachers.length)})</option>
+            {scopeTeachers.map((t) => (
+              <option key={t.id} value={t.id}>
+                👩‍🏫 {t.name}
               </option>
             ))}
           </select>
@@ -223,7 +247,7 @@ function RecitePrint() {
       </div>
 
       <div className="sheet">
-        {!blocks.length && <p className="empty">لا توجد حلقات في هذا المسجد</p>}
+        {!blocks.length && <p className="empty">{teacher ? "لا طالبات لهذه المعلّمة في هذا النطاق" : "لا توجد حلقات في هذا المسجد"}</p>}
         {blocks.map(({ h, list, meetings, cell, tNames }) => {
           const totals = list.map((s) => {
             let hifz = 0,
