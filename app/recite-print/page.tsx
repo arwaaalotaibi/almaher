@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   activeStudents,
@@ -11,6 +11,7 @@ import {
   isDesc,
   isMurDesc,
   recitePartLabel,
+  TEACHER_PICK_KEY,
   useApp,
   type Halaqa,
   type RecitationLog,
@@ -21,6 +22,7 @@ import { partFaces } from "@/lib/progress";
 import { useForceLight } from "@/components/theme-toggle";
 import { useHydrated } from "@/components/ui";
 import { RoleOnly } from "@/components/admin-only";
+import { useRole } from "@/components/auth-gate";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 const fmt = (n: number) => (Number.isInteger(n) ? ar(n) : n.toLocaleString("ar-EG", { maximumFractionDigits: 2 }));
@@ -44,7 +46,7 @@ type Mode = "detail" | "grid";
     «مختصر» = جدول واحد بالأوجه (الطالبات × اللقاءات) بالعرض. */
 export default function RecitePrintPage() {
   return (
-    <RoleOnly roles={["admin"]}>
+    <RoleOnly roles={["admin", "teacher"]}>
       <Suspense fallback={<main className="p-8" />}>
         <RecitePrint />
       </Suspense>
@@ -98,6 +100,12 @@ function RecitePrint() {
   // كل حلقة باسمها: «مسجد البحر — الاثنين» غير «مسجد البحر — الأربعاء»
   const sortedHalaqas = useMemo(() => [...halaqas].sort((a, b) => halaqaTitle(a).localeCompare(halaqaTitle(b), "ar")), [halaqas]);
   const [halaqaId, setHalaqaId] = useState(initHalaqa?.id ?? "");
+  // 👩‍🏫 المعلّمة: طالباتها فقط (ومن تشاركها حلقتها)، بلا اختيار معلّمة أخرى
+  const isTeacher = useRole() === "teacher";
+  const [myId, setMyId] = useState("");
+  useEffect(() => {
+    if (isTeacher) setMyId(window.localStorage.getItem(TEACHER_PICK_KEY) ?? "");
+  }, [isTeacher]);
   const [by, setBy] = useState<"halaqa" | "teacher">("halaqa");
   const [teacherId, setTeacherId] = useState("");
   const [tHalaqaId, setTHalaqaId] = useState(""); // حلقة من حلقات المعلّمة ("" = كلها)
@@ -105,18 +113,19 @@ function RecitePrint() {
   const cur = sortedHalaqas.find((h) => h.id === halaqaId) ?? sortedHalaqas[0];
   const today = dateKey(new Date());
   // 👩‍🏫 بالمعلّمة: كل طالباتها في كل حلقاتها (كل حلقة في ورقة)
-  const teacher = by === "teacher" ? teachers.find((t) => t.id === teacherId) : undefined;
+  const teacher = isTeacher ? teachers.find((t) => t.id === myId) : by === "teacher" ? teachers.find((t) => t.id === teacherId) : undefined;
+  const teacherIds = new Set(teacher ? [teacher.id, ...(isTeacher ? (state.settings.teacherShares?.[teacher.id] ?? []) : [])] : []);
   const sortedTeachers = useMemo(() => [...teachers].sort((a, b) => a.name.localeCompare(b.name, "ar")), [teachers]);
   const teacherHalaqas = teacher
-    ? sortedHalaqas.filter((h) => students.some((s) => s.teacherId === teacher.id && s.halaqaId === h.id))
+    ? sortedHalaqas.filter((h) => students.some((s) => teacherIds.has(s.teacherId) && s.halaqaId === h.id))
     : [];
-  const chosen = by === "teacher" ? teacherHalaqas.filter((h) => !tHalaqaId || h.id === tHalaqaId) : cur ? [cur] : [];
+  const chosen = isTeacher || by === "teacher" ? teacherHalaqas.filter((h) => !tHalaqaId || h.id === tHalaqaId) : cur ? [cur] : [];
 
   const blocks = useMemo(
     () =>
       chosen.flatMap((h) => {
         const list = students
-          .filter((s) => s.halaqaId === h.id && (!teacher || s.teacherId === teacher.id))
+          .filter((s) => s.halaqaId === h.id && (!teacher || teacherIds.has(s.teacherId)))
           .sort((a, b) => a.name.localeCompare(b.name, "ar"));
         if (teacher && !list.length) return [];
         const ids = new Set(list.map((s) => s.id));
@@ -131,14 +140,14 @@ function RecitePrint() {
         return [{ h, list, meetings, cell, tNames }];
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [chosen.map((h) => h.id).join(), teacher?.id, students, recitations, teachers, today]
+    [chosen.map((h) => h.id).join(), [...teacherIds].join(), students, recitations, teachers, today]
   );
 
   if (!hydrated) return <main className="p-8" />;
 
   const back = () => {
     if (window.history.length > 1) window.history.back();
-    else window.location.assign("/director");
+    else window.location.assign(isTeacher ? "/" : "/director");
   };
 
   const partText = (p: RecitePart | undefined, faces: number, reverse = false) => {
@@ -205,16 +214,27 @@ function RecitePrint() {
           <button type="button" className="act back" onClick={back}>
             → رجوع
           </button>
-          <div className="seg">
-            <button type="button" className={by === "halaqa" ? "on" : ""} onClick={() => setBy("halaqa")}>
-              🕌 بالحلقة
-            </button>
-            <button type="button" className={by === "teacher" ? "on" : ""} onClick={() => setBy("teacher")}>
-              👩‍🏫 بالمعلّمة
-            </button>
-          </div>
+          {isTeacher ? (
+            <select value={tHalaqaId} onChange={(e) => setTHalaqaId(e.target.value)} aria-label="المسجد">
+              <option value="">🕌 كل مساجدي ({ar(teacherHalaqas.length)})</option>
+              {teacherHalaqas.map((h) => (
+                <option key={h.id} value={h.id}>
+                  🕌 {halaqaTitle(h)}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="seg">
+              <button type="button" className={by === "halaqa" ? "on" : ""} onClick={() => setBy("halaqa")}>
+                🕌 بالحلقة
+              </button>
+              <button type="button" className={by === "teacher" ? "on" : ""} onClick={() => setBy("teacher")}>
+                👩‍🏫 بالمعلّمة
+              </button>
+            </div>
+          )}
         </div>
-        <div className="row">
+        <div className="row" hidden={isTeacher}>
           {by === "halaqa" ? (
             <select value={cur?.id ?? ""} onChange={(e) => setHalaqaId(e.target.value)} aria-label="الحلقة">
               {sortedHalaqas.map((h) => (
@@ -271,7 +291,13 @@ function RecitePrint() {
       <div className="sheet">
         {!blocks.length && (
           <p className="empty">
-            {by === "teacher" ? (teacher ? "لا طالبات مسجّلات لهذه المعلّمة" : "اختاري المعلّمة من القائمة 👆") : "لا توجد حلقات"}
+            {isTeacher
+              ? "لا طالبات لكِ بعد"
+              : by === "teacher"
+                ? teacher
+                  ? "لا طالبات مسجّلات لهذه المعلّمة"
+                  : "اختاري المعلّمة من القائمة 👆"
+                : "لا توجد حلقات"}
           </p>
         )}
         {blocks.map(({ h, list, meetings, cell, tNames }) => {

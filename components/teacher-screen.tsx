@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import {
   buildSchedule,
   dateKey,
@@ -212,6 +213,20 @@ export function TeacherScreen({ teacher, onLogout }: { teacher: Teacher; onLogou
 
       {/* 🏆 لوحة الشرف الشهرية */}
       <HonorMonthCard teacherId={teacher.id} sections={herHalaqas.map((h) => ({ halaqa: h, list: mine(h) }))} />
+
+      {/* 🖨️ سجل تسميع طالباتها في كل اللقاءات */}
+      {total > 0 && (
+        <Link
+          href="/recite-print"
+          className="card mb-4 flex items-center justify-between gap-2 rounded-2xl px-4 py-3 active:scale-[0.99]"
+        >
+          <span>
+            <span className="block font-kufi text-base font-bold text-plum-800">🖨️ طباعة سجل التسميع</span>
+            <span className="block text-xs font-bold text-silver-600">ما سمّعته طالباتكِ في كل لقاءات الفصل</span>
+          </span>
+          <span className="text-plum-600">←</span>
+        </Link>
+      )}
 
       <NotificationsCard halaqaIds={teacher.halaqaIds} />
 
