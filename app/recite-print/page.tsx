@@ -33,7 +33,7 @@ const shortName = (name: string) => name.split(/\s+/).slice(0, 3).join(" ");
 type Mode = "detail" | "grid";
 
 /** 🖨️ سجل تسميع الحلقة — ما سمّعته كل طالبة في كل لقاء فائت من الفصل،
-    لحلقة واحدة أو لكل حلقات المسجد. «تفصيلي» = جدول لكل لقاء بالمقاطع،
+    لحلقة واحدة (المسجد واليوم)، ولمعلّمة واحدة إن اختيرت. «تفصيلي» = جدول لكل لقاء بالمقاطع،
     «مختصر» = جدول واحد بالأوجه (الطالبات × اللقاءات) بالعرض. */
 export default function RecitePrintPage() {
   return (
@@ -85,14 +85,13 @@ function RecitePrint() {
   const students = useMemo(() => activeStudents(state.students), [state.students]);
 
   const initHalaqa = halaqas.find((h) => h.id === params.get("halaqa"));
-  const mosques = useMemo(() => [...new Set(halaqas.map((h) => h.mosque))].sort((a, b) => a.localeCompare(b, "ar")), [halaqas]);
-  const [mosque, setMosque] = useState(initHalaqa?.mosque ?? "");
+  // كل حلقة باسمها: «مسجد البحر — الاثنين» غير «مسجد البحر — الأربعاء»
+  const sortedHalaqas = useMemo(() => [...halaqas].sort((a, b) => halaqaTitle(a).localeCompare(halaqaTitle(b), "ar")), [halaqas]);
   const [halaqaId, setHalaqaId] = useState(initHalaqa?.id ?? "");
   const [teacherId, setTeacherId] = useState("");
   const [mode, setMode] = useState<Mode>("detail");
-  const curMosque = mosque || mosques[0] || "";
-  const mosqueHalaqas = halaqas.filter((h) => h.mosque === curMosque);
-  const chosen = halaqaId ? mosqueHalaqas.filter((h) => h.id === halaqaId) : mosqueHalaqas;
+  const cur = sortedHalaqas.find((h) => h.id === halaqaId) ?? sortedHalaqas[0];
+  const chosen = cur ? [cur] : [];
   const today = dateKey(new Date());
   // معلّمات النطاق المختار: من تُسند لها الحلقة أو لها طالبات فيها
   const scopeIds = new Set(chosen.map((h) => h.id));
@@ -193,32 +192,16 @@ function RecitePrint() {
             → رجوع
           </button>
           <select
-            value={curMosque}
-            onChange={(e) => {
-              setMosque(e.target.value);
-              setHalaqaId("");
-              setTeacherId("");
-            }}
-            aria-label="المسجد"
-          >
-            {mosques.map((m) => (
-              <option key={m} value={m}>
-                🕌 {m}
-              </option>
-            ))}
-          </select>
-          <select
-            value={halaqaId}
+            value={cur?.id ?? ""}
             onChange={(e) => {
               setHalaqaId(e.target.value);
               setTeacherId("");
             }}
             aria-label="الحلقة"
           >
-            <option value="">كل حلقات المسجد ({ar(mosqueHalaqas.length)})</option>
-            {mosqueHalaqas.map((h) => (
+            {sortedHalaqas.map((h) => (
               <option key={h.id} value={h.id}>
-                {h.day || halaqaTitle(h)}
+                🕌 {halaqaTitle(h)}
               </option>
             ))}
           </select>
@@ -247,7 +230,7 @@ function RecitePrint() {
       </div>
 
       <div className="sheet">
-        {!blocks.length && <p className="empty">{teacher ? "لا طالبات لهذه المعلّمة في هذا النطاق" : "لا توجد حلقات في هذا المسجد"}</p>}
+        {!blocks.length && <p className="empty">{teacher ? "لا طالبات لهذه المعلّمة في هذه الحلقة" : "لا توجد حلقات"}</p>}
         {blocks.map(({ h, list, meetings, cell, tNames }) => {
           const totals = list.map((s) => {
             let hifz = 0,
