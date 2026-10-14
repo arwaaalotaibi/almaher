@@ -131,7 +131,7 @@ export function MushafPage({
       <div className="mb-2 flex items-center justify-between gap-2">
         {onTurn ? (
           <button type="button" onClick={() => onTurn(-1)} disabled={page <= 1} className={arrow} aria-label="الصفحة السابقة">
-            ›
+            <Chevron dir="right" />
           </button>
         ) : (
           <span />
@@ -148,7 +148,7 @@ export function MushafPage({
         </span>
         {onTurn ? (
           <button type="button" onClick={() => onTurn(1)} disabled={page >= 604} className={arrow} aria-label="الصفحة التالية">
-            ‹
+            <Chevron dir="left" />
           </button>
         ) : (
           <span />
@@ -250,5 +250,14 @@ export function MushafPage({
         المظلّل = الآية التي تسمعينها · اسحبي الصفحة أو استعملي ‹ › للتقليب
       </p>}
     </div>
+  );
+}
+
+/** سهم برسم ثابت الاتجاه — حروف ‹ › تنقلب في النص العربي */
+function Chevron({ dir }: { dir: "left" | "right" }) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d={dir === "right" ? "M9 5l7 7-7 7" : "M15 5l-7 7 7 7"} />
+    </svg>
   );
 }
