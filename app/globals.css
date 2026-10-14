@@ -388,6 +388,11 @@ input, textarea, select {
   min-width: 34px; padding: 1px 8px; text-align: center; color: #8a6a3a; border-radius: 999px;
   border: 1.5px solid #c9a567; background: var(--mushaf-head-in, #fffaf0);
 }
+/* 🖍️ آيات علّمتها الطالبة: 🟠 صعبة · 🔴 أخطأت فيها (قبل mushaf-cur ليغلبها تظليل التلاوة) */
+.mushaf-mark-hard { background: var(--mark-hard, #fed7aa); box-shadow: 0 0 0 2px var(--mark-hard, #fed7aa); }
+.mushaf-mark-error { background: var(--mark-error, #fecaca); box-shadow: 0 0 0 2px var(--mark-error, #fecaca); }
+:root[data-theme="dark"] { --mark-hard: #9a4d1a99; --mark-error: #9b2c2c99; }
+[data-mline] span { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .mushaf-cur { background: var(--mushaf-cur, #fde68ab3); box-shadow: 0 0 0 2px var(--mushaf-cur, #fde68ab3); }
 @keyframes mushaf-turn { from { opacity: 0; transform: translateX(-18px) rotateY(8deg); } to { opacity: 1; transform: none; } }
 .mushaf-turn { animation: mushaf-turn 0.45s ease-out both; transform-origin: right center; }

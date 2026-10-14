@@ -2,10 +2,36 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { fetchMushafPage, loadMushafFont, mushafFontFamily, type MushafLine } from "@/lib/quran-audio";
-import { surahName } from "@/lib/mushaf";
+import { refLabel, surahName } from "@/lib/mushaf";
 import { juzOfPage } from "@/lib/progress";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
+
+/** 🖍️ تلوين الآيات: الطالبة تضغط مطوّلاً على آية فتعلّمها «صعبة» أو «أخطأت فيها» —
+    تُحفظ في جهازها (لكل طالبة على حدة) */
+type Mark = "hard" | "error";
+const marksKey = () => {
+  try {
+    return `almaher-ayah-marks:${window.localStorage.getItem("almaher-my-student-id") || "me"}`;
+  } catch {
+    return "almaher-ayah-marks:me";
+  }
+};
+function loadMarks(): Record<string, Mark> {
+  try {
+    return JSON.parse(window.localStorage.getItem(marksKey()) || "{}") as Record<string, Mark>;
+  } catch {
+    return {};
+  }
+}
+function saveMarks(m: Record<string, Mark>) {
+  try {
+    window.localStorage.setItem(marksKey(), JSON.stringify(m));
+  } catch {
+    /* تخزين محجوب */
+  }
+}
+const LONG_PRESS_MS = 450;
 
 /** 📖 صفحة من مصحف المدينة بسطورها — الآية الحالية مظلّلة، وآيات خارج الورد باهتة.
     في المصحف المطبوع: الصفحات الفردية في الجهة اليمنى، والزوجية في اليسرى. */
@@ -40,6 +66,51 @@ export function MushafPage({
   const [failed, setFailed] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 340, h: 0 });
+
+  // 🖍️ العلامات وقائمة الضغط المطوّل
+  const [marks, setMarks] = useState<Record<string, Mark>>({});
+  useEffect(() => setMarks(loadMarks()), []);
+  const [menu, setMenu] = useState<{ key: string; x: number; y: number } | null>(null);
+  const press = useRef<{ t: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null);
+  const fired = useRef(false); // الضغط المطوّل لا يُتبع بنقرة (لا ينتقل للآية)
+  const startPress = (key: string) => (e: React.PointerEvent) => {
+    fired.current = false;
+    const { clientX: x, clientY: y } = e;
+    if (press.current) clearTimeout(press.current.t);
+    press.current = {
+      x,
+      y,
+      t: setTimeout(() => {
+        fired.current = true;
+        press.current = null;
+        try {
+          navigator.vibrate?.(15);
+        } catch {
+          /* */
+        }
+        setMenu({ key, x, y });
+      }, LONG_PRESS_MS),
+    };
+  };
+  const movePress = (e: React.PointerEvent) => {
+    const p0 = press.current;
+    if (p0 && Math.hypot(e.clientX - p0.x, e.clientY - p0.y) > 10) {
+      clearTimeout(p0.t);
+      press.current = null;
+    }
+  };
+  const endPress = () => {
+    if (press.current) clearTimeout(press.current.t);
+    press.current = null;
+  };
+  const setMark = (key: string, m: Mark | null) => {
+    const next = { ...loadMarks() };
+    if (m) next[key] = m;
+    else delete next[key];
+    saveMarks(next);
+    setMarks(next);
+    setMenu(null);
+  };
 
   useEffect(() => {
     let off = false;
@@ -223,11 +294,24 @@ export function MushafPage({
                         {w.code}
                       </span>
                     );
+                  const mark = marks[w.key];
                   return (
                     <span
                       key={i}
-                      onClick={inWard && onPick ? () => onPick(w.key) : undefined}
-                      className={`rounded px-0 transition-colors duration-500 ${isCur ? "mushaf-cur" : ""} ${
+                      onPointerDown={startPress(w.key)}
+                      onPointerMove={movePress}
+                      onPointerUp={endPress}
+                      onPointerCancel={endPress}
+                      onPointerLeave={endPress}
+                      onContextMenu={(e) => e.preventDefault()}
+                      onClick={() => {
+                        if (fired.current) {
+                          fired.current = false;
+                          return;
+                        }
+                        if (inWard && onPick) onPick(w.key);
+                      }}
+                      className={`rounded px-0 transition-colors duration-500 ${mark ? `mushaf-mark-${mark}` : ""} ${isCur ? "mushaf-cur" : ""} ${
                         inWard ? (onPick ? "cursor-pointer" : "") : "opacity-45"
                       }`}
                     >
@@ -247,8 +331,42 @@ export function MushafPage({
         </div>
       </div>
       {!fill && <p className="mt-2 text-center text-[10px] font-bold text-silver-600">
-        المظلّل = الآية التي تسمعينها · اسحبي الصفحة أو استعملي ‹ › للتقليب
+        المظلّل = الآية التي تسمعينها · اسحبي الصفحة للتقليب · اضغطي مطوّلاً على آية لتلوينها
       </p>}
+
+      {/* 🖍️ قائمة تلوين الآية */}
+      {menu && (
+        <div className="fixed inset-0 z-[80]" onPointerDown={() => setMenu(null)}>
+          <div
+            className="absolute w-56 rounded-2xl bg-white p-2 shadow-xl ring-1 ring-cream-dark dark:bg-plum-900"
+            style={{
+              left: Math.min(Math.max(8, menu.x - 112), (typeof window !== "undefined" ? window.innerWidth : 360) - 232),
+              top: menu.y > 260 ? menu.y - 190 : menu.y + 16,
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <p className="px-2 pb-1.5 pt-1 text-center font-kufi text-xs font-bold text-silver-600">
+              {(() => {
+                const [s0, a0] = menu.key.split(":").map(Number);
+                return refLabel(s0, a0);
+              })()}
+            </p>
+            <div className="grid gap-1.5">
+              <button type="button" onClick={() => setMark(menu.key, "hard")} className={`rounded-xl px-3 py-2.5 text-start text-sm font-bold text-orange-900 ${marks[menu.key] === "hard" ? "ring-2 ring-orange-400" : ""}`} style={{ background: "#ffedd5" }}>
+                🟠 آية صعبة
+              </button>
+              <button type="button" onClick={() => setMark(menu.key, "error")} className={`rounded-xl px-3 py-2.5 text-start text-sm font-bold text-red-900 ${marks[menu.key] === "error" ? "ring-2 ring-red-400" : ""}`} style={{ background: "#fee2e2" }}>
+                🔴 أخطأتُ فيها
+              </button>
+              {marks[menu.key] && (
+                <button type="button" onClick={() => setMark(menu.key, null)} className="rounded-xl bg-cream px-3 py-2.5 text-start text-sm font-bold text-plum-800">
+                  ✕ إزالة اللون
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
