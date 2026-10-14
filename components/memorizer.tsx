@@ -540,7 +540,7 @@ export function Memorizer({
               hide ? "bg-plum-600 text-white" : "bg-cream text-plum-700"
             }`}
           >
-            🙈 اختبري نفسك
+            🎯 اختبري نفسك
           </button>
           {view === "page" && (
             <button
@@ -596,7 +596,7 @@ export function Memorizer({
                   {cur.text.split(" ")[0]} …
                 </span>
               )}
-              <span className="text-sm font-bold text-amber-800">🙈 الآية مخفية — سمّعيها ثم اضغطي لكشفها</span>
+              <span className="text-sm font-bold text-amber-800">🎯 الآية مخفية — سمّعيها ثم اضغطي لكشفها</span>
             </button>
           ) : (
             <p className="font-body text-2xl font-medium leading-[2.3] text-ink" dir="rtl">
