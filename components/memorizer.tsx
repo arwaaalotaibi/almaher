@@ -7,7 +7,8 @@ import {
   type ReciterId,
   type WardAyah,
 } from "@/lib/quran-audio";
-import { pageOf, refLabel } from "@/lib/mushaf";
+import { refLabel } from "@/lib/mushaf";
+import { displayPageOf } from "@/lib/mushaf-display";
 import { MushafPage } from "./mushaf-page";
 import { buildTrack, silence, stepAt, type Step } from "@/lib/ward-audio";
 
@@ -423,7 +424,7 @@ export function Memorizer({
     );
   }
 
-  const readPage = pageOf(cur.surah, cur.ayah);
+  const readPage = displayPageOf(cur.surah, cur.ayah); // صفحة المصحف المعروض (طبعة الخطوط)
   const page = browse ?? readPage;
   const turn = (d: 1 | -1) => setBrowse(Math.min(604, Math.max(1, page + d)));
   const back = page !== readPage ? () => setBrowse(null) : undefined;

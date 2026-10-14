@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { partOn, STUDENT_PICK_KEY, useApp } from "@/lib/store";
 import { computeProgress } from "@/lib/progress";
-import { pageOf, pageStart, refLabel } from "@/lib/mushaf";
+import { refLabel } from "@/lib/mushaf";
+import { displayPageOf, displayPageStart } from "@/lib/mushaf-display";
 import { searchQuran, type SearchHit } from "@/lib/quran-audio";
 import { ayahCount, SURAHS } from "@/lib/surahs";
 import { useHydrated } from "@/components/ui";
@@ -101,7 +102,7 @@ export function MemorizePanel() {
     if (!text) return;
     if (/^\d+$/.test(text)) {
       const n = Number(text);
-      if (n >= 1 && n <= 604) goTo(pageStart(n));
+      if (n >= 1 && n <= 604) goTo(displayPageStart(n));
       else setFound({ hits: [], total: 0, msg: "رقم الصفحة من ١ إلى ٦٠٤" });
       return;
     }
@@ -153,7 +154,7 @@ export function MemorizePanel() {
                 >
                   <span className="flex items-center justify-between gap-2 text-[11px] font-bold text-plum-700">
                     <span>📖 {refLabel(h.surah, h.ayah)}</span>
-                    <span className="text-silver-600">صفحة {ar(pageOf(h.surah, h.ayah))}</span>
+                    <span className="text-silver-600">صفحة {ar(displayPageOf(h.surah, h.ayah))}</span>
                   </span>
                   <span className="mt-0.5 line-clamp-2 text-sm text-ink">{h.text}</span>
                 </button>

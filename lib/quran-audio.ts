@@ -132,27 +132,65 @@ export function loadMushafFont(page: number): Promise<void> {
   return p;
 }
 
+type RawWord = { position: number; code_v2: string; line_number: number; page_number: number; char_type_name: string };
+type RawVerse = { verse_key: string; words: RawWord[] };
+
+const rawCache = new Map<number, Promise<RawVerse[]>>();
+/** آيات by_page كما تُعيدها الواجهة */
+function fetchRawPage(page: number): Promise<RawVerse[]> {
+  let p = rawCache.get(page);
+  if (!p) {
+    p = fetch(
+      `https://api.quran.com/api/v4/verses/by_page/${page}?words=true&word_fields=code_v2,line_number,page_number&per_page=50`
+    )
+      .then((res) => {
+        if (!res.ok) throw new Error("mushaf-api");
+        return res.json() as Promise<{ verses?: RawVerse[] }>;
+      })
+      .then((json) => json.verses ?? []);
+    p.catch(() => rawCache.delete(page));
+    rawCache.set(page, p);
+  }
+  return p;
+}
+
+const verseOrder = (key: string) => {
+  const [s, a] = key.split(":").map(Number);
+  return s * 1000 + a;
+};
+
 const pageCache = new Map<number, Promise<MushafLine[]>>();
 /** سطور صفحة المصحف (مع سطور عناوين السور والبسملة) */
 export function fetchMushafPage(page: number): Promise<MushafLine[]> {
   let p = pageCache.get(page);
   if (!p) {
     p = (async () => {
-      const res = await fetch(
-        `https://api.quran.com/api/v4/verses/by_page/${page}?words=true&word_fields=code_v2,line_number,page_number&per_page=50`
-      );
-      if (!res.ok) throw new Error("mushaf-api");
-      const json = (await res.json()) as {
-        verses?: { verse_key: string; words: { code_v2: string; line_number: number; page_number: number; char_type_name: string }[] }[];
-      };
-      const byLine = new Map<number, MushafWord[]>();
-      for (const v of json.verses ?? []) {
+      // ⚠️ الواجهة تُسقط أحياناً آخر آية من by_page لصفحة وتُعيدها مع الصفحة المجاورة
+      // (المائدة ٧٧ تأتي مع ١٢١ وهي في ١٢٠)، فتُجمع كلمات الصفحة من الصفحات الثلاث بحسب page_number
+      // — تحقّقنا على الصفحات ٦٠٤: كل كلمات الآيات ٦٢٣٦ تظهر مرة واحدة في صفحتها
+      const near = [page - 1, page, page + 1].filter((n) => n >= 1 && n <= 604);
+      const [mine, ...others] = await Promise.all([
+        fetchRawPage(page),
+        ...near.filter((n) => n !== page).map((n) => fetchRawPage(n).catch(() => [] as RawVerse[])),
+      ]);
+      const seen = new Set<string>();
+      const byLine = new Map<number, (MushafWord & { o: number })[]>();
+      for (const v of [...mine, ...others.flat()]) {
         for (const w of v.words) {
-          if (w.page_number !== page) continue; // الواجهة قد تُلحق آيات من الصفحة التالية
+          if (w.page_number !== page) continue;
+          const id = `${v.verse_key}#${w.position}`;
+          if (seen.has(id)) continue;
+          seen.add(id);
           if (!byLine.has(w.line_number)) byLine.set(w.line_number, []);
-          byLine.get(w.line_number)!.push({ code: w.code_v2, key: v.verse_key, end: w.char_type_name === "end" });
+          byLine.get(w.line_number)!.push({
+            code: w.code_v2,
+            key: v.verse_key,
+            end: w.char_type_name === "end",
+            o: verseOrder(v.verse_key) * 1000 + w.position,
+          });
         }
       }
+      for (const [n, ws] of byLine) byLine.set(n, ws.sort((a, b) => a.o - b.o));
       const nums = [...byLine.keys()].sort((a, b) => a - b);
       if (!nums.length) return [];
       const maxLine = page <= 2 ? Math.max(...nums) : 15;
