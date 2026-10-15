@@ -445,6 +445,9 @@ function DirectorInner() {
       >
         🖨️ طباعة سجل التسميع (لكل لقاء)
       </Link>
+      <Link href="/usage" className="mb-2 block rounded-xl bg-cream py-2.5 text-center font-kufi text-sm font-bold text-plum-800">
+        📱 متابعة الاستخدام (آخر دخول ومسمّعي)
+      </Link>
       <div className="grid grid-cols-2 gap-2">
         <button type="button" onClick={exportCsv} className="rounded-xl bg-emerald-600 py-2.5 font-kufi text-sm font-bold text-white">
           ⬇️ تصدير Excel

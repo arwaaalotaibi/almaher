@@ -11,6 +11,24 @@ import { refLabel } from "@/lib/mushaf";
 import { displayPageOf } from "@/lib/mushaf-display";
 import { MushafPage } from "./mushaf-page";
 import { buildTrack, silence, stepAt, type Step } from "@/lib/ward-audio";
+import { supabase } from "@/lib/supabase";
+import { useRole } from "./auth-gate";
+
+/** 🎧 تسجيل استماع الطالبة (آخر استماع وعدد الأيام) — مرة كل ١٥ دقيقة على الأكثر */
+const LISTEN_PING_KEY = "almaher-listen-ping";
+function pingListened() {
+  try {
+    const last = Number(window.localStorage.getItem(LISTEN_PING_KEY) || 0);
+    if (Date.now() - last < 15 * 60 * 1000) return;
+    window.localStorage.setItem(LISTEN_PING_KEY, String(Date.now()));
+  } catch {
+    /* تخزين محجوب: نسجّل على أي حال */
+  }
+  void supabase.rpc("almaher_listened").then(
+    () => {},
+    () => {}
+  );
+}
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 const rateLabel = (r: number) => (r === 1 ? "عادية" : r < 1 ? `🐢 ${ar(r)}×` : `${ar(r)}×`);
@@ -32,6 +50,7 @@ export function Memorizer({
   /** 🔍 البدء من آية معيّنة (من البحث) — n يميّز كل طلب */
   startAt?: { surah: number; ayah: number; n: number } | null;
 }) {
+  const isStudent = useRole() === "student";
   const [ayahs, setAyahs] = useState<WardAyah[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [idx, setIdx] = useState(0); // الآية الجديدة الحالية في الورد
@@ -473,6 +492,7 @@ export function Memorizer({
         }}
         onPlay={(e) => {
           if (e.currentTarget.playbackRate !== rate) e.currentTarget.playbackRate = rate;
+          if (isStudent) pingListened();
         }}
         preload="auto"
       />

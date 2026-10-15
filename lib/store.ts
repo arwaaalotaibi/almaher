@@ -175,6 +175,8 @@ export interface Student {
   agreedAt?: string; // ISO — وقت إقرار الطالبة باللائحة
   agreedVersion?: string; // نسخة اللائحة التي أقرّت بها
   lastSeen?: string; // ISO — آخر مرة فتحت فيها الطالبة التطبيق
+  lastListen?: string; // ISO — 🎧 آخر مرة شغّلت التلاوة في مسمّعي
+  listenDays?: number; // 🎧 عدد الأيام التي استمعت فيها في مسمّعي
 }
 
 /** رابط واتساب برسالة جاهزة — مع رقم (محادثة مباشرة) أو بدونه (اختيار جهة) */
@@ -1125,6 +1127,8 @@ interface StudentRow {
   agreed_at: string | null;
   agreed_version: string;
   last_seen?: string | null;
+  last_listen?: string | null;
+  listen_days?: number | null;
 }
 
 function syncAlert() {
@@ -1210,7 +1214,7 @@ export async function pullRemote(): Promise<void> {
     supabase.from("almaher_teachers").select("id,name,halaqa_ids").order("created_at"),
     supabase
       .from("almaher_students")
-      .select("id,name,halaqa_id,teacher_id,track,plan,sessions,goals,done,note,phone,updated_at,agreed_at,agreed_version,last_seen")
+      .select("id,name,halaqa_id,teacher_id,track,plan,sessions,goals,done,note,phone,updated_at,agreed_at,agreed_version,last_seen,last_listen,listen_days")
       .order("created_at"),
     supabase
       .from("almaher_announcements")
@@ -1316,6 +1320,8 @@ export async function pullRemote(): Promise<void> {
     agreedAt: row.agreed_at ?? undefined,
     agreedVersion: row.agreed_version ?? "",
     lastSeen: row.last_seen ?? undefined,
+    lastListen: row.last_listen ?? undefined,
+    listenDays: row.listen_days ?? 0,
   }));
   persist({
     halaqas: (h.data ?? []).map((row) => ({
