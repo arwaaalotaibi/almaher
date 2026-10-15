@@ -96,6 +96,73 @@ export function HonorList({ onDesign }: { onDesign: (halaqaId: string, studentId
     }
   };
 
+  // 🏅 طباعة متميزات اللقاءات: لقاء برقمه (لكل حلقة تاريخها)، أو آخر لقاء فيه اختيارات، أو كل اللقاءات
+  const [weekSel, setWeekSel] = useState<string>("last");
+  const maxSession = Math.max(0, ...data.map((d) => d.weekDates.length && d.termSessionOf(d.weekDates[0])));
+  const weekRows = data
+    .map((d) => {
+      const pick = (dt: string) => ({
+        n: d.termSessionOf(dt),
+        date: dt,
+        picks: d.allWeek.filter((x) => x.period === dt),
+      });
+      const dates =
+        weekSel === "all"
+          ? [...d.weekDates].reverse()
+          : weekSel === "last"
+            ? d.weekDates.slice(0, 1)
+            : d.weekDates.filter((dt) => d.termSessionOf(dt) === Number(weekSel));
+      return { h: d.h, rows: dates.map(pick).filter((r) => r.picks.length) };
+    })
+    .filter((d) => d.rows.length);
+  const weekTitle =
+    weekSel === "all" ? "متميزات اللقاءات" : weekSel === "last" ? "متميزات آخر لقاء" : `متميزات اللقاء ${ar(Number(weekSel))}`;
+  const weekText = () =>
+    `🏅 ${weekTitle} — جمعية الماهر بالقرآن\n\n` +
+    weekRows
+      .map((d) =>
+        [
+          `🕌 ${halaqaTitle(d.h)}`,
+          ...d.rows.map((r) => `   لقاء ${ar(r.n)}: ${r.picks.map((x) => nameOf(x.studentId)).join("، ")}`),
+        ].join("\n")
+      )
+      .join("\n\n");
+  const printWeek = () => {
+    const w = window.open("", "_blank");
+    if (!w) return;
+    const esc = (t: string) => t.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c] as string);
+    const body = weekRows
+      .map(
+        (d) => `<section><h2>🕌 ${esc(halaqaTitle(d.h))}</h2><table>${d.rows
+          .map(
+            (r) =>
+              `<tr><td>لقاء ${ar(r.n)}<br><small>${esc(dayLabel(r.date))}</small></td><td>${r.picks
+                .map((x) => `<b>🏅 ${esc(nameOf(x.studentId))}</b> <small>· ${esc(teacherOf(x.teacherId))}</small>`)
+                .join("<br>")}</td></tr>`
+          )
+          .join("")}</table></section>`
+      )
+      .join("");
+    w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>${esc(weekTitle)}</title>
+      <style>body{font-family:"Geeza Pro","Noto Naskh Arabic",Tahoma,serif;color:#4d3340;padding:24px}h1{text-align:center;margin:0 0 4px}p.s{text-align:center;color:#8b7c84;margin:0 0 18px}
+      section{break-inside:avoid;border:2px solid #e8d9b5;border-radius:14px;padding:12px 16px;margin-bottom:14px}h2{margin:0 0 6px;font-size:20px}
+      table{width:100%;border-collapse:collapse;font-size:17px}td{border-bottom:1px solid #eee;padding:6px 4px;vertical-align:top}td:first-child{width:30%;color:#7d5a6c;font-weight:bold}small{color:#8b7c84;font-weight:normal;font-size:13px}</style></head>
+      <body><h1>🏅 ${esc(weekTitle)}</h1><p class="s">جمعية الماهر بالقرآن</p>${body || "<p class='s'>لا اختيارات بعد</p>"}</body></html>`);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 400);
+  };
+  const [weekCopied, setWeekCopied] = useState(false);
+  const copyWeek = async () => {
+    try {
+      await navigator.clipboard.writeText(weekText());
+      setWeekCopied(true);
+      setTimeout(() => setWeekCopied(false), 1800);
+    } catch {
+      /* */
+    }
+  };
+
   return (
     <div>
       {/* 🔓 المفتوحة للمعلّمات الآن — تلقائياً بالتاريخ */}
@@ -151,6 +218,36 @@ export function HonorList({ onDesign }: { onDesign: (halaqaId: string, studentId
         <button type="button" onClick={copy} disabled={!filled.length} className="rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white disabled:opacity-40">
           {copied ? "✓ نُسخت" : "📋 نسخ للواتساب"}
         </button>
+      </div>
+
+      {/* 🏅 طباعة متميزات اللقاءات */}
+      <div className="card mb-4 rounded-2xl p-3">
+        <p className="mb-2 font-kufi text-sm font-bold text-plum-800">🏅 طباعة متميزات اللقاءات</p>
+        <select
+          className="mb-2 w-full rounded-xl border border-cream-dark bg-white px-3 py-2.5 text-sm font-bold"
+          value={weekSel}
+          onChange={(e) => setWeekSel(e.target.value)}
+          aria-label="اللقاء"
+        >
+          <option value="last">آخر لقاء</option>
+          {Array.from({ length: maxSession }, (_, i) => maxSession - i).map((k) => (
+            <option key={k} value={String(k)}>
+              اللقاء {ar(k)}
+            </option>
+          ))}
+          <option value="all">كل اللقاءات</option>
+        </select>
+        <p className="mb-2 text-[11px] font-bold text-silver-600">
+          {hid ? "للحلقة المختارة أعلاه" : "لكل الحلقات"} · {ar(weekRows.reduce((n, d) => n + d.rows.reduce((m, r) => m + r.picks.length, 0), 0))} متميزة
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" onClick={printWeek} disabled={!weekRows.length} className="rounded-xl bg-plum-600 py-2.5 text-sm font-bold text-white disabled:opacity-40">
+            🖨️ طباعة
+          </button>
+          <button type="button" onClick={copyWeek} disabled={!weekRows.length} className="rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white disabled:opacity-40">
+            {weekCopied ? "✓ نُسخت" : "📋 نسخ للواتساب"}
+          </button>
+        </div>
       </div>
 
       {data.map(({ h, b, boardPicks, allWeek, weekDates, termSessionOf }) => {
