@@ -38,7 +38,13 @@ export function HonorList({ onDesign }: { onDesign: (halaqaId: string, studentId
       const weekPicks = b ? all.filter((x) => x.kind === "week" && x.halaqaId === h.id && b.dates.includes(x.period)) : [];
       const dates = b ? b.dates.filter((d) => weekPicks.some((x) => x.period === d)) : [];
       const sessionOf = (d: string) => (b ? b.from + b.dates.indexOf(d) : 0);
-      return { h, b, boardPicks, weekPicks, dates, sessionOf };
+      // 🏅 على الشاشة: متميزات كل لقاءات الفصل حتى اليوم (الأحدث أولاً) — لا لقاءات اللوحة المختارة وحدها،
+      // وإلا اختفت متميزات اللقاء ٥ فما بعد ما دامت اللوحة الأولى هي المفتوحة
+      const termDates = boards.flatMap((x) => x.dates);
+      const allWeek = all.filter((x) => x.kind === "week" && x.halaqaId === h.id && termDates.includes(x.period));
+      const weekDates = termDates.filter((d) => allWeek.some((x) => x.period === d)).reverse();
+      const termSessionOf = (d: string) => (boards[0]?.from ?? 1) + termDates.indexOf(d);
+      return { h, b, boardPicks, weekPicks, dates, sessionOf, allWeek, weekDates, termSessionOf };
     });
 
   const filled = data.filter((d) => d.boardPicks.length || d.weekPicks.length);
@@ -147,7 +153,7 @@ export function HonorList({ onDesign }: { onDesign: (halaqaId: string, studentId
         </button>
       </div>
 
-      {data.map(({ h, b, boardPicks, weekPicks, dates, sessionOf }) => {
+      {data.map(({ h, b, boardPicks, allWeek, weekDates, termSessionOf }) => {
         const tIn = teachersIn(h);
         const missing = tIn.filter((t) => !boardPicks.some((x) => x.teacherId === t.id));
         return (
@@ -188,18 +194,18 @@ export function HonorList({ onDesign }: { onDesign: (halaqaId: string, studentId
                   {missing.length > 0 && <p className="mt-1.5 text-[11px] font-bold text-amber-800">⏳ لم تختر بعد: {missing.map((t) => t.name).join("، ")}</p>}
                 </div>
 
-                {/* 🏅 لقاءات اللوحة */}
+                {/* 🏅 كل لقاءات الفصل — الأحدث أولاً */}
                 <p className="mb-1.5 font-kufi text-sm font-bold text-plum-800">🏅 متميزات اللقاءات</p>
-                {dates.length ? (
+                {weekDates.length ? (
                   <div className="grid gap-1.5">
-                    {dates.map((dt) => {
-                      const picks = weekPicks.filter((x) => x.period === dt);
+                    {weekDates.map((dt) => {
+                      const picks = allWeek.filter((x) => x.period === dt);
                       const miss = tIn.filter((t) => !picks.some((x) => x.teacherId === t.id));
                       return (
                         <div key={dt} className="rounded-xl bg-cream/70 px-3 py-2">
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-xs font-bold text-plum-600">
-                              لقاء {ar(sessionOf(dt))} · {dayLabel(dt)}
+                              لقاء {ar(termSessionOf(dt))} · {dayLabel(dt)}
                             </span>
                             <button
                               type="button"
@@ -216,7 +222,7 @@ export function HonorList({ onDesign }: { onDesign: (halaqaId: string, studentId
                     })}
                   </div>
                 ) : (
-                  <p className="text-xs text-silver-600">لا اختيارات في لقاءات هذه اللوحة بعد</p>
+                  <p className="text-xs text-silver-600">لا اختيارات في لقاءات الفصل بعد</p>
                 )}
               </>
             )}
