@@ -36,6 +36,8 @@ const rateLabel = (r: number) => (r === 1 ? "عادية" : r < 1 ? `🐢 ${ar(r)
 const PREFS_KEY = "almaher-memorizer";
 const REPEATS = [1, 3, 5, 7];
 const RATES = [0.75, 1, 1.25, 1.5]; // سرعة التلاوة
+/** ⚙️ إعدادات التلاوة مفتوحة؟ — تبقى كما هي حين يُعاد بناء المسمّع (تغيير المقطع) */
+let settingsOpen = false;
 const LOOPS = [1, 2, 3, 0]; // تكرار الورد كاملاً (0 = بلا توقف)
 const LINK_MAX = 10; // 🔗 الربط التراكمي: أقصى عدد آيات يُعاد ربطها (حتى لا يطول في المقاطع الكبيرة)
 
@@ -45,6 +47,7 @@ export function Memorizer({
   to,
   startAt,
   initialLoops,
+  extraSettings,
 }: {
   from: { surah: number; ayah: number };
   to: { surah: number; ayah: number };
@@ -52,6 +55,8 @@ export function Memorizer({
   startAt?: { surah: number; ayah: number; n: number } | null;
   /** 🔁 تكرار الورد عند الفتح (0 = بلا توقف) — لا يُحفظ في التفضيلات */
   initialLoops?: number;
+  /** ⚙️ إعدادات إضافية تُعرض أعلى «إعدادات التلاوة» (مقدار التكرار) */
+  extraSettings?: React.ReactNode;
 }) {
   const isStudent = useRole() === "student";
   const [ayahs, setAyahs] = useState<WardAyah[] | null>(null);
@@ -665,7 +670,13 @@ export function Memorizer({
       </div>
 
       {/* ③ إعدادات التلاوة — مطويّة */}
-      <details className="card group mt-3 rounded-2xl">
+      <details
+        className="card group mt-3 rounded-2xl"
+        open={settingsOpen}
+        onToggle={(e) => {
+          settingsOpen = (e.currentTarget as HTMLDetailsElement).open;
+        }}
+      >
         <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3">
           <span className="text-sm font-bold text-plum-800">⚙️ إعدادات التلاوة</span>
           <span className="text-xs font-bold text-silver-600">
@@ -677,6 +688,7 @@ export function Memorizer({
           </span>
         </summary>
         <div className="grid gap-3 border-t border-cream-dark px-4 pb-4 pt-3">
+          {extraSettings}
           <label className="block">
             <span className="mb-1 block text-xs font-bold text-plum-700">🎙️ القارئ</span>
             <select
@@ -747,7 +759,7 @@ export function Memorizer({
             )}
           </div>
           <div>
-            <span className="mb-1 block text-xs font-bold text-plum-700">🔄 تكرار الورد كاملاً</span>
+            <span className="mb-1 block text-xs font-bold text-plum-700">🔄 عدد مرات التكرار</span>
             <div className="flex gap-1.5">
               {LOOPS.map((n) => (
                 <button

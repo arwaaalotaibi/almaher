@@ -9,6 +9,7 @@ import { searchQuran, type SearchHit } from "@/lib/quran-audio";
 import { ayahCount, SURAH_AYAHS, SURAHS } from "@/lib/surahs";
 import { useHydrated } from "@/components/ui";
 import { Memorizer } from "./memorizer";
+import { RUB_STARTS } from "@/lib/quran-rub";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 
@@ -35,6 +36,41 @@ function wardFaces(r: { from: Pos; to: Pos }): { page: number; from: Pos; to: Po
   return out;
 }
 
+/** 🔁 مقدار التكرار: الورد كاملاً، أو قطعة منه (وجه، وجهان، ربع حزب) */
+type Unit = "ward" | "face" | "two" | "rub";
+const UNITS: { key: Unit; label: string }[] = [
+  { key: "ward", label: "الورد كاملاً" },
+  { key: "face", label: "وجه" },
+  { key: "two", label: "وجهين" },
+  { key: "rub", label: "ربع" },
+];
+const UNIT_KEY = "almaher-mem-unit";
+type Piece = { label: string; from: Pos; to: Pos };
+
+function wardPieces(r: { from: Pos; to: Pos }, unit: Unit): Piece[] {
+  if (unit === "ward") return [];
+  if (unit === "rub") {
+    const out: Piece[] = [];
+    for (let i = 0; i < RUB_STARTS.length; i++) {
+      const start = { surah: RUB_STARTS[i][0], ayah: RUB_STARTS[i][1] };
+      const end = i + 1 < RUB_STARTS.length ? prevAyah({ surah: RUB_STARTS[i + 1][0], ayah: RUB_STARTS[i + 1][1] }) : { surah: 114, ayah: 6 };
+      if (before(end, r.from) || before(r.to, start)) continue;
+      const from = before(start, r.from) ? r.from : start;
+      const to = before(r.to, end) ? r.to : end;
+      out.push({ label: `الربع ${ar((i % 4) + 1)} من الحزب ${ar(Math.floor(i / 4) + 1)}`, from, to });
+    }
+    return out;
+  }
+  const faces = wardFaces(r);
+  if (unit === "face") return faces.map((f, i) => ({ label: `الوجه ${ar(i + 1)} · ص${ar(f.page)}`, from: f.from, to: f.to }));
+  const out: Piece[] = [];
+  for (let i = 0; i < faces.length; i += 2) {
+    const a = faces[i], b = faces[i + 1] ?? faces[i];
+    out.push({ label: b === a ? `الوجه ${ar(i + 1)} · ص${ar(a.page)}` : `الوجهان ${ar(i + 1)}–${ar(i + 2)} · ص${ar(a.page)}–${ar(b.page)}`, from: a.from, to: b.to });
+  }
+  return out;
+}
+
 /** 🎧 مسمّعي: تحفيظ الورد بالاستماع والتكرار — يعرف وردك القادم تلقائياً.
     يُعرض في تبويب «مسمّعي» بصفحة الطالبة، وفي صفحة /memorize */
 export function MemorizePanel() {
@@ -49,8 +85,26 @@ export function MemorizePanel() {
   const [busy, setBusy] = useState(false);
   const [found, setFound] = useState<{ hits: SearchHit[]; total: number; msg?: string } | null>(null);
   const [startAt, setStartAt] = useState<{ surah: number; ayah: number; n: number } | null>(null);
-  // 📄 وجه واحد من الورد يُكرَّر (null = الورد كاملاً) — رقم الصفحة
-  const [facePage, setFacePage] = useState<number | null>(null);
+  // 🔁 مقدار التكرار وأي قطعة من الورد (يُحفظ المقدار على الجهاز)
+  const [unit, setUnitState] = useState<Unit>("ward");
+  const [pieceIdx, setPieceIdx] = useState(0);
+  useEffect(() => {
+    try {
+      const u = window.localStorage.getItem(UNIT_KEY) as Unit | null;
+      if (u && UNITS.some((x) => x.key === u)) setUnitState(u);
+    } catch {
+      /* */
+    }
+  }, []);
+  const setUnit = (u: Unit) => {
+    setUnitState(u);
+    setPieceIdx(0);
+    try {
+      window.localStorage.setItem(UNIT_KEY, u);
+    } catch {
+      /* */
+    }
+  };
 
   useEffect(() => {
     setMyId(window.localStorage.getItem(STUDENT_PICK_KEY));
@@ -88,9 +142,9 @@ export function MemorizePanel() {
             (cFrom.surah === cTo.surah && cFrom.ayah > cTo.ayah)
           ? null
           : { from: cFrom, to: cTo };
-  const faces = wardRange ? wardFaces(wardRange) : [];
-  const face = faces.length > 1 ? faces.find((f) => f.page === facePage) : undefined;
-  const range = face ? { from: face.from, to: face.to } : wardRange;
+  const pieces = wardRange ? wardPieces(wardRange, unit) : [];
+  const piece = pieces.length > 1 ? pieces[Math.min(pieceIdx, pieces.length - 1)] : undefined;
+  const range = piece ? { from: piece.from, to: piece.to } : wardRange;
 
   const rangeText = (r: { from: Pos; to: Pos } | null) =>
     r ? `${refLabel(r.from.surah, r.from.ayah)} ← ${refLabel(r.to.surah, r.to.ayah)}` : "";
@@ -141,6 +195,42 @@ export function MemorizePanel() {
       setBusy(false);
     }
   };
+
+  /** ⚙️ في إعدادات التلاوة: ماذا يتكرر؟ */
+  const repeatUi = wardRange ? (
+    <div>
+      <p className="mb-1.5 text-xs font-bold text-plum-700">🔁 مقدار التكرار</p>
+      <div className="grid grid-cols-4 gap-1.5">
+        {UNITS.map((u) => (
+          <button
+            key={u.key}
+            type="button"
+            onClick={() => setUnit(u.key)}
+            className={`rounded-xl py-2 text-sm font-bold ${unit === u.key ? "bg-plum-600 text-white" : "bg-cream text-silver-600"}`}
+          >
+            {u.label}
+          </button>
+        ))}
+      </div>
+      {unit !== "ward" &&
+        (pieces.length > 1 ? (
+          <select
+            value={Math.min(pieceIdx, pieces.length - 1)}
+            onChange={(e) => setPieceIdx(Number(e.target.value))}
+            className="mt-2 w-full rounded-xl border border-cream-dark bg-white px-3 py-2 text-sm font-bold text-plum-800"
+            aria-label="القطعة"
+          >
+            {pieces.map((pc, i) => (
+              <option key={i} value={i}>
+                {pc.label} — {rangeText(pc)}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <p className="mt-1.5 text-[11px] font-bold text-silver-600">وردكِ كله ضمن {unit === "rub" ? "ربع واحد" : unit === "two" ? "وجهين" : "وجه واحد"} — يتكرر الورد كاملاً</p>
+        ))}
+    </div>
+  ) : null;
 
   return (
     <div>
@@ -197,7 +287,7 @@ export function MemorizePanel() {
             type="button"
             onClick={() => {
               setPreset(p.key);
-              setFacePage(null);
+              setPieceIdx(0);
             }}
             className={`flex-1 rounded-xl py-2 font-kufi text-[13px] font-bold transition ${
               preset === p.key ? "bg-plum-600 text-white shadow" : "text-silver-600"
@@ -211,34 +301,10 @@ export function MemorizePanel() {
         <p className="mb-2 text-center text-xs font-bold text-plum-700">📍 {rangeText(wardRange)}</p>
       )}
 
-      {/* 📄 أكرّر وجهاً واحداً من وردي */}
-      {faces.length > 1 && (
-        <div className="mb-3">
-          <div className="flex gap-1.5 overflow-x-auto pb-1">
-            <button
-              type="button"
-              onClick={() => setFacePage(null)}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${!face ? "bg-plum-600 text-white" : "bg-cream text-plum-700"}`}
-            >
-              📖 الورد كاملاً
-            </button>
-            {faces.map((f, i) => (
-              <button
-                key={f.page}
-                type="button"
-                onClick={() => setFacePage(f.page)}
-                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${face?.page === f.page ? "bg-amber-500 text-white" : "bg-cream text-plum-700"}`}
-              >
-                📄 الوجه {ar(i + 1)} <span className="font-normal opacity-80">· ص{ar(f.page)}</span>
-              </button>
-            ))}
-          </div>
-          {face && (
-            <p className="mt-1 text-center text-xs font-bold text-amber-800">
-              🔁 يتكرر الوجه بلا توقف: {rangeText(face)}
-            </p>
-          )}
-        </div>
+      {piece && (
+        <p className="-mt-1 mb-3 text-center text-xs font-bold text-amber-800">
+          🔁 يتكرر {piece.label.split(" · ")[0]}: {rangeText(piece)}
+        </p>
       )}
 
       {/* المقطع المخصص */}
@@ -296,8 +362,9 @@ export function MemorizePanel() {
           key={`${preset}-${range.from.surah}-${range.from.ayah}-${range.to.surah}-${range.to.ayah}`}
           from={range.from}
           to={range.to}
-          startAt={preset === "custom" && !face ? startAt : null}
-          initialLoops={face ? 0 : undefined}
+          startAt={preset === "custom" && !piece ? startAt : null}
+          initialLoops={piece ? 0 : undefined}
+          extraSettings={repeatUi}
         />
       ) : preset !== "custom" ? (
         <div className="card rounded-2xl p-8 text-center">
