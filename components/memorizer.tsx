@@ -10,6 +10,7 @@ import {
 import { refLabel } from "@/lib/mushaf";
 import { displayPageOf } from "@/lib/mushaf-display";
 import { MushafPage } from "./mushaf-page";
+import { VoiceRecorder } from "./voice-recorder";
 import { buildTrack, silence, stepAt, type Step } from "@/lib/ward-audio";
 import { supabase } from "@/lib/supabase";
 import { useRole } from "./auth-gate";
@@ -668,6 +669,21 @@ export function Memorizer({
         )}
         <div className="mt-3">{controls(false)}</div>
       </div>
+
+      {/* 🎙️ سمّعي وسجّلي صوتكِ — تُخفى الآيات أثناء التسجيل ثم تُكشف للمقارنة */}
+      <VoiceRecorder
+        label={`${refLabel(from.surah, from.ayah)} ← ${refLabel(to.surah, to.ayah)}`}
+        onStart={() => {
+          const el = audioRef.current;
+          if (el && playing) {
+            el.pause();
+            setPlaying(false);
+          }
+          setHide((h) => h || "all");
+          setRevealed(new Set());
+        }}
+        onStop={() => setHide(false)}
+      />
 
       {/* ③ إعدادات التلاوة — مطويّة */}
       <details
