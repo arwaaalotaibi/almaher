@@ -44,11 +44,14 @@ export function Memorizer({
   from,
   to,
   startAt,
+  initialLoops,
 }: {
   from: { surah: number; ayah: number };
   to: { surah: number; ayah: number };
   /** 🔍 البدء من آية معيّنة (من البحث) — n يميّز كل طلب */
   startAt?: { surah: number; ayah: number; n: number } | null;
+  /** 🔁 تكرار الورد عند الفتح (0 = بلا توقف) — لا يُحفظ في التفضيلات */
+  initialLoops?: number;
 }) {
   const isStudent = useRole() === "student";
   const [ayahs, setAyahs] = useState<WardAyah[] | null>(null);
@@ -97,6 +100,8 @@ export function Memorizer({
     } catch {
       /* نتجاهل */
     }
+    if (initialLoops !== undefined && LOOPS.includes(initialLoops)) setLoops(initialLoops);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const savePrefs = (patch: Record<string, unknown>) => {
     try {

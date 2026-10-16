@@ -6,7 +6,7 @@ import { computeProgress } from "@/lib/progress";
 import { refLabel } from "@/lib/mushaf";
 import { displayPageOf, displayPageStart } from "@/lib/mushaf-display";
 import { searchQuran, type SearchHit } from "@/lib/quran-audio";
-import { ayahCount, SURAHS } from "@/lib/surahs";
+import { ayahCount, SURAH_AYAHS, SURAHS } from "@/lib/surahs";
 import { useHydrated } from "@/components/ui";
 import { Memorizer } from "./memorizer";
 
@@ -14,6 +14,26 @@ const ar = (n: number) => n.toLocaleString("ar-EG");
 
 type Pos = { surah: number; ayah: number };
 type Preset = "hifz" | "tathbit" | "muraja" | "custom";
+
+const before = (a: Pos, b: Pos) => a.surah < b.surah || (a.surah === b.surah && a.ayah < b.ayah);
+/** آخر آية قبل موضع (عبر حدود السور) */
+const prevAyah = (p: Pos): Pos => (p.ayah > 1 ? { surah: p.surah, ayah: p.ayah - 1 } : { surah: p.surah - 1, ayah: SURAH_AYAHS[p.surah - 2] });
+
+/** 📄 أوجه الورد: لكل صفحة من صفحات المصحف المعروض الجزء الذي يقع منها في الورد */
+function wardFaces(r: { from: Pos; to: Pos }): { page: number; from: Pos; to: Pos }[] {
+  const p0 = displayPageOf(r.from.surah, r.from.ayah);
+  const p1 = displayPageOf(r.to.surah, r.to.ayah);
+  if (p1 - p0 > 30) return []; // مقطع طويل جداً (كالمصحف كاملاً): لا أوجه
+  const out: { page: number; from: Pos; to: Pos }[] = [];
+  for (let p = p0; p <= p1; p++) {
+    const start = displayPageStart(p);
+    const end = p < 604 ? prevAyah(displayPageStart(p + 1)) : { surah: 114, ayah: 6 };
+    const from = before(start, r.from) ? r.from : start;
+    const to = before(r.to, end) ? r.to : end;
+    if (!before(to, from)) out.push({ page: p, from, to });
+  }
+  return out;
+}
 
 /** 🎧 مسمّعي: تحفيظ الورد بالاستماع والتكرار — يعرف وردك القادم تلقائياً.
     يُعرض في تبويب «مسمّعي» بصفحة الطالبة، وفي صفحة /memorize */
@@ -29,6 +49,8 @@ export function MemorizePanel() {
   const [busy, setBusy] = useState(false);
   const [found, setFound] = useState<{ hits: SearchHit[]; total: number; msg?: string } | null>(null);
   const [startAt, setStartAt] = useState<{ surah: number; ayah: number; n: number } | null>(null);
+  // 📄 وجه واحد من الورد يُكرَّر (null = الورد كاملاً) — رقم الصفحة
+  const [facePage, setFacePage] = useState<number | null>(null);
 
   useEffect(() => {
     setMyId(window.localStorage.getItem(STUDENT_PICK_KEY));
@@ -55,7 +77,7 @@ export function MemorizePanel() {
 
   if (!hydrated) return null;
 
-  const range =
+  const wardRange =
     preset === "hifz"
       ? hifzRange
       : preset === "muraja"
@@ -66,6 +88,9 @@ export function MemorizePanel() {
             (cFrom.surah === cTo.surah && cFrom.ayah > cTo.ayah)
           ? null
           : { from: cFrom, to: cTo };
+  const faces = wardRange ? wardFaces(wardRange) : [];
+  const face = faces.length > 1 ? faces.find((f) => f.page === facePage) : undefined;
+  const range = face ? { from: face.from, to: face.to } : wardRange;
 
   const rangeText = (r: { from: Pos; to: Pos } | null) =>
     r ? `${refLabel(r.from.surah, r.from.ayah)} ← ${refLabel(r.to.surah, r.to.ayah)}` : "";
@@ -170,7 +195,10 @@ export function MemorizePanel() {
           <button
             key={p.key}
             type="button"
-            onClick={() => setPreset(p.key)}
+            onClick={() => {
+              setPreset(p.key);
+              setFacePage(null);
+            }}
             className={`flex-1 rounded-xl py-2 font-kufi text-[13px] font-bold transition ${
               preset === p.key ? "bg-plum-600 text-white shadow" : "text-silver-600"
             }`}
@@ -179,8 +207,38 @@ export function MemorizePanel() {
           </button>
         ))}
       </div>
-      {preset !== "custom" && range && (
-        <p className="mb-3 text-center text-xs font-bold text-plum-700">📍 {rangeText(range)}</p>
+      {preset !== "custom" && wardRange && (
+        <p className="mb-2 text-center text-xs font-bold text-plum-700">📍 {rangeText(wardRange)}</p>
+      )}
+
+      {/* 📄 أكرّر وجهاً واحداً من وردي */}
+      {faces.length > 1 && (
+        <div className="mb-3">
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
+            <button
+              type="button"
+              onClick={() => setFacePage(null)}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${!face ? "bg-plum-600 text-white" : "bg-cream text-plum-700"}`}
+            >
+              📖 الورد كاملاً
+            </button>
+            {faces.map((f, i) => (
+              <button
+                key={f.page}
+                type="button"
+                onClick={() => setFacePage(f.page)}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${face?.page === f.page ? "bg-amber-500 text-white" : "bg-cream text-plum-700"}`}
+              >
+                📄 الوجه {ar(i + 1)} <span className="font-normal opacity-80">· ص{ar(f.page)}</span>
+              </button>
+            ))}
+          </div>
+          {face && (
+            <p className="mt-1 text-center text-xs font-bold text-amber-800">
+              🔁 يتكرر الوجه بلا توقف: {rangeText(face)}
+            </p>
+          )}
+        </div>
       )}
 
       {/* المقطع المخصص */}
@@ -238,7 +296,8 @@ export function MemorizePanel() {
           key={`${preset}-${range.from.surah}-${range.from.ayah}-${range.to.surah}-${range.to.ayah}`}
           from={range.from}
           to={range.to}
-          startAt={preset === "custom" ? startAt : null}
+          startAt={preset === "custom" && !face ? startAt : null}
+          initialLoops={face ? 0 : undefined}
         />
       ) : preset !== "custom" ? (
         <div className="card rounded-2xl p-8 text-center">
