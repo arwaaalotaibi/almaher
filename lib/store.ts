@@ -1204,6 +1204,9 @@ export async function fetchSessionHistory(
   return { ready: true, rows };
 }
 
+/** سجلّات تسميع أُضيفت ولم يكتمل حفظها بعد ← معرّفها النهائي في القاعدة */
+const pendingAdds = new Map<string, Promise<string>>();
+
 /** ⚠️ واجهة Supabase تُعيد ١٠٠٠ صف على الأكثر في الطلب الواحد — فتُجلب الجداول الكبيرة
     على دفعات حتى آخرها. (تجاوز سجلّ التسميع ١٠٠٠ صف في ١٤ أكتوبر فاختفت أقدم اللقاءات) */
 const PAGE = 1000;
@@ -1257,6 +1260,8 @@ export async function pullRemote(): Promise<void> {
         .from("almaher_sessions")
         .select("id,student_id,log_date,attended,parts,note,created_at,faces")
         .order("log_date", { ascending: false })
+        // في اليوم نفسه: الأقدم أولاً — فإن تكرّر سجلّ لقاء يُعتمد الأصلي في العرض والتعديل
+        .order("created_at")
         .order("id")
         .range(f, t)
     ),
@@ -1959,23 +1964,52 @@ export const actions = {
   },
   /** الطالبة تسجّل ما سمّعته في اللقاء (تسميع/مراجعة/تثبيت) */
   addRecitation(log: Omit<RecitationLog, "id" | "createdAt">) {
+    // 🛡️ سجلّ واحد للطالبة في اليوم: إن كان عندنا سجلّ لنفس اللقاء (ضغطتان متتاليتان مثلاً) يُعدَّل لا يُكرَّر
+    const local = getState().recitations.find((r) => r.studentId === log.studentId && r.date === log.date);
+    if (local) {
+      actions.updateRecitation(local.id, log);
+      return;
+    }
     const rec: RecitationLog = {
       ...log,
       id: uid(),
       createdAt: new Date().toISOString(),
     };
     setState((s) => ({ ...s, recitations: [rec, ...s.recitations] }));
-    run(() =>
-      supabase.from("almaher_sessions").insert({
-        id: rec.id,
-        student_id: rec.studentId,
-        log_date: rec.date,
-        attended: rec.attended,
-        parts: { tasmi: rec.tasmi, muraja: rec.muraja, tathbit: rec.tathbit, ...(rec.star ? { star: true } : {}) },
-        note: rec.note ?? "",
-        faces: rec.faces ?? {},
-      })
-    );
+    const row = {
+      log_date: rec.date,
+      attended: rec.attended,
+      parts: { tasmi: rec.tasmi, muraja: rec.muraja, tathbit: rec.tathbit, ...(rec.star ? { star: true } : {}) },
+      note: rec.note ?? "",
+      faces: rec.faces ?? {},
+    };
+    let settle: (id: string) => void = () => {};
+    pendingAdds.set(rec.id, new Promise<string>((r) => (settle = r)));
+    run(async () => {
+      // 🛡️ وإن لم يظهر السجلّ في الجهاز (بيانات ناقصة أو قديمة) نسأل القاعدة أولاً:
+      // يوجد سجلّ لهذه الطالبة في هذا اليوم ⇒ يُعدَّل الأقدم بدل إضافة نسخة ثانية
+      const found = await supabase
+        .from("almaher_sessions")
+        .select("id")
+        .eq("student_id", rec.studentId)
+        .eq("log_date", rec.date)
+        .order("created_at")
+        .limit(1);
+      const existingId = (found.data?.[0] as { id?: string } | undefined)?.id;
+      try {
+        if (existingId) {
+          setState((s) => ({
+            ...s,
+            recitations: s.recitations.filter((x) => x.id !== existingId).map((x) => (x.id === rec.id ? { ...x, id: existingId } : x)),
+          }));
+          return await supabase.from("almaher_sessions").update(row).eq("id", existingId);
+        }
+        return await supabase.from("almaher_sessions").insert({ id: rec.id, student_id: rec.studentId, ...row });
+      } finally {
+        settle(existingId ?? rec.id);
+        pendingAdds.delete(rec.id);
+      }
+    });
   },
   /** تعديل سجلّ تسميع موجود — تصحيح خطأ دون إعادة الإدخال من البداية */
   updateRecitation(id: string, data: Omit<RecitationLog, "id" | "createdAt">) {
@@ -1985,7 +2019,9 @@ export const actions = {
         x.id === id ? { ...x, ...data } : x
       ),
     }));
-    run(() =>
+    // سجلّ أُضيف للتو ولم يصل للقاعدة بعد: ننتظره (وقد يكون صار سجلّاً قديماً موجوداً) ثم نعدّله
+    const pending = pendingAdds.get(id);
+    run(async () =>
       supabase
         .from("almaher_sessions")
         .update({
@@ -1995,7 +2031,7 @@ export const actions = {
           note: data.note ?? "",
           faces: data.faces ?? {},
         })
-        .eq("id", id)
+        .eq("id", pending ? await pending : id)
     );
   },
   /** 🗂️ استرجاع نسخة من الأرشيف: تحلّ محلّ سجلّ اللقاء نفسه إن وُجد (فتُؤرشف نسخته الحالية
@@ -2032,7 +2068,8 @@ export const actions = {
       ...s,
       recitations: s.recitations.filter((x) => x.id !== id),
     }));
-    run(() => supabase.from("almaher_sessions").delete().eq("id", id));
+    const pending = pendingAdds.get(id);
+    run(async () => supabase.from("almaher_sessions").delete().eq("id", pending ? await pending : id));
   },
   /* ===== التجويد ===== */
   addTajweed(data: Omit<TajweedLesson, "id" | "createdAt">) {
