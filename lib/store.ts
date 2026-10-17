@@ -1204,6 +1204,21 @@ export async function fetchSessionHistory(
   return { ready: true, rows };
 }
 
+/** ⚠️ واجهة Supabase تُعيد ١٠٠٠ صف على الأكثر في الطلب الواحد — فتُجلب الجداول الكبيرة
+    على دفعات حتى آخرها. (تجاوز سجلّ التسميع ١٠٠٠ صف في ١٤ أكتوبر فاختفت أقدم اللقاءات) */
+const PAGE = 1000;
+async function fetchAll<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>
+): Promise<{ data: T[] | null; error: unknown }> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await page(from, from + PAGE - 1);
+    if (error) return { data: from ? out : null, error };
+    out.push(...(data ?? []));
+    if (!data || data.length < PAGE) return { data: out, error: null };
+  }
+}
+
 export async function pullRemote(): Promise<void> {
   const [h, t, s, a, b, r, sess, trm, tj, tjr, rdp, sup, codes, setg, tcodes, hon] = await Promise.all([
     supabase
@@ -1212,10 +1227,14 @@ export async function pullRemote(): Promise<void> {
       .select("*")
       .order("created_at"),
     supabase.from("almaher_teachers").select("id,name,halaqa_ids").order("created_at"),
-    supabase
-      .from("almaher_students")
-      .select("id,name,halaqa_id,teacher_id,track,plan,sessions,goals,done,note,phone,updated_at,agreed_at,agreed_version,last_seen,last_listen,listen_days")
-      .order("created_at"),
+    fetchAll<StudentRow>((f, t) =>
+      supabase
+        .from("almaher_students")
+        .select("id,name,halaqa_id,teacher_id,track,plan,sessions,goals,done,note,phone,updated_at,agreed_at,agreed_version,last_seen,last_listen,listen_days")
+        .order("created_at")
+        .order("id")
+        .range(f, t)
+    ),
     supabase
       .from("almaher_announcements")
       .select("id,body,halaqa_id,created_at,pinned,type,show_at,expires_at")
@@ -1224,13 +1243,23 @@ export async function pullRemote(): Promise<void> {
       .from("almaher_books")
       .select("id,title,url,pages,img_base,reading_plan,created_at")
       .order("created_at", { ascending: false }),
-    supabase
-      .from("almaher_notif_reads")
-      .select("announcement_id,student_id,read_at"),
-    supabase
-      .from("almaher_sessions")
-      .select("id,student_id,log_date,attended,parts,note,created_at,faces")
-      .order("log_date", { ascending: false }),
+    fetchAll<{ announcement_id: string; student_id: string; read_at: string }>((f, t) =>
+      supabase
+        .from("almaher_notif_reads")
+        .select("announcement_id,student_id,read_at")
+        .order("read_at")
+        .order("announcement_id")
+        .order("student_id")
+        .range(f, t)
+    ),
+    fetchAll<Record<string, unknown>>((f, t) =>
+      supabase
+        .from("almaher_sessions")
+        .select("id,student_id,log_date,attended,parts,note,created_at,faces")
+        .order("log_date", { ascending: false })
+        .order("id")
+        .range(f, t)
+    ),
     supabase
       .from("almaher_terms")
       .select("id,halaqa_id,day,term_start,term_sessions,students,closed_at")
@@ -1239,12 +1268,25 @@ export async function pullRemote(): Promise<void> {
       .from("almaher_tajweed")
       .select("id,title,kind,url,questions,created_at")
       .order("created_at"),
-    supabase
-      .from("almaher_tajweed_results")
-      .select("lesson_id,student_id,score,total,answered_at"),
-    supabase
-      .from("almaher_reading_progress")
-      .select("book_id,segment_id,student_id,done,score,total,updated_at"),
+    fetchAll<Record<string, unknown>>((f, t) =>
+      supabase
+        .from("almaher_tajweed_results")
+        .select("lesson_id,student_id,score,total,answered_at")
+        .order("answered_at")
+        .order("lesson_id")
+        .order("student_id")
+        .range(f, t)
+    ),
+    fetchAll<Record<string, unknown>>((f, t) =>
+      supabase
+        .from("almaher_reading_progress")
+        .select("book_id,segment_id,student_id,done,score,total,updated_at")
+        .order("updated_at")
+        .order("book_id")
+        .order("segment_id")
+        .order("student_id")
+        .range(f, t)
+    ),
     supabase
       .from("almaher_support")
       .select("id,student_id,kind,body,reply,status,created_at,replied_at")
@@ -1256,7 +1298,9 @@ export async function pullRemote(): Promise<void> {
     // رموز المعلّمات — للإدارة فقط (قبل تشغيل v12 يعيد خطأ يُتجاهل)
     supabase.from("almaher_teacher_codes").select("teacher_id,code"),
     // 🏅🏆 متميزات اللقاء ولوحة الشرف (v21 — قبل تشغيله يعيد خطأ يُتجاهل)
-    supabase.from("almaher_honors").select("id,kind,period,halaqa_id,teacher_id,student_id,created_at"),
+    fetchAll<Record<string, unknown>>((f, t) =>
+      supabase.from("almaher_honors").select("id,kind,period,halaqa_id,teacher_id,student_id,created_at").order("created_at").order("id").range(f, t)
+    ),
   ]);
   const teacherCodeMap = new Map(
     ((tcodes.data ?? []) as { teacher_id: string; code: string }[]).map((x) => [x.teacher_id, x.code])
