@@ -1,9 +1,33 @@
 import { partFaces } from "./progress";
+import { rangeFaces } from "./faces";
+import { advanceByUnit, unitOf } from "./units";
+import { surahNumber } from "./mushaf";
+
+/** 📏 مطلوب لقاء بالأوجه في الخطة السارية فيه: الوجه كما هو، والسطر/الربع/الحزب
+    بأوجه المطلوب من بداية ما سمّعته (أو المحفوظ مع السجلّ حين سُجّل) */
+export function requiredFaces(
+  p: CoursePlan,
+  part: RecitePart,
+  key: "hifz" | "murajaah",
+  stored?: number
+): number {
+  if (typeof stored === "number") return stored;
+  const qty = Math.max(0, Math.round(((key === "hifz" ? p.hifz : p.murajaah) || 0) * 4) / 4);
+  const unit = unitOf(key === "hifz" ? p.hifzUnit : p.murUnit);
+  if (unit === "face" || qty <= 0 || part.status !== "done" || !part.fromSurah) return unit === "face" ? qty : 0;
+  const desc = key === "hifz" ? isDesc(p) : isMurDesc(p);
+  const mode = desc ? "surahDesc" : "asc";
+  const from = { surah: surahNumber(part.fromSurah), ayah: part.fromAyah ?? 1 };
+  return rangeFaces(from, advanceByUnit(from, qty, unit, mode).end, mode);
+}
 import {
   isDesc,
   isMurDesc,
+  planAt,
   tathbitSpan,
   partOn,
+  type CoursePlan,
+  type RecitePart,
   type Halaqa,
   type ReadingProgress,
   type RecitationLog,
@@ -64,8 +88,7 @@ export function computeRace(
     // المقرر = أوجه الخطة لكل لقاء، ومقرر التثبيت = حفظ آخر لقاء حاضر (أو لقاءين/ثلاثة بحسب الخطة).
     // نمرّ على اللقاءات الحاضرة بترتيب التاريخ لمعرفة حفظ اللقاءات السابقة (ولو قبل الفترة).
     // المقرر بدقة الربع (١٫٥ وجه مثلاً)
-    const reqH = Math.max(0, Math.round((st.plan?.hifz || 0) * 4) / 4);
-    const reqM = Math.max(0, Math.round((st.plan?.murajaah || 0) * 4) / 4);
+    // 🗂️ المقرر من الخطة السارية في تاريخ كل لقاء (تعديل الخطة خلال الفصل لا يغيّر حكم ما مضى)
     const d = isDesc(st.plan);
     const md = isMurDesc(st.plan);
     const mine = recitations
@@ -74,9 +97,6 @@ export function computeRace(
         a.date < b.date ? -1 : a.date > b.date ? 1 : (a.createdAt ?? "") < (b.createdAt ?? "") ? -1 : 1
       );
     const kT = tathbitSpan(st.plan);
-    const onH = partOn(st.plan, "hifz");
-    const onT = partOn(st.plan, "tathbit");
-    const onM = partOn(st.plan, "murajaah");
     const recentTasmi: number[] = []; // أوجه حفظ آخر k لقاء حاضر
     // أول لقاء تحضره الطالبة في الفصل: لا حفظ سابق يُثبَّت ⇒ لا نقاط تثبيت فيه (للجميع)
     const firstDate = mine.find((r) => r.date >= (h?.termStart ?? ""))?.date;
@@ -87,6 +107,12 @@ export function computeRace(
       const fT = r.faces?.tathbit ?? partFaces(r.tathbit, d);
       const fM = r.faces?.muraja ?? partFaces(r.muraja, md, "muraja");
       const inRange = !since || r.date >= since;
+      const p = planAt(st.plan, r.date);
+      const onH = partOn(p, "hifz");
+      const onT = partOn(p, "tathbit");
+      const onM = partOn(p, "murajaah");
+      const reqH = requiredFaces(p, r.tasmi, "hifz", r.faces?.req_tasmi);
+      const reqM = requiredFaces(p, r.muraja, "murajaah", r.faces?.req_muraja);
       if (inRange) {
         attends++;
         faces += fH;

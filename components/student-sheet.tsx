@@ -19,6 +19,9 @@ import {
   PLAN_FIELDS,
   PLAN_PARTS,
   partOn,
+  currentSessionIndex,
+  planVersionChanged,
+  versionOf,
   recitePartLabel,
   TATHBIT_SPANS,
   tathbitSpan,
@@ -37,6 +40,7 @@ import {
   realignTermLogs,
   sessionVerdict,
 } from "@/lib/progress";
+import { amountLabel, PLAN_UNITS, unitOf } from "@/lib/units";
 import { facesLabel } from "@/lib/arabic";
 import { printHifzSchedule } from "@/lib/print-schedule";
 import { DirectionPicker } from "./direction-picker";
@@ -68,6 +72,8 @@ export function StudentSheet({
   const [msgOpen, setMsgOpen] = useState(false); // ✉️ رسالة خاصة للطالبة
   const [msg, setMsg] = useState("");
   const [msgSent, setMsgSent] = useState(false);
+  // 🗂️ تعديل الخطة خلال الفصل: من أي لقاء يسري؟ (null = غير مفتوح)
+  const [fromN, setFromN] = useState<number | null>(null);
 
   useEffect(() => {
     if (student) {
@@ -86,20 +92,51 @@ export function StudentSheet({
 
   if (!student) return null;
 
+  // 🗂️ لقاءات الفصل وأقرب لقاء يسري منه تعديل الخطة
+  const termHalaqa = halaqas.find((h) => h.id === halaqaId);
+  const termRows = termHalaqa ? buildSchedule(termHalaqa, EMPTY_PLAN) : null;
+  const termStartKey = termHalaqa?.termStart ?? "";
+  const myLogs = recitations.filter((r) => r.studentId === student.id && (!termStartKey || r.date >= termStartKey));
+  const termStarted = !!termRows?.length && myLogs.length > 0;
+  const lastUntil = [...(student.plan.history ?? [])].map((h) => h.until).sort().pop() ?? "";
+  // لا يُعدَّل ما قبل آخر تعديل سابق — يبدأ الاختيار من لقائه (أو الثاني)
+  const minFrom = Math.max(2, (termRows?.find((r) => dateKey(r.date) >= lastUntil)?.n ?? 2));
+  const defaultFrom = Math.max(minFrom, termRows ? currentSessionIndex(termRows, myLogs) || termRows.length : 2);
+
   const save = () => {
     if (!name.trim()) return;
-    // تعديل بداية الحفظ/المراجعة أو اتجاهها يسري من اللقاء الأول حتى لو كان مسجّلاً:
-    // تُعاد مقاطع لقاءات الفصل للقسم الذي تغيّرت بدايته متسلسلةً من البداية الجديدة بأوجهها نفسها.
-    // أما حفظ الخطة بلا تغيير في البداية (أوجه، اسم، ملاحظة…) فلا يمسّ أي سجل
+    // 🗂️ خلال الفصل (بعد أول تسجيل): يُسأل من أي لقاء يسري تعديل الخطة — فلا يتغيّر حكم ما مضى
+    if (termStarted && planVersionChanged(student.plan, plan) && termRows) {
+      setFromN(Math.min(defaultFrom, termRows.length));
+      return;
+    }
+    commit(plan, 1);
+  };
+
+  /** حفظ البيانات بخطة تسري من اللقاء n: n=1 كل الفصل (كالسابق)، وما بعده نسخة جديدة والسابقة لما قبله */
+  const commit = (p: CoursePlan, n: number) => {
+    let finalPlan: CoursePlan = p;
+    if (n > 1 && termRows?.[n - 1]) {
+      const until = dateKey(termRows[n - 1].date);
+      const keep = (student.plan.history ?? []).filter((h) => h.until < until);
+      finalPlan = { ...p, history: [...keep, versionOf(student.plan, until)] };
+    } else if (n <= 1 && p.history?.length) {
+      const { history: _h, ...rest } = p; // من بداية الفصل: لا نسخ سابقة
+      void _h;
+      finalPlan = rest;
+    }
     actions.updateStudent(student.id, {
       name: name.trim(),
       teacherId,
       halaqaId,
-      plan,
+      plan: finalPlan,
       note: note.trim(),
       phone: phone.trim(),
     });
-    alignFromFirstSession(plan);
+    // تعديل بداية الحفظ/المراجعة أو اتجاهها «من بداية الفصل» يعيد مقاطع لقاءاته من البداية الجديدة
+    // (كالسابق). أما التعديل من لقاء لاحق فلا يمسّ أي سجل
+    if (n <= 1) alignFromFirstSession(finalPlan);
+    setFromN(null);
     onClose();
   };
 
@@ -422,10 +459,10 @@ export function StudentSheet({
       {/* خطة الفصل بالأوجه */}
       <div className="mb-3 rounded-2xl border border-cream-dark p-3">
         <p className="mb-1 font-kufi text-sm font-bold text-plum-800">
-          📋 أوجه كل لقاء
+          📋 مقدار كل لقاء
         </p>
         <p className="mb-2 text-[11px] text-silver-600">
-          كمية كل لقاء — يحسب النظام مقطعها عبر المصحف، والتثبيت تلقائياً (= حفظ{" "}
+          كمية كل لقاء بوحدتها — يحسب النظام مقطعها عبر المصحف، والتثبيت تلقائياً (= حفظ{" "}
           {TATHBIT_SPANS.find((t) => t.key === tathbitSpan(plan))?.label ?? "آخر لقاء"})
         </p>
         <div className="grid grid-cols-2 gap-2">
@@ -444,6 +481,24 @@ export function StudentSheet({
                   setPlan({ ...plan, [key]: planNum(e.target.value) })
                 }
               />
+              {/* 📏 الوحدة: وجه (الافتراضي) · سطر · ربع · حزب */}
+              <select
+                className="mt-1 w-full rounded-lg border border-cream-dark bg-white px-2 py-1.5 text-center text-xs font-bold text-plum-800"
+                value={unitOf(key === "hifz" ? plan.hifzUnit : plan.murUnit)}
+                disabled={!partOn(plan, key)}
+                aria-label="الوحدة"
+                onChange={(e) => {
+                  const u = e.target.value as CoursePlan["hifzUnit"];
+                  const field = key === "hifz" ? "hifzUnit" : "murUnit";
+                  setPlan({ ...plan, [field]: u === "face" ? undefined : u });
+                }}
+              >
+                {PLAN_UNITS.map((u) => (
+                  <option key={u.key} value={u.key}>
+                    بال{u.key === "face" ? "أوجه" : u.key === "line" ? "أسطر" : u.key === "rub" ? "أرباع" : "أحزاب"}
+                  </option>
+                ))}
+              </select>
             </label>
           ))}
         </div>
@@ -513,6 +568,40 @@ export function StudentSheet({
         )}
       </div>
 
+        {/* 🗂️ تعديلات الخطة هذا الفصل */}
+        {(plan.history?.length ?? 0) > 0 && termRows && (
+          <div className="mt-3 rounded-xl bg-cream/60 p-2.5">
+            <p className="mb-1 text-xs font-bold text-plum-700">🗂️ تعديلات الخطة هذا الفصل</p>
+            {(() => {
+              const nOf = (d: string) => termRows.find((r) => dateKey(r.date) >= d)?.n ?? termRows.length + 1;
+              const vs = [...(plan.history ?? [])].sort((a, b) => a.until.localeCompare(b.until));
+              const line = (v: Partial<Pick<CoursePlan, "hifz" | "murajaah" | "hifzUnit" | "murUnit" | "off">>) =>
+                [
+                  partOn(v, "hifz") ? `📖 ${amountLabel(v.hifz || 0, unitOf(v.hifzUnit))}` : "📖 —",
+                  partOn(v, "murajaah") ? `🔁 ${amountLabel(v.murajaah || 0, unitOf(v.murUnit))}` : "🔁 —",
+                ].join(" · ");
+              let from = 1;
+              const out = vs.map((v) => {
+                const to = nOf(v.until) - 1;
+                const el = (
+                  <p key={v.until} className="text-[11px] text-silver-600">
+                    اللقاءات {from.toLocaleString("ar-EG")}–{to.toLocaleString("ar-EG")}: {line(v)}
+                  </p>
+                );
+                from = to + 1;
+                return el;
+              });
+              return (
+                <>
+                  {out}
+                  <p className="text-[11px] font-bold text-plum-800">
+                    من اللقاء {from.toLocaleString("ar-EG")}: {line(plan)}
+                  </p>
+                </>
+              );
+            })()}
+          </div>
+        )}
       </fieldset>
 
       {/* جدول الحفظ المولّد */}
@@ -542,9 +631,9 @@ export function StudentSheet({
               const murLabel = log ? recitePartLabel(log.muraja) : "";
               // حكم كل قسم: أنجزت / زادت / ناقص — مقارنةً بمطلوب اللقاء
               const d = isDesc(plan);
-              const vH = att && log ? partVerdict(log.tasmi, s.hifz, d) : null;
-              const vT = att && log ? partVerdict(log.tathbit, s.tathbit, d) : null;
-              const vM = att && log ? partVerdict(log.muraja, s.murajaah, md, "muraja") : null;
+              const vH = att && log ? partVerdict(log.tasmi, s.hifzUnit === "face" ? s.hifz : s.hifzQty, d, "hifz", s.hifzUnit) : null;
+              const vT = att && log ? partVerdict(log.tathbit, s.hifzUnit === "face" ? s.tathbit : s.tathbitQty, d, "hifz", s.hifzUnit) : null;
+              const vM = att && log ? partVerdict(log.muraja, s.murUnit === "face" ? s.murajaah : s.murajaahQty, md, "muraja", s.murUnit) : null;
               const overall = att && log ? sessionVerdict(log, s, d, md) : null;
               // اللقاءات القادمة: المقطع مُسقَط من الموضع الفعلي
               const pj = !log ? prog.projected[s.n] : undefined;
@@ -573,7 +662,7 @@ export function StudentSheet({
                     📖{" "}
                     {att && tasmiLabel
                       ? `سُمّع: ${tasmiLabel}`
-                      : hifzPlan || (s.hifz ? facesLabel(s.hifz) : "—")}{" "}
+                      : hifzPlan || (s.hifzQty ? amountLabel(s.hifzQty, s.hifzUnit) : "—")}{" "}
                     <VerdictChip v={vH} voice="admin" />
                   </p>
                   )}
@@ -583,7 +672,7 @@ export function StudentSheet({
                       {att && thLabel
                         ? `سُمّع: ${thLabel}`
                         : tathbitPlan ||
-                          (s.tathbit ? facesLabel(s.tathbit) : "—")}{" "}
+                          (s.tathbitQty ? amountLabel(s.tathbitQty, s.hifzUnit) : "—")}{" "}
                       <VerdictChip v={vT} voice="admin" />
                     </p>
                   )}
@@ -593,7 +682,7 @@ export function StudentSheet({
                     {att && murLabel
                       ? `سُمّع: ${murLabel}`
                       : murPlan ||
-                        (s.murajaah ? facesLabel(s.murajaah) : "—")}{" "}
+                        (s.murajaahQty ? amountLabel(s.murajaahQty, s.murUnit) : "—")}{" "}
                     <VerdictChip v={vM} voice="admin" />
                   </p>
                   )}
@@ -650,7 +739,35 @@ export function StudentSheet({
         </p>
       )}
 
-      {!readOnly && <PrimaryBtn onClick={save}>حفظ البيانات</PrimaryBtn>}
+      {!readOnly && fromN !== null && termRows ? (
+        <div className="mb-2 rounded-2xl border-2 border-amber-300 bg-amber-50 p-3">
+          <p className="font-kufi text-sm font-bold text-amber-900">🗂️ من أي لقاء يبدأ تعديل الخطة؟</p>
+          <p className="mb-2 text-[11px] font-bold text-amber-800">
+            اللقاءات قبله تبقى على خطتها السابقة (مقاطعها وحكمها ونقاطها)، وما بعده على الخطة الجديدة
+          </p>
+          <select className={inputCls} value={fromN} onChange={(e) => setFromN(Number(e.target.value))}>
+            {termRows
+              .filter((r) => r.n >= minFrom)
+              .map((r) => (
+                <option key={r.n} value={r.n}>
+                  من اللقاء {r.n.toLocaleString("ar-EG")} — {formatSchedDate(r.date)}
+                  {r.n === defaultFrom ? " (القادم)" : ""}
+                </option>
+              ))}
+            <option value={1}>من بداية الفصل — يغيّر حكم اللقاءات الماضية</option>
+          </select>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => commit(plan, fromN)} className="rounded-xl bg-plum-600 py-2.5 text-sm font-bold text-white">
+              ✓ حفظ
+            </button>
+            <button type="button" onClick={() => setFromN(null)} className="rounded-xl bg-white py-2.5 text-sm font-bold text-plum-700 ring-1 ring-cream-dark">
+              إلغاء
+            </button>
+          </div>
+        </div>
+      ) : (
+        !readOnly && <PrimaryBtn onClick={save}>حفظ البيانات</PrimaryBtn>
+      )}
 
       {/* 🚪 الانسحاب — بدل الحذف: يبقى السجلّ ويمكن الرجوع */}
       {!readOnly && (

@@ -14,6 +14,7 @@ import {
   recitePartLabel,
   tathbitSpan,
   partOn,
+  planAt,
   RECITE_TO_PLAN,
   useApp,
   type Halaqa,
@@ -28,11 +29,14 @@ import {
   murMode,
   partFaces,
   rangeForFaces,
+  rangeForUnit,
   type PathMode,
   type PosRange,
 } from "@/lib/progress";
 import { surahName, surahNumber } from "@/lib/mushaf";
 import { facesText } from "@/lib/faces";
+import { measureRange, unitOf, unitText, type PlanUnit } from "@/lib/units";
+import { requiredFaces } from "@/lib/points";
 import { ayahCount, SURAHS } from "@/lib/surahs";
 import { PrimaryBtn, inputCls } from "./ui";
 import { supabase } from "@/lib/supabase";
@@ -167,7 +171,8 @@ export function QuickSession({
         const existing = mine.find((r) => r.date === date);
         // المطلوب القادم يُحسب من السجلات قبل هذا التاريخ (حتى لا يقفز بعد الحفظ)
         const before = mine.filter((r) => r.date < date);
-        const p = computeProgress(s, before, halaqa);
+        // الخطة السارية في هذا اللقاء (تعديل الخطة خلال الفصل) ووحدتها
+        const p = computeProgress(s, before, halaqa, { atDate: date });
         const lastTasmi = mergeReciteParts(
           before
             .filter((r) => r.tasmi.status === "done")
@@ -236,12 +241,32 @@ export function QuickSession({
     key === "muraja" ? murMode(s.plan) : hifzMode(s.plan);
   const facesOf = (s: Student, key: PartKey, r: PosRange | null) =>
     partFaces(rangePart(r), modeOf(s, key) !== "asc", key === "muraja" ? "muraja" : "hifz");
+  /** 📏 وحدة القسم في خطة الطالبة السارية في هذا اللقاء */
+  const unitFor = (s: Student, key: PartKey): PlanUnit => {
+    const p = planAt(s.plan, date);
+    return unitOf(key === "muraja" ? p.murUnit : p.hifzUnit);
+  };
+  /** مقدار المقطع بوحدة الطالبة */
+  const amountOf = (s: Student, key: PartKey, r: PosRange | null): number => {
+    const u = unitFor(s, key);
+    if (u === "face" || !r) return facesOf(s, key, r);
+    return measureRange(r.from, r.to, u, modeOf(s, key));
+  };
   /** زيادة/نقصان وجه: يُعاد حساب النهاية من البداية نفسها */
   // المراجعة النازلة بالصفحات تُبنى من طرفها الأعلى («إلى») نزولاً؛ البقية من «من»
   const anchorIsTo = (s: Student, key: PartKey) => modeOf(s, key) === "pageDesc";
   const bump = (s: Student, key: PartKey, st: RowState, delta: number) => {
     const cur = rangeOf(s, key, st);
     if (!cur) return;
+    const u = unitFor(s, key);
+    if (u !== "face") {
+      // بالسطر والربع: واحد زيادة/نقصاً، وبالحزب ربع حزب
+      const step = u === "hizb" ? 0.25 : 1;
+      const k = Math.max(step, Math.round((amountOf(s, key, cur) + delta * step) / step) * step);
+      const next = rangeForUnit(cur.from, k, u, modeOf(s, key));
+      if (next) setRow(s.id, { edit: { ...st.edit, [key]: next } }, st);
+      return;
+    }
     // وجه كامل زيادة/نقصاً من البداية نفسها (بدقة الربع)
     const k = Math.max(0.25, Math.round((facesOf(s, key, cur) + delta) * 4) / 4);
     const next = rangeForFaces(anchorIsTo(s, key) ? cur.to : cur.from, k, modeOf(s, key));
@@ -280,6 +305,12 @@ export function QuickSession({
       star: st.attended && !!st.star && starOk,
     };
     data.faces = logFaces(data, s.plan);
+    // 📏 مطلوب هذا اللقاء بالأوجه من خطته السارية — يُحفظ مع السجلّ للسباق
+    {
+      const pp = planAt(s.plan, date);
+      if (data.attended && data.tasmi.status === "done" && partOn(pp, "hifz")) data.faces.req_tasmi = requiredFaces(pp, data.tasmi, "hifz");
+      if (data.attended && data.muraja.status === "done" && partOn(pp, "murajaah")) data.faces.req_muraja = requiredFaces(pp, data.muraja, "murajaah");
+    }
     if (i.existing) actions.updateRecitation(i.existing.id, data);
     else actions.addRecitation(data);
     // نُفرغ تعديلات هذا الصف فقط — يُعرض بعدها من سجلّه المحفوظ
@@ -708,7 +739,8 @@ export function QuickSession({
                             const edited = !!st.edit?.[p.key];
                             const ek = `${s.id}:${p.key}`;
                             const isEditing = editing === ek;
-                            const n = has ? facesOf(s, p.key, r) : 0;
+                            const n = has ? amountOf(s, p.key, r) : 0;
+                            const u = unitFor(s, p.key);
                             return (
                               <div key={p.key}>
                                 <div className="flex items-stretch gap-1">
@@ -731,7 +763,7 @@ export function QuickSession({
                                       {p.icon} {p.label}
                                       {has && (
                                         <span className={`ms-1 font-normal ${on ? "text-white/85" : ""}`}>
-                                          ({facesText(n)})
+                                          ({u === "face" ? facesText(n) : unitText(n, u)})
                                           {edited && " ✏️"}
                                         </span>
                                       )}

@@ -10,6 +10,7 @@ import {
   RECITE_PARTS,
   RECITE_TO_PLAN,
   partOn,
+  planAt,
   isDesc,
   isMurDesc,
   getState,
@@ -30,6 +31,8 @@ import {
   type PartVerdict,
 } from "@/lib/progress";
 import { facesAcc, facesPlain } from "@/lib/arabic";
+import { unitText, type PlanUnit } from "@/lib/units";
+import { requiredFaces } from "@/lib/points";
 import { ayahCount, SURAHS } from "@/lib/surahs";
 import { Field, inputCls, PrimaryBtn } from "./ui";
 
@@ -47,6 +50,21 @@ export function VerdictChip({
   voice?: ChipVoice;
 }) {
   if (!v) return null;
+  // 📏 بالسطر/الربع/الحزب: الفرق بوحدة خطة الطالبة
+  const u = v.unit && v.unit !== "face" ? v.unit : null;
+  if (u && v.status !== "met")
+    return v.status === "exceeded" ? (
+      <span
+        className="inline-block rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+        style={{ background: "linear-gradient(135deg,#b7973f,#8a6d3b)" }}
+      >
+        🌟 {voice === "student" ? "زدتِ" : "زادت"} {unitText(v.diff, u)}
+      </span>
+    ) : (
+      <span className="inline-block rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-700">
+        ⏳ ناقص {unitText(-v.diff, u)}
+      </span>
+    );
   if (v.status === "exceeded")
     return (
       <span
@@ -195,6 +213,19 @@ function SurahAyah({
 }
 
 /** مطلوب كل قسم من صفّ الجدول — بمفاتيح أقسام التسميع */
+const ROW_QTY: Record<string, "hifzQty" | "tathbitQty" | "murajaahQty"> = {
+  tasmi: "hifzQty",
+  tathbit: "tathbitQty",
+  muraja: "murajaahQty",
+};
+type ReqRow = { hifz: number; tathbit: number; murajaah: number } & Partial<
+  Pick<ScheduleRow, "hifzQty" | "tathbitQty" | "murajaahQty" | "hifzUnit" | "murUnit">
+>;
+/** مطلوب القسم بوحدة خطته في ذلك اللقاء: [المقدار، الوحدة] */
+const reqOf = (row: ReqRow, key: string): [number, PlanUnit] => {
+  const u = (key === "muraja" ? row.murUnit : row.hifzUnit) ?? "face";
+  return u === "face" ? [row[ROW_REQ[key]], u] : [row[ROW_QTY[key]] ?? row[ROW_REQ[key]], u];
+};
 const ROW_REQ: Record<string, "hifz" | "tathbit" | "murajaah"> = {
   tasmi: "hifz",
   tathbit: "tathbit",
@@ -255,9 +286,7 @@ export function ReciteHistory({
     return map;
   }, [terms, studentId]);
   // صفّ الجدول الموافق لتاريخ السجلّ — من الفصل الحالي أو من الأرشيف
-  const rowFor = (
-    dateISO: string
-  ): { hifz: number; tathbit: number; murajaah: number } | undefined =>
+  const rowFor = (dateISO: string): ReqRow | undefined =>
     schedule?.find((s) => dateKey(s.date) === dateISO) ??
     archivedReqs.get(dateISO);
 
@@ -280,9 +309,10 @@ export function ReciteHistory({
             row && r.attended
               ? partVerdict(
                   r[p.key] as RecitePart,
-                  row[ROW_REQ[p.key]],
+                  reqOf(row, p.key)[0],
                   p.key === "muraja" ? mdesc : desc,
-                  p.key === "muraja" ? "muraja" : "hifz"
+                  p.key === "muraja" ? "muraja" : "hifz",
+                  reqOf(row, p.key)[1]
                 )
               : null,
         })).filter((x) => x.label);
@@ -480,6 +510,12 @@ export function ReciteLogger({
     }
     // الأوجه رقماً مع السجلّ — منها تُحسب نقاط السباق دون كشف المقاطع لغيرها
     data.faces = logFaces(data, student.plan);
+    // 📏 مطلوب هذا اللقاء بالأوجه من خطته السارية — يُحفظ مع السجلّ للسباق
+    {
+      const pp = planAt(student.plan, date);
+      if (data.attended && data.tasmi.status === "done" && partOn(pp, "hifz")) data.faces.req_tasmi = requiredFaces(pp, data.tasmi, "hifz");
+      if (data.attended && data.muraja.status === "done" && partOn(pp, "murajaah")) data.faces.req_muraja = requiredFaces(pp, data.muraja, "murajaah");
+    }
     if (editingId) actions.updateRecitation(editingId, data);
     else actions.addRecitation(data);
     reset();

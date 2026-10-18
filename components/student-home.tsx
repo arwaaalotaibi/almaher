@@ -55,6 +55,7 @@ import { MemorizePanel } from "./memorize-panel";
 import { ReciteLogger, SessionVerdictChip, VerdictChip } from "./recite-log";
 import { MotivationPanel } from "./motivation-panel";
 import { computeProgress, partVerdict, sessionVerdict } from "@/lib/progress";
+import { amountLabel, PLAN_UNITS, unitOf } from "@/lib/units";
 import { facesLabel } from "@/lib/arabic";
 
 /** شاشة الطالبة: تدخل برمزها فتُعرض أهدافها مباشرة (قراءة فقط) */
@@ -571,7 +572,7 @@ export function StudentHome() {
                       <p className="mt-0.5 font-kufi text-lg font-bold text-plum-800">
                         {prog.nextHifzLabel ||
                           s.hifzLabel ||
-                          (s.hifz ? facesLabel(s.hifz) : "—")}
+                          (s.hifzQty ? amountLabel(s.hifzQty, s.hifzUnit) : "—")}
                       </p>
                       {prog.currentTasmiLabel && (
                         <p className="mt-1 text-[10px] font-bold text-silver-500">
@@ -588,7 +589,7 @@ export function StudentHome() {
                       <p className="mt-0.5 font-kufi text-lg font-bold text-plum-700">
                         {prog.nextMurLabel ||
                           s.murajaahLabel ||
-                          (s.murajaah ? facesLabel(s.murajaah) : "—")}
+                          (s.murajaahQty ? amountLabel(s.murajaahQty, s.murUnit) : "—")}
                       </p>
                       {prog.currentMurLabel && (
                         <p className="mt-1 text-[10px] font-bold text-silver-500">
@@ -671,15 +672,15 @@ export function StudentHome() {
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-center">
                   {[
-                    { l: "حفظ", v: me.plan.hifz, i: "📖", on: partOn(me.plan, "hifz") },
-                    { l: "مراجعة", v: me.plan.murajaah, i: "🔁", on: partOn(me.plan, "murajaah") },
+                    { l: "حفظ", v: me.plan.hifz, i: "📖", on: partOn(me.plan, "hifz"), u: unitOf(me.plan.hifzUnit) },
+                    { l: "مراجعة", v: me.plan.murajaah, i: "🔁", on: partOn(me.plan, "murajaah"), u: unitOf(me.plan.murUnit) },
                   ].map((x) => (
                     <div key={x.l} className="rounded-xl bg-plum-50 py-2">
                       <p className="text-lg font-bold text-plum-800">
                         {x.on ? ar(x.v ?? 0) : "—"}
                       </p>
                       <p className="text-[11px] font-bold text-silver-600">
-                        {x.i} {x.l} (وجه)
+                        {x.i} {x.l} ({PLAN_UNITS.find((u) => u.key === x.u)?.label ?? "وجه"})
                       </p>
                     </div>
                   ))}
@@ -703,9 +704,9 @@ export function StudentHome() {
                   const murPlan = pj?.murajaahLabel || s.murajaahLabel;
                   // حكم كل قسم: أنجزت المطلوب / زادت / ناقص
                   const d = isDesc(me.plan);
-                  const vH = att && log ? partVerdict(log.tasmi, s.hifz, d) : null;
-                  const vT = att && log ? partVerdict(log.tathbit, s.tathbit, d) : null;
-                  const vM = att && log ? partVerdict(log.muraja, s.murajaah, md, "muraja") : null;
+                  const vH = att && log ? partVerdict(log.tasmi, s.hifzUnit === "face" ? s.hifz : s.hifzQty, d, "hifz", s.hifzUnit) : null;
+                  const vT = att && log ? partVerdict(log.tathbit, s.hifzUnit === "face" ? s.tathbit : s.tathbitQty, d, "hifz", s.hifzUnit) : null;
+                  const vM = att && log ? partVerdict(log.muraja, s.murUnit === "face" ? s.murajaah : s.murajaahQty, md, "muraja", s.murUnit) : null;
                   const overall = att && log ? sessionVerdict(log, s, d, md) : null;
                   return (
                     <div
@@ -749,7 +750,7 @@ export function StudentHome() {
                             {tasmiLabel
                               ? `سمّعتِ: ${tasmiLabel}`
                               : hifzPlan ||
-                                (s.hifz ? facesLabel(s.hifz) : "—")}{" "}
+                                (s.hifzQty ? amountLabel(s.hifzQty, s.hifzUnit) : "—")}{" "}
                             <VerdictChip v={vH} />
                           </p>
                           )}
@@ -763,7 +764,7 @@ export function StudentHome() {
                               {att && thLabel
                                 ? `سمّعتِ: ${thLabel}`
                                 : tathbitPlan ||
-                                  (s.tathbit ? facesLabel(s.tathbit) : "—")}{" "}
+                                  (s.tathbitQty ? amountLabel(s.tathbitQty, s.hifzUnit) : "—")}{" "}
                               <VerdictChip v={vT} />
                             </p>
                           )}
@@ -777,7 +778,7 @@ export function StudentHome() {
                             {att && murLabel
                               ? `سمّعتِ: ${murLabel}`
                               : murPlan ||
-                                (s.murajaah ? facesLabel(s.murajaah) : "—")}{" "}
+                                (s.murajaahQty ? amountLabel(s.murajaahQty, s.murUnit) : "—")}{" "}
                             <VerdictChip v={vM} />
                           </p>
                           )}

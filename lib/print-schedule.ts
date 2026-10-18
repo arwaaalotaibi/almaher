@@ -1,4 +1,5 @@
 import type { ScheduleRow } from "./store";
+import { amountLabel } from "./units";
 
 /** حمولة صفحة الطباعة — تُمرَّر عبر sessionStorage إلى /print
     (بدل window.open الذي لا يعمل داخل التطبيق المثبّت على الجوال) */
@@ -11,6 +12,9 @@ export interface PrintPayload {
     date: string; // ISO
     hifz: number;
     murajaah: number;
+    /** المقدار بوحدة الخطة للعرض («وجهين»، «٥ أسطر») */
+    hifzAmount?: string;
+    murAmount?: string;
     hifzLabel: string;
     murajaahLabel: string;
   }[];
@@ -34,6 +38,8 @@ export function printHifzSchedule(opts: {
       date: s.date.toISOString(),
       hifz: s.hifz,
       murajaah: s.murajaah,
+      hifzAmount: s.hifzQty ? amountLabel(s.hifzQty, s.hifzUnit) : "",
+      murAmount: s.murajaahQty ? amountLabel(s.murajaahQty, s.murUnit) : "",
       hifzLabel: s.hifzLabel,
       murajaahLabel: s.murajaahLabel,
     })),

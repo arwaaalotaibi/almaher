@@ -125,10 +125,10 @@ export default function PrintPage() {
                   <td className="num">{ar(s.n)}</td>
                   <td>{formatSchedDate(new Date(s.date))}</td>
                   <td className="seg">
-                    {s.hifzLabel || (s.hifz ? `${ar(s.hifz)} أوجه` : dash)}
+                    {s.hifzLabel || s.hifzAmount || (s.hifz ? `${ar(s.hifz)} أوجه` : dash)}
                   </td>
                   <td className="seg">
-                    {s.murajaahLabel || (s.murajaah ? `${ar(s.murajaah)} أوجه` : dash)}
+                    {s.murajaahLabel || s.murAmount || (s.murajaah ? `${ar(s.murajaah)} أوجه` : dash)}
                   </td>
                 </tr>
               ))}

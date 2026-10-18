@@ -4,7 +4,8 @@ import { useSyncExternalStore } from "react";
 import { ALLOWED_ABSENCES, absenceMessage } from "./absence";
 import { supabase } from "./supabase";
 import { ayahCount } from "./surahs";
-import { advanceByFaces, descRangeLabel, facesText, spanLabel } from "./faces";
+import { advanceByFaces, descRangeLabel, facesText, rangeFaces, spanLabel } from "./faces";
+import { advanceByUnit, unitOf, type PlanUnit } from "./units";
 import {
   hifzRangeLabel,
   MUSHAF_PAGES,
@@ -70,6 +71,56 @@ export interface CoursePlan {
   studentEditedTerm?: string; // الفصل الذي عدّلت فيه خطتها (مرة واحدة فقط)
   studentEditedAt?: string;
   planBeforeEdit?: Record<string, unknown>; // الخطة قبل تعديل الطالبة — للإدارة
+  /** 📏 وحدة الحفظ (والتثبيت معه) ووحدة المراجعة — الافتراضي «وجه» */
+  hifzUnit?: PlanUnit;
+  murUnit?: PlanUnit;
+  /** 🗂️ الخطط السابقة في هذا الفصل: كل نسخة تسري على اللقاءات قبل تاريخ until (yyyy-mm-dd)،
+      وما بعده للخطة الحالية — فتعديل الخطة خلال الفصل لا يغيّر حكم اللقاءات الماضية */
+  history?: PlanVersion[];
+}
+
+/** الحقول التي تتبدّل بين نسخ الخطة خلال الفصل */
+export const VERSION_KEYS = [
+  "hifz",
+  "tathbit",
+  "murajaah",
+  "hifzUnit",
+  "murUnit",
+  "tathbitSessions",
+  "off",
+  "direction",
+  "murDirection",
+  "startSurah",
+  "startAyah",
+  "murStartSurah",
+  "murStartAyah",
+] as const;
+export type PlanVersion = Partial<Pick<CoursePlan, (typeof VERSION_KEYS)[number]>> & {
+  until: string; // أول لقاء تسري فيه النسخة التالية (yyyy-mm-dd)
+  savedAt?: string;
+};
+
+/** الخطة السارية في تاريخ لقاء معيّن (yyyy-mm-dd): أقدم نسخة سابقة لم يحن انتهاؤها، وإلا الحالية */
+export function planAt(plan: CoursePlan, date: string): CoursePlan {
+  const h = plan.history;
+  if (!h?.length || !date) return plan;
+  const v = [...h].sort((a, b) => a.until.localeCompare(b.until)).find((x) => date < x.until);
+  if (!v) return plan;
+  const out: CoursePlan = { ...plan };
+  for (const k of VERSION_KEYS) (out as unknown as Record<string, unknown>)[k] = (v as Record<string, unknown>)[k];
+  return out;
+}
+
+/** لقطة حقول النسخة من خطة (لحفظها في السجلّ قبل التعديل) */
+export function versionOf(plan: CoursePlan, until: string): PlanVersion {
+  const v: PlanVersion = { until, savedAt: new Date().toISOString() };
+  for (const k of VERSION_KEYS) (v as Record<string, unknown>)[k] = (plan as unknown as Record<string, unknown>)[k];
+  return v;
+}
+
+/** تغيّر شيء من حقول النسخة؟ */
+export function planVersionChanged(a: CoursePlan, b: CoursePlan): boolean {
+  return VERSION_KEYS.some((k) => JSON.stringify(a[k] ?? null) !== JSON.stringify(b[k] ?? null));
 }
 
 export const EMPTY_PLAN: CoursePlan = {
@@ -439,7 +490,14 @@ export interface RecitationLog {
   createdAt?: string;
   /** أوجه مكتملة لكل قسم — تُحسب عند التسجيل وتُحفظ رقماً، ومنها تحسب
       قاعدة البيانات ترتيب السباق دون كشف مقاطع الطالبة لغيرها */
-  faces?: { tasmi: number; tathbit: number; muraja: number };
+  faces?: {
+    tasmi: number;
+    tathbit: number;
+    muraja: number;
+    /** 📏 مطلوب اللقاء بالأوجه حين سُجّل (لخطط السطر/الربع/الحزب وتعديل الخطة خلال الفصل) — للسباق */
+    req_tasmi?: number;
+    req_muraja?: number;
+  };
   /** ⭐ «ماهرة» في هذا اللقاء — بتقدير المعلّمة (تُحفظ داخل parts.star)، لها لوحة «الماهرات» ولا تدخل نقاط السباق */
   star?: boolean;
 }
@@ -777,6 +835,12 @@ export interface ScheduleRow {
   cumHifz: number; // التراكمي حتى هذا اللقاء
   cumTathbit: number;
   cumMurajaah: number;
+  /** 📏 المطلوب بوحدة خطة الطالبة (للعرض والحكم) — في الوحدة «وجه» يساوي الأوجه */
+  hifzQty: number;
+  tathbitQty: number;
+  murajaahQty: number;
+  hifzUnit: PlanUnit;
+  murUnit: PlanUnit;
 }
 
 function dayNameToDow(day: string): number {
@@ -812,39 +876,33 @@ export function buildSchedule(
   const first = new Date(start);
   while (first.getDay() !== dow) first.setDate(first.getDate() + 1);
 
-  // «أوجه الحفظ» و«أوجه المراجعة» = كمية كل لقاء (تتراكم عبر المصحف)
-  // القسم الملغى عن الطالبة (🚫) = صفر في كل لقاء
-  const perH = partOn(plan, "hifz") ? Math.max(0, Math.round((plan.hifz || 0) * 4) / 4) : 0; // بدقة الربع
-  const perM = partOn(plan, "murajaah") ? Math.max(0, Math.round((plan.murajaah || 0) * 4) / 4) : 0;
-  const tOn = partOn(plan, "tathbit");
-
-  const hDesc = isDesc(plan);
-  const mDesc = isMurDesc(plan);
-  // بداية المراجعة كما أدخلتها الإدارة — نازلاً بالسور: «الناس ٦» (آخر آية) تعني السورة من أوّلها، كالحفظ
-  const mStartPos: PathPos | null = plan.murStartSurah
-    ? mDesc
-      ? normalizeDescStart({ surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 })
-      : { surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 }
-    : null;
-
-  const rows: ScheduleRow[] = [];
-  // مؤشّرات المواضع (آية): الحفظ من بدايته، والمراجعة من بدايتها (نازلاً: الطرف الأعلى)
-  let hPosCur: PathPos | null = plan.startSurah
-    ? hDesc
-      ? normalizeDescStart({ surah: surahNumber(plan.startSurah), ayah: plan.startAyah || 1 })
-      : { surah: surahNumber(plan.startSurah), ayah: plan.startAyah || 1 }
-    : null;
-  let mPosCur: PathPos | null = mStartPos;
-  const hMode: "asc" | "surahDesc" = hDesc ? "surahDesc" : "asc";
-  const mMode: "asc" | "surahDesc" = mDesc ? "surahDesc" : "asc"; // المراجعة النازلة بالسور كالحفظ
   const posLabel = (a: PathPos, b: PathPos) => {
     const x = refLabel(a.surah, a.ayah);
     const y = refLabel(b.surah, b.ayah);
     return x === y ? x : `${x} ← ${y}`;
   };
+  /** بداية الحفظ/المراجعة في نسخة خطة — نازلاً بالسور: «الناس ٦» (آخر آية) تعني السورة من أوّلها */
+  const hStartOf = (p: CoursePlan): PathPos | null =>
+    p.startSurah
+      ? isDesc(p)
+        ? normalizeDescStart({ surah: surahNumber(p.startSurah), ayah: p.startAyah || 1 })
+        : { surah: surahNumber(p.startSurah), ayah: p.startAyah || 1 }
+      : null;
+  const mStartOf = (p: CoursePlan): PathPos | null =>
+    p.murStartSurah
+      ? isMurDesc(p)
+        ? normalizeDescStart({ surah: surahNumber(p.murStartSurah), ayah: p.murStartAyah || 1 })
+        : { surah: surahNumber(p.murStartSurah), ayah: p.murStartAyah || 1 }
+      : null;
+  const hKey = (p: CoursePlan) => `${p.startSurah ?? ""}|${p.startAyah ?? 1}|${p.direction ?? ""}`;
+  const mKey = (p: CoursePlan) => `${p.murStartSurah ?? ""}|${p.murStartAyah ?? 1}|${p.murDirection ?? p.direction ?? ""}`;
+
+  const rows: ScheduleRow[] = [];
+  let prevP: CoursePlan | null = null;
+  let hPosCur: PathPos | null = null;
+  let mPosCur: PathPos | null = null;
   // حفظ اللقاءات السابقة (الأحدث آخراً) — التثبيت يدمج آخر k منها
-  const kT = tathbitSpan(plan);
-  const recentH: { start: PathPos | null; end: PathPos | null; count: number; label: string }[] = [];
+  const recentH: { start: PathPos | null; end: PathPos | null; count: number; qty: number; label: string }[] = [];
   let ch = 0,
     ct = 0,
     cm = 0;
@@ -852,26 +910,55 @@ export function buildSchedule(
   for (let i = 0; i < n; i++) {
     const date = new Date(first);
     date.setDate(first.getDate() + i * 7);
+    // 🗂️ الخطة السارية في هذا اللقاء (تعديل الخطة خلال الفصل يسري من لقائه فما بعد)
+    const p = planAt(plan, dateKey(date));
+    // بداية جديدة في هذه النسخة ⇒ يبدأ المؤشّر منها، وإلا يكمل من حيث انتهى
+    if (!prevP || hKey(p) !== hKey(prevP)) hPosCur = hStartOf(p);
+    if (!prevP || mKey(p) !== mKey(prevP)) mPosCur = mStartOf(p);
+    prevP = p;
 
-    // مقطع الحفظ الجديد لهذا اللقاء — بمقدار perH وجه بدقة الربع على المسار
+    // «الحفظ» و«المراجعة» = كمية كل لقاء بوحدة الخطة (تتراكم عبر المصحف) — القسم الملغى (🚫) = صفر
+    const perH = partOn(p, "hifz") ? Math.max(0, Math.round((p.hifz || 0) * 4) / 4) : 0; // بدقة الربع
+    const perM = partOn(p, "murajaah") ? Math.max(0, Math.round((p.murajaah || 0) * 4) / 4) : 0;
+    const tOn = partOn(p, "tathbit");
+    const hU = unitOf(p.hifzUnit);
+    const mU = unitOf(p.murUnit);
+    const hMode: "asc" | "surahDesc" = isDesc(p) ? "surahDesc" : "asc";
+    const mMode: "asc" | "surahDesc" = isMurDesc(p) ? "surahDesc" : "asc"; // المراجعة النازلة بالسور كالحفظ
+    const kT = tathbitSpan(p);
+
+    // مقطع الحفظ الجديد لهذا اللقاء — بمقدار perH (بالوحدة) على المسار
     let hLabel = "";
-    let hCount = perH;
+    let hCount = perH; // بالأوجه
+    let hQty = perH; // بالوحدة
     let hStart: PathPos | null = null;
     let hEnd: PathPos | null = null;
     if (hPosCur && perH > 0) {
-      const r = advanceByFaces(hPosCur, perH, hMode);
-      hLabel = hMode === "surahDesc" ? descRangeLabel(hPosCur, r.end) : posLabel(hPosCur, r.end);
-      hCount = r.faces;
-      hStart = hPosCur;
-      hEnd = r.end;
-      hPosCur = r.next;
-    } else if (plan.startSurah) {
+      if (hU === "face") {
+        const r = advanceByFaces(hPosCur, perH, hMode);
+        hCount = r.faces;
+        hQty = r.faces;
+        hEnd = r.end;
+        hStart = hPosCur;
+        hPosCur = r.next;
+      } else {
+        const r = advanceByUnit(hPosCur, perH, hU, hMode);
+        hCount = rangeFaces(hPosCur, r.end, hMode);
+        hQty = r.qty;
+        hEnd = r.end;
+        hStart = hPosCur;
+        hPosCur = r.next;
+      }
+      hLabel = hMode === "surahDesc" ? descRangeLabel(hStart, hEnd) : posLabel(hStart, hEnd);
+    } else if (p.startSurah) {
       hCount = 0; // انتهى المصحف
+      hQty = 0;
     }
 
     // التثبيت = حفظ آخر لقاء (الافتراضي) أو آخر لقاءين/ثلاثة مدمجاً من بداية الأقدم إلى نهاية الأحدث
     const span = tOn ? recentH.slice(-kT) : [];
-    const tCount = span.reduce((n, x) => n + x.count, 0);
+    const tCount = span.reduce((s0, x) => s0 + x.count, 0);
+    const tQty = span.reduce((s0, x) => s0 + x.qty, 0);
     const oldest = span[0];
     const newest = span[span.length - 1];
     const tLabel =
@@ -884,13 +971,24 @@ export function buildSchedule(
     // مقطع المراجعة (إن حُدّدت بدايتها): نازلاً يُكتب من الطرف الأعلى إلى الأدنى
     let mLabel = "";
     let mCount = perM;
+    let mQty = perM;
     if (mPosCur && perM > 0) {
-      const r = advanceByFaces(mPosCur, perM, mMode);
-      mLabel = posLabel(mPosCur, r.end); // نازلاً: «الناس ١ ← الملك ٣٠»
-      mCount = r.faces;
-      mPosCur = r.next;
-    } else if (plan.murStartSurah) {
+      if (mU === "face") {
+        const r = advanceByFaces(mPosCur, perM, mMode);
+        mLabel = posLabel(mPosCur, r.end); // نازلاً: «الناس ١ ← الملك ٣٠»
+        mCount = r.faces;
+        mQty = r.faces;
+        mPosCur = r.next;
+      } else {
+        const r = advanceByUnit(mPosCur, perM, mU, mMode);
+        mLabel = posLabel(mPosCur, r.end);
+        mCount = rangeFaces(mPosCur, r.end, mMode);
+        mQty = r.qty;
+        mPosCur = r.next;
+      }
+    } else if (p.murStartSurah) {
       mCount = 0;
+      mQty = 0;
     }
 
     ch += hCount;
@@ -908,8 +1006,13 @@ export function buildSchedule(
       cumHifz: ch,
       cumTathbit: ct,
       cumMurajaah: cm,
+      hifzQty: hQty,
+      tathbitQty: tQty,
+      murajaahQty: mQty,
+      hifzUnit: hU,
+      murUnit: mU,
     });
-    recentH.push({ start: hStart, end: hEnd, count: hCount, label: hLabel });
+    recentH.push({ start: hStart, end: hEnd, count: hCount, qty: hQty, label: hLabel });
     if (recentH.length > kT) recentH.shift();
   }
   return rows;
@@ -1317,6 +1420,8 @@ export async function pullRemote(): Promise<void> {
           tasmi: Number(f.tasmi) || 0,
           tathbit: Number(f.tathbit) || 0,
           muraja: Number(f.muraja) || 0,
+          ...(typeof f.req_tasmi === "number" ? { req_tasmi: f.req_tasmi } : {}),
+          ...(typeof f.req_muraja === "number" ? { req_muraja: f.req_muraja } : {}),
         }
       : undefined;
   };

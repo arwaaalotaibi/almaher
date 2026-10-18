@@ -1,8 +1,8 @@
 "use client";
 
+import { amountLabel, unitOf } from "@/lib/units";
 import { useState } from "react";
 import { actions, isDesc, halaqaTitle, lastPlanReply, partOn, useApp, type Halaqa, type Student } from "@/lib/store";
-import { facesLabel } from "@/lib/arabic";
 import { inputCls, PrimaryBtn } from "./ui";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
@@ -53,11 +53,11 @@ export function PlanConfirmGate({
   };
 
   const rows: { icon: string; label: string; value: string }[] = [
-    { icon: "📖", label: "الحفظ في كل لقاء", value: partOn(p, "hifz") && p.hifz ? facesLabel(p.hifz) : "لا يوجد" },
+    { icon: "📖", label: "الحفظ في كل لقاء", value: partOn(p, "hifz") && p.hifz ? amountLabel(p.hifz, unitOf(p.hifzUnit)) : "لا يوجد" },
     ...(partOn(p, "hifz") && !partOn(p, "tathbit")
       ? [{ icon: "📌", label: "التثبيت", value: "لا يوجد هذا الفصل" }]
       : []),
-    { icon: "🔁", label: "المراجعة في كل لقاء", value: partOn(p, "murajaah") && p.murajaah ? facesLabel(p.murajaah) : "لا يوجد" },
+    { icon: "🔁", label: "المراجعة في كل لقاء", value: partOn(p, "murajaah") && p.murajaah ? amountLabel(p.murajaah, unitOf(p.murUnit)) : "لا يوجد" },
     { icon: "🧭", label: "الاتجاه", value: dirLabel(isDesc(p)) },
     {
       icon: "🚩",

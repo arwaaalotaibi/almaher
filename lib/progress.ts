@@ -9,6 +9,7 @@ import {
   surahNumber,
 } from "./mushaf";
 import { SURAH_AYAHS } from "./surahs";
+import { advanceByUnit, measureRange, unitOf, type PlanUnit } from "./units";
 import {
   descPathIndex,
   descPosAfter,
@@ -20,7 +21,9 @@ import {
 import {
   buildSchedule,
   currentSessionIndex,
+  dateKey,
   isDesc,
+  planAt,
   isMurDesc,
   mergeReciteParts,
   recitePartLabel,
@@ -118,7 +121,8 @@ function furthestEnd(
 function nextLabel(
   from: Pos | null,
   perH: number,
-  mode: PathMode = "asc"
+  mode: PathMode = "asc",
+  unit: PlanUnit = "face"
 ): {
   label: string;
   fromPage: number;
@@ -127,10 +131,12 @@ function nextLabel(
   next?: Pos | null; // موضع بداية المقطع التالي
 } {
   if (!from || perH <= 0) return { label: "", fromPage: 0, toPage: 0, range: null };
+  // 📏 بوحدة الخطة (الوجه كما هو، والسطر/الربع/الحزب بمقدارها على المسار نفسه)
+  const adv = (p: Pos) => (unit === "face" ? advanceByFaces(p, perH, mode) : advanceByUnit(p, perH, unit, mode));
   if (mode === "pageDesc") {
     // المراجعة النازلة: «من» هو الطرف الأعلى («الناس ١» = السورة كاملة)، والمقطع يُخزَّن من الأدنى إلى الأعلى
     const top = normalizeTopEdge(from);
-    const r = advanceByFaces(top, perH, mode);
+    const r = adv(top);
     const a = topEdgeLabel(top);
     const b = refLabel(r.end.surah, r.end.ayah);
     return {
@@ -141,7 +147,7 @@ function nextLabel(
       next: r.next,
     };
   }
-  const r = advanceByFaces(from, perH, mode);
+  const r = adv(from);
   // نازلاً بالسور: «فصلت ٤٧ ← ٥٤ ثم غافر ١ ← ٨» عند عبور سورة واحدة، وإلا مختصر «الناس ١ ← الملك ٣٠»
   const label =
     mode === "surahDesc" && from.surah - r.end.surah <= 1
@@ -165,12 +171,19 @@ export function rangeForFaces(from: Pos | null, k: number, mode: PathMode): PosR
   return nextLabel(from, k, mode).range;
 }
 
+/** مقطع بمقدار qty بوحدة الخطة ابتداءً من موضع — للتسجيل السريع (زيادة/نقصان) وحكم المطلوب */
+export function rangeForUnit(from: Pos | null, qty: number, unit: PlanUnit, mode: PathMode): PosRange | null {
+  return nextLabel(from, qty, mode, unit).range;
+}
+
 /** الحافة التي يبدأ منها المقطع الذي يلي مقطعاً محسوباً (للإسقاط) */
 function edgeAfter(
   nl: { fromPage: number; toPage: number; next?: Pos | null },
-  mode: PathMode
+  mode: PathMode,
+  unit: PlanUnit = "face"
 ): Pos | null {
-  if (mode === "surahDesc") return nl.next ?? null;
+  // بالسطر/الربع/الحزب: يبدأ ما بعده من الآية التالية مباشرة (لا من حدّ الصفحة)
+  if (mode === "surahDesc" || unit !== "face") return nl.next ?? null;
   if (mode === "pageDesc") return nl.fromPage > 1 ? ayahBefore(pageStart(nl.fromPage)) : null;
   return nl.toPage > 0 && nl.toPage < MUSHAF_PAGES
     ? ayahAfter(pageEnd(nl.toPage))
@@ -415,16 +428,20 @@ export interface PartVerdict {
   diff: number; // + زيادة عن المطلوب / − نقص
   partialFace: boolean; // بدأت وجهاً إضافياً ولم تكمليه (سُمّع أوله)
   status: "exceeded" | "met" | "partial";
+  /** 📏 وحدة الأرقام (غير موجودة = أوجه) */
+  unit?: PlanUnit;
 }
 
 export function partVerdict(
   part: RecitePart | undefined,
   required: number,
   desc = false,
-  kind: "hifz" | "muraja" = "hifz"
+  kind: "hifz" | "muraja" = "hifz",
+  unit: PlanUnit = "face"
 ): PartVerdict | null {
   // لا حكم إلا على قسم سُمّع فعلاً (وإن لم يكتمل منه وجه واحد)
   if (!part || part.status !== "done" || !part.fromSurah) return null;
+  if (unit !== "face") return unitVerdict(part, required, unit, modeOf(desc, kind));
   const { done, partial } = facesInfo(part, modeOf(desc, kind));
   const req = Math.max(0, Math.round((required || 0) * 4) / 4);
   const diff = done - req;
@@ -437,23 +454,56 @@ export function partVerdict(
   };
 }
 
+/** 📏 الحكم بالسطر/الربع/الحزب: من بداية ما سمّعته، أين ينتهي المطلوب بوحدتها؟
+    بلغت نهايته = أنجزت، تجاوزتها = زيادة، قبلها = ناقص — والفرق بالوحدة نفسها */
+function unitVerdict(part: RecitePart, required: number, unit: Exclude<PlanUnit, "face">, mode: PathMode): PartVerdict {
+  const start: Pos = { surah: surahNumber(part.fromSurah!), ayah: part.fromAyah ?? 1 };
+  const end: Pos = { surah: surahNumber(part.toSurah || part.fromSurah!), ayah: part.toAyah ?? part.fromAyah ?? 1 };
+  const req = Math.max(0, Math.round((required || 0) * 4) / 4);
+  const done = measureRange(start, end, unit, mode);
+  if (req <= 0) return { done, required: 0, diff: done, partialFace: false, status: done > 0 ? "exceeded" : "met", unit };
+  const expEnd = advanceByUnit(start, req, unit, mode).end;
+  const same = (a: Pos, b: Pos) => a.surah === b.surah && a.ayah === b.ayah;
+  let status: PartVerdict["status"] = "met";
+  if (!same(end, expEnd)) {
+    // أيّهما يُبلغ أولاً على المسار؟
+    status = "exceeded";
+    let cur: Pos | null = start;
+    for (let g = 0; cur && g < 7000; g++) {
+      if (same(cur, end)) {
+        status = "partial";
+        break;
+      }
+      if (same(cur, expEnd)) break;
+      cur = stepPos(cur, mode);
+    }
+  }
+  const raw = done - measureRange(start, expEnd, unit, mode);
+  const diff = status === "met" ? 0 : status === "exceeded" ? Math.max(raw, 0.25) : Math.min(raw, -0.25);
+  return { done, required: req, diff, partialFace: false, status, unit };
+}
+
 /** حكم اللقاء كاملاً عبر الأقسام الثلاثة: الحفظ والتثبيت والمراجعة */
 export function sessionVerdict(
   log: RecitationLog,
-  row: Pick<ScheduleRow, "hifz" | "tathbit" | "murajaah">,
+  row: Pick<ScheduleRow, "hifz" | "tathbit" | "murajaah"> &
+    Partial<Pick<ScheduleRow, "hifzQty" | "tathbitQty" | "murajaahQty" | "hifzUnit" | "murUnit">>,
   desc = false,
   murDesc = desc
 ): PartVerdict["status"] | null {
-  const pairs: [RecitePart | undefined, number, boolean, "hifz" | "muraja"][] = [
-    [log.tasmi, row.hifz, desc, "hifz"],
-    [log.tathbit, row.tathbit, desc, "hifz"],
-    [log.muraja, row.murajaah, murDesc, "muraja"],
+  // 📏 بوحدة خطة الطالبة في ذلك اللقاء (الوجه افتراضياً)
+  const hU = row.hifzUnit ?? "face";
+  const mU = row.murUnit ?? "face";
+  const pairs: [RecitePart | undefined, number, boolean, "hifz" | "muraja", PlanUnit][] = [
+    [log.tasmi, hU === "face" ? row.hifz : (row.hifzQty ?? row.hifz), desc, "hifz", hU],
+    [log.tathbit, hU === "face" ? row.tathbit : (row.tathbitQty ?? row.tathbit), desc, "hifz", hU],
+    [log.muraja, mU === "face" ? row.murajaah : (row.murajaahQty ?? row.murajaah), murDesc, "muraja", mU],
   ];
   let any = false;
   let exceeded = false;
   let short = false;
-  for (const [part, req, d, kind] of pairs) {
-    const v = partVerdict(part, req, d, kind);
+  for (const [part, req, d, kind, u] of pairs) {
+    const v = partVerdict(part, req, d, kind, u);
     if (v) any = true;
     if (v?.status === "exceeded") exceeded = true;
     // قسم مطلوب لم يُسمَّع، أو سُمّع أقل من مطلوبه ⇒ لم يكتمل
@@ -532,7 +582,9 @@ export interface Progress {
 export function computeProgress(
   student: Student,
   recitations: RecitationLog[],
-  halaqa: Halaqa | undefined
+  halaqa: Halaqa | undefined,
+  /** atDate: تاريخ اللقاء الذي يُحسب له «المطلوب القادم» (للتسجيل المتأخر) — الخطة السارية فيه */
+  opts?: { atDate?: string }
 ): Progress {
   const plan: CoursePlan = student.plan;
   const desc = isDesc(plan);
@@ -614,8 +666,13 @@ export function computeProgress(
   const ahead = (edge: Pos, expected: number, d = desc) =>
     d ? expected - completedPageOf(edge, "pageDesc") : completedPageOf(edge) - expected;
 
-  // المطلوب القادم للحفظ = من الآية التي تلي (أو تسبق) حافة الحفظ، بمقدار أوجه الخطة
-  const perHplan = partOn(plan, "hifz") ? Math.max(0, Math.round((plan.hifz || 0) * 4) / 4) : 0; // 🚫 ملغى ⇒ لا مطلوب
+  // 🗂️ الخطة السارية في اللقاء القادم (أو في لقاء التسجيل المتأخر) — تعديل الخطة خلال الفصل يسري من لقائه
+  const refDate = opts?.atDate ?? (schedule && nextIdx > 0 ? dateKey(schedule[nextIdx - 1].date) : "");
+  const pN: CoursePlan = refDate ? planAt(plan, refDate) : plan;
+  const hU = unitOf(pN.hifzUnit);
+  const mU = unitOf(pN.murUnit);
+  // المطلوب القادم للحفظ = من الآية التي تلي (أو تسبق) حافة الحفظ، بمقدار الخطة (بوحدتها)
+  const perHplan = partOn(pN, "hifz") ? Math.max(0, Math.round((pN.hifz || 0) * 4) / 4) : 0; // 🚫 ملغى ⇒ لا مطلوب
   const hifzStartPos: Pos | null = plan.startSurah
     ? hMode === "surahDesc"
       ? normalizeDescStart({ surah: surahNumber(plan.startSurah), ayah: plan.startAyah || 1 })
@@ -642,14 +699,14 @@ export function computeProgress(
           : 0
       : 0;
   const nextHifzFrom = lastTasmi ? stepPos(lastTasmi, hMode) : hifzStartPos;
-  const nh = nextLabel(nextHifzFrom, perHplan, hMode);
+  const nh = nextLabel(nextHifzFrom, perHplan, hMode, hU);
   const nextHifzLabel = nh.label;
   const nextFromPage = nh.fromPage;
   const nextToPage = nh.toPage;
 
   // المطلوب القادم للمراجعة = من الآية التي تلي (أو تسبق) حافة المراجعة
   const lastMuraja = furthestEnd(mine.map((r) => ({ part: r.muraja })), mMode);
-  const perMplan = partOn(plan, "murajaah") ? Math.max(0, Math.round((plan.murajaah || 0) * 4) / 4) : 0;
+  const perMplan = partOn(pN, "murajaah") ? Math.max(0, Math.round((pN.murajaah || 0) * 4) / 4) : 0;
   // نازلاً بالسور: «الناس ٦» (آخر آية) تعني السورة من أوّلها، كبداية الحفظ
   const murStartPos: Pos | null = plan.murStartSurah
     ? mdesc
@@ -657,8 +714,11 @@ export function computeProgress(
       : { surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 }
     : null;
   const nextMurFrom = lastMuraja ? stepPos(lastMuraja, mMode) : murStartPos;
-  const nm = nextLabel(nextMurFrom, perMplan, mMode);
+  const nm = nextLabel(nextMurFrom, perMplan, mMode, mU);
   const nextMurLabel = nm.label;
+  // وتيرة اللقاء بالأوجه (للمقارنات والسباق): الوحدة «وجه» كما هي، وغيرها بأوجه مقطعها القادم
+  const perHfaces = hU === "face" ? perHplan : nh.range ? rangeFaces(nh.range.from, nh.range.to, hMode) : 0;
+  const perMfaces = mU === "face" ? perMplan : nm.range ? rangeFaces(nm.range.from, nm.range.to, mMode) : 0;
 
   // موقع المراجعة مقابل خطتها (تراكمياً) — كمؤشر الحفظ، في اتجاه المراجعة
   let expectedMurPage = 0;
@@ -716,14 +776,14 @@ export function computeProgress(
         meetingsLeft: left,
         needHifz,
         needMur,
-        extraHifz: Math.max(0, needHifz - perHplan),
-        extraMur: Math.max(0, needMur - perMplan),
+        extraHifz: Math.max(0, needHifz - perHfaces),
+        extraMur: Math.max(0, needMur - perMfaces),
         status:
           remHifz + remMur <= 0
             ? "done"
             : left === 0
               ? "ended"
-              : needHifz <= perHplan && needMur <= perMplan
+              : needHifz <= perHfaces && needMur <= perMfaces
                 ? "onTrack"
                 : "boost",
       };
@@ -772,16 +832,31 @@ export function computeProgress(
         ? spanLabel(oldest.range.from, newest.range.to, hMode)
         : newest.label;
     };
+    // بدايات نسخة الخطة — إن تغيّرت بداية الحفظ/المراجعة في لقاء قادم يبدأ الإسقاط منها
+    const hKey = (q: CoursePlan) => `${q.startSurah ?? ""}|${q.startAyah ?? 1}|${q.direction ?? ""}`;
+    const mKey = (q: CoursePlan) => `${q.murStartSurah ?? ""}|${q.murStartAyah ?? 1}|${q.murDirection ?? q.direction ?? ""}`;
+    const startOf = (surah: string | undefined, ayah: number | undefined, d: boolean): Pos | null =>
+      surah ? (d ? normalizeDescStart({ surah: surahNumber(surah), ayah: ayah || 1 }) : { surah: surahNumber(surah), ayah: ayah || 1 }) : null;
+    let prevP: CoursePlan = pN;
     for (let n = nextIdx; n <= schedule.length; n++) {
-      const nh2 = nextLabel(hFrom, perHplan, hMode);
-      const nm2 = nextLabel(mFrom, perMplan, mMode);
+      // 🗂️ الخطة السارية في هذا اللقاء القادم
+      const pn = n === nextIdx ? pN : planAt(plan, dateKey(schedule[n - 1].date));
+      if (hKey(pn) !== hKey(prevP)) hFrom = startOf(pn.startSurah, pn.startAyah, isDesc(pn));
+      if (mKey(pn) !== mKey(prevP)) mFrom = startOf(pn.murStartSurah, pn.murStartAyah, isMurDesc(pn));
+      prevP = pn;
+      const hUn = unitOf(pn.hifzUnit);
+      const mUn = unitOf(pn.murUnit);
+      const perHn = partOn(pn, "hifz") ? Math.max(0, Math.round((pn.hifz || 0) * 4) / 4) : 0;
+      const perMn = partOn(pn, "murajaah") ? Math.max(0, Math.round((pn.murajaah || 0) * 4) / 4) : 0;
+      const nh2 = nextLabel(hFrom, perHn, hMode, hUn);
+      const nm2 = nextLabel(mFrom, perMn, mMode, mUn);
       projected[n] = {
         hifzLabel: nh2.label,
         tathbitLabel: tathbitOf(),
         murajaahLabel: nm2.label,
       };
-      hFrom = nh2.fromPage ? edgeAfter(nh2, hMode) : null;
-      mFrom = nm2.fromPage ? edgeAfter(nm2, mMode) : null;
+      hFrom = nh2.fromPage ? edgeAfter(nh2, hMode, hUn) : null;
+      mFrom = nm2.fromPage ? edgeAfter(nm2, mMode, mUn) : null;
       if (nh2.label) {
         recent.push({ range: nh2.range, label: nh2.label });
         if (recent.length > kT) recent.shift();
@@ -798,7 +873,7 @@ export function computeProgress(
             tasmiLogs.length
         )
       : 0;
-  const facesPerSession = Math.max(1, perHplan || avg || 1);
+  const facesPerSession = Math.max(1, perHfaces || avg || 1);
   const boostFaces = facesPerSession + 2;
   const sessionsToJuzEnd = pagesToJuzEnd
     ? Math.ceil(pagesToJuzEnd / facesPerSession)
