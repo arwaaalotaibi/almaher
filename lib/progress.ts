@@ -656,7 +656,12 @@ export function computeProgress(
     .sort((a, b) => b.date.localeCompare(a.date));
 
   // حافة الحفظ (آية) من سجلّ التسميع، وصفحتها
-  const lastTasmi = furthestEnd(mine.map((r) => ({ part: r.tasmi })), hMode);
+  // 📖 حافة الحفظ = نهاية حفظ «آخر لقاء مسجَّل» (لا أبعد موضع في كل السجلات) — كالمراجعة؛
+  // وإن تكرّر سجلّ اللقاء يُعتمد الأصلي (الأقدم إنشاءً)
+  const lastTasmiLog = mine
+    .filter((r) => r.attended && r.tasmi.status === "done" && r.tasmi.fromSurah)
+    .sort((a, b) => b.date.localeCompare(a.date) || (a.createdAt ?? "").localeCompare(b.createdAt ?? ""))[0];
+  const lastTasmi = lastTasmiLog ? furthestEnd([{ part: lastTasmiLog.tasmi }], hMode) : null;
   const currentPage = lastTasmi ? pageOf(lastTasmi.surah, lastTasmi.ayah) : 0;
   // صفحات قُطعت من أوّل المصحف في اتجاهها (نازلاً: من ٦٠٤ هبوطاً)
   const pagesReached = currentPage
