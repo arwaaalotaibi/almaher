@@ -486,6 +486,10 @@ export interface RecitationLog {
   tasmi: RecitePart;
   muraja: RecitePart;
   tathbit: RecitePart;
+  /** 🔄 دورة مراجعة جديدة في هذا اللقاء: مقطع مراجعة ثانٍ من بداية النطاق (الأول يختم الدورة السابقة) */
+  muraja2?: RecitePart;
+  /** 🔄 المعلّمة قرّرت أن الدورة الجديدة تبدأ من اللقاء التالي (بلا مقطع ثانٍ هنا) */
+  newCycle?: boolean;
   note?: string;
   createdAt?: string;
   /** أوجه مكتملة لكل قسم — تُحسب عند التسجيل وتُحفظ رقماً، ومنها تحسب
@@ -493,13 +497,33 @@ export interface RecitationLog {
   faces?: {
     tasmi: number;
     tathbit: number;
-    muraja: number;
+    muraja: number; // مجموع مقطعي المراجعة إن وُجد الثاني
+    muraja2?: number;
     /** 📏 مطلوب اللقاء بالأوجه حين سُجّل (لخطط السطر/الربع/الحزب وتعديل الخطة خلال الفصل) — للسباق */
     req_tasmi?: number;
     req_muraja?: number;
   };
   /** ⭐ «ماهرة» في هذا اللقاء — بتقدير المعلّمة (تُحفظ داخل parts.star)، لها لوحة «الماهرات» ولا تدخل نقاط السباق */
   star?: boolean;
+}
+
+/** الأقسام كما تُحفظ في عمود parts (jsonb) — مع مقطع الدورة الجديدة وعلامتها إن وُجدا */
+export function partsOf(rec: Pick<RecitationLog, "tasmi" | "muraja" | "tathbit" | "star" | "muraja2" | "newCycle">) {
+  return {
+    tasmi: rec.tasmi,
+    muraja: rec.muraja,
+    tathbit: rec.tathbit,
+    ...(rec.star ? { star: true } : {}),
+    ...(rec.muraja2?.status === "done" ? { muraja2: rec.muraja2 } : {}),
+    ...(rec.newCycle ? { newCycle: true } : {}),
+  };
+}
+
+/** نصّ مقطع المراجعة في سجلّ: الأول، ثم «🔄 ثم» مقطع الدورة الجديدة إن وُجد */
+export function murajaLabel(log: Pick<RecitationLog, "muraja" | "muraja2">, reverse = false): string {
+  const a = recitePartLabel(log.muraja, reverse);
+  const b = log.muraja2?.status === "done" ? recitePartLabel(log.muraja2, reverse) : "";
+  return a && b ? `${a} 🔄 ثم ${b}` : a || b;
 }
 
 /** أقسام سجلّ التسميع الثلاثة */
@@ -1420,6 +1444,7 @@ export async function pullRemote(): Promise<void> {
           tasmi: Number(f.tasmi) || 0,
           tathbit: Number(f.tathbit) || 0,
           muraja: Number(f.muraja) || 0,
+          ...(typeof f.muraja2 === "number" ? { muraja2: f.muraja2 } : {}),
           ...(typeof f.req_tasmi === "number" ? { req_tasmi: f.req_tasmi } : {}),
           ...(typeof f.req_muraja === "number" ? { req_muraja: f.req_muraja } : {}),
         }
@@ -1530,6 +1555,8 @@ export async function pullRemote(): Promise<void> {
         tasmi: normPart(parts.tasmi),
         muraja: normPart(parts.muraja),
         tathbit: normPart(parts.tathbit),
+        muraja2: parts.muraja2 ? normPart(parts.muraja2) : undefined,
+        newCycle: parts.newCycle === true || undefined,
         star: parts.star === true || undefined,
         note: (row.note as string) || undefined,
         createdAt: (row.created_at as string) ?? undefined,
@@ -2084,7 +2111,7 @@ export const actions = {
     const row = {
       log_date: rec.date,
       attended: rec.attended,
-      parts: { tasmi: rec.tasmi, muraja: rec.muraja, tathbit: rec.tathbit, ...(rec.star ? { star: true } : {}) },
+      parts: partsOf(rec),
       note: rec.note ?? "",
       faces: rec.faces ?? {},
     };
@@ -2132,7 +2159,7 @@ export const actions = {
         .update({
           log_date: data.date,
           attended: data.attended,
-          parts: { tasmi: data.tasmi, muraja: data.muraja, tathbit: data.tathbit, ...(data.star ? { star: true } : {}) },
+          parts: partsOf(data),
           note: data.note ?? "",
           faces: data.faces ?? {},
         })
@@ -2161,7 +2188,7 @@ export const actions = {
         student_id: rec.studentId,
         log_date: rec.date,
         attended: rec.attended,
-        parts: { tasmi: rec.tasmi, muraja: rec.muraja, tathbit: rec.tathbit, ...(rec.star ? { star: true } : {}) },
+        parts: partsOf(rec),
         note: rec.note ?? "",
         faces: rec.faces ?? {},
         created_at: rec.createdAt,

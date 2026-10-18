@@ -23,6 +23,7 @@ import {
   planVersionChanged,
   versionOf,
   recitePartLabel,
+  murajaLabel,
   TATHBIT_SPANS,
   tathbitSpan,
   useApp,
@@ -36,6 +37,7 @@ import {
   hifzStartChanged,
   logFaces,
   murStartChanged,
+  murajaVerdict,
   partVerdict,
   realignTermLogs,
   sessionVerdict,
@@ -630,14 +632,14 @@ export function StudentSheet({
               const tasmiLabel = log ? recitePartLabel(log.tasmi) : "";
               const thLabel = log ? recitePartLabel(log.tathbit) : "";
               const md = isMurDesc(plan);
-              const murLabel = log ? recitePartLabel(log.muraja) : "";
+              const murLabel = log ? murajaLabel(log) : "";
               // حكم كل قسم: أنجزت / زادت / ناقص — مقارنةً بمطلوب اللقاء
               const d = isDesc(plan);
               const vH = att && log ? partVerdict(log.tasmi, s.hifzUnit === "face" ? s.hifz : s.hifzQty, d, "hifz", s.hifzUnit) : null;
               // 📌 التثبيت يُحاسَب على ما حفظته فعلاً في اللقاء السابق (لا تنقص مرتين)
               const sx = withActualTathbit(s, myLogsAll, dateKey(s.date), plan, halaqa?.termStart);
               const vT = att && log ? partVerdict(log.tathbit, sx.hifzUnit === "face" ? sx.tathbit : sx.tathbitQty, d, "hifz", sx.hifzUnit) : null;
-              const vM = att && log ? partVerdict(log.muraja, s.murUnit === "face" ? s.murajaah : s.murajaahQty, md, "muraja", s.murUnit) : null;
+              const vM = att && log ? murajaVerdict(log, s.murUnit === "face" ? s.murajaah : s.murajaahQty, md, s.murUnit) : null;
               const overall = att && log ? sessionVerdict(log, sx, d, md) : null;
               // اللقاءات القادمة: المقطع مُسقَط من الموضع الفعلي
               const pj = !log ? prog.projected[s.n] : undefined;

@@ -105,7 +105,7 @@ export function computeRace(
       // الأوجه المحفوظة رقماً مع السجلّ (سجلات الزميلات تصل بها فقط)، وإلا من المقاطع
       const fH = r.faces?.tasmi ?? partFaces(r.tasmi, d);
       const fT = r.faces?.tathbit ?? partFaces(r.tathbit, d);
-      const fM = r.faces?.muraja ?? partFaces(r.muraja, md, "muraja");
+      const fM = r.faces?.muraja ?? partFaces(r.muraja, md, "muraja") + partFaces(r.muraja2, md, "muraja");
       const inRange = !since || r.date >= since;
       const p = planAt(st.plan, r.date);
       const onH = partOn(p, "hifz");

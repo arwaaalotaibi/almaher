@@ -8,6 +8,7 @@ import {
   dateKey,
   EMPTY_PLAN,
   formatSchedDate,
+  isMurDesc,
   mergeReciteParts,
   missingEarlierSession,
   STAR_FROM_SESSION,
@@ -34,6 +35,7 @@ import {
   type PosRange,
 } from "@/lib/progress";
 import { surahName, surahNumber } from "@/lib/mushaf";
+import { normalizeDescStart } from "@/lib/hifz-path";
 import { facesText } from "@/lib/faces";
 import { measureRange, unitOf, unitText, type PlanUnit } from "@/lib/units";
 import { requiredFaces } from "@/lib/points";
@@ -43,12 +45,15 @@ import { supabase } from "@/lib/supabase";
 
 const ar = (n: number) => n.toLocaleString("ar-EG");
 
-type PartKey = "tasmi" | "tathbit" | "muraja";
+type PartKey = "tasmi" | "tathbit" | "muraja" | "muraja2";
 interface RowState {
   attended: boolean;
   tasmi: boolean;
   tathbit: boolean;
   muraja: boolean;
+  /** 🔄 دورة مراجعة جديدة: "now" = مقطع ثانٍ من البداية في هذا اللقاء · "next" = تبدأ من اللقاء التالي */
+  cycle?: "now" | "next";
+  muraja2?: boolean;
   // تعديل المقطع الفعلي (زيادة/نقصان): نهاية مختلفة عن المطلوب
   edit?: Partial<Record<PartKey, PosRange>>;
   // 📝 ملاحظة اللقاء (undefined = كما هي في السجلّ المحفوظ)
@@ -57,11 +62,15 @@ interface RowState {
   star?: boolean;
 }
 
-const PARTS: { key: PartKey; icon: string; label: string }[] = [
+type BasePartKey = Exclude<PartKey, "muraja2">;
+type PartDef = { key: PartKey; icon: string; label: string };
+const PARTS: { key: BasePartKey; icon: string; label: string }[] = [
   { key: "tasmi", icon: "📖", label: "حفظ" },
   { key: "tathbit", icon: "📌", label: "تثبيت" },
   { key: "muraja", icon: "🔁", label: "مراجعة" },
 ];
+/** 🔄 صفّ الدورة الجديدة (مقطع مراجعة ثانٍ من بداية النطاق في اللقاء نفسه) */
+const CYCLE_PART: PartDef = { key: "muraja2", icon: "🔄", label: "الدورة الجديدة" };
 
 /** قسم تسميع إلى مقطع (للتثبيت المأخوذ من آخر حفظ) */
 function partRange(p: RecitePart | null): PosRange | null {
@@ -199,6 +208,8 @@ export function QuickSession({
         tathbit: e.tathbit.status === "done",
         muraja: e.muraja.status === "done",
         star: !!e.star,
+        cycle: e.muraja2?.status === "done" ? "now" : e.newCycle ? "next" : undefined,
+        muraja2: e.muraja2?.status === "done",
       };
     }
     return {
@@ -235,16 +246,29 @@ export function QuickSession({
     if (saved) return saved;
     if (key === "tasmi") return i?.hifz ?? null;
     if (key === "muraja") return i?.mur ?? null;
+    if (key === "muraja2") return cycleStartRange(s);
     return partRange(i?.tathbit ?? null);
   };
+  /** 🔄 مقطع الدورة الجديدة الافتراضي: من بداية المراجعة في الخطة السارية بكميتها المعتادة */
+  const cycleStartRange = (s: Student): PosRange | null => {
+    const p = planAt(s.plan, date);
+    if (!p.murStartSurah || !partOn(p, "murajaah")) return null;
+    const md = isMurDesc(p);
+    const start = md
+      ? normalizeDescStart({ surah: surahNumber(p.murStartSurah), ayah: p.murStartAyah || 1 })
+      : { surah: surahNumber(p.murStartSurah), ayah: p.murStartAyah || 1 };
+    const qty = Math.max(0.25, Math.round((p.murajaah || 0) * 4) / 4);
+    const u = unitOf(p.murUnit);
+    return u === "face" ? rangeForFaces(start, qty, murMode(p)) : rangeForUnit(start, qty, u, murMode(p));
+  };
   const modeOf = (s: Student, key: PartKey): PathMode =>
-    key === "muraja" ? murMode(s.plan) : hifzMode(s.plan);
+    key === "muraja" || key === "muraja2" ? murMode(s.plan) : hifzMode(s.plan);
   const facesOf = (s: Student, key: PartKey, r: PosRange | null) =>
-    partFaces(rangePart(r), modeOf(s, key) !== "asc", key === "muraja" ? "muraja" : "hifz");
+    partFaces(rangePart(r), modeOf(s, key) !== "asc", key === "muraja" || key === "muraja2" ? "muraja" : "hifz");
   /** 📏 وحدة القسم في خطة الطالبة السارية في هذا اللقاء */
   const unitFor = (s: Student, key: PartKey): PlanUnit => {
     const p = planAt(s.plan, date);
-    return unitOf(key === "muraja" ? p.murUnit : p.hifzUnit);
+    return unitOf(key === "muraja" || key === "muraja2" ? p.murUnit : p.hifzUnit);
   };
   /** مقدار المقطع بوحدة الطالبة */
   const amountOf = (s: Student, key: PartKey, r: PosRange | null): number => {
@@ -301,6 +325,9 @@ export function QuickSession({
       muraja: st.attended && st.muraja ? rangePart(rangeOf(s, "muraja", st)) : { status: "none" },
       tathbit:
         st.attended && st.tathbit ? rangePart(rangeOf(s, "tathbit", st)) : { status: "none" },
+      // 🔄 دورة مراجعة جديدة: مقطع ثانٍ في هذا اللقاء، أو علامة «من اللقاء التالي»
+      ...(st.attended && st.cycle === "now" && st.muraja2 ? { muraja2: rangePart(rangeOf(s, "muraja2", st)) } : {}),
+      ...(st.attended && st.cycle === "next" ? { newCycle: true } : {}),
       note: st.note ?? i.existing?.note ?? "",
       star: st.attended && !!st.star && starOk,
     };
@@ -577,6 +604,125 @@ export function QuickSession({
                     tasmi: recitePartLabel(rangePart(rangeOf(s, "tasmi", st))),
                     tathbit: recitePartLabel(rangePart(rangeOf(s, "tathbit", st))),
                     muraja: recitePartLabel(rangePart(rangeOf(s, "muraja", st)), modeOf(s, "muraja") === "pageDesc"),
+                    muraja2: recitePartLabel(rangePart(rangeOf(s, "muraja2", st)), modeOf(s, "muraja2") === "pageDesc"),
+                  };
+                  /** صفّ قسم واحد: المقطع وأزرار − + ✏️ */
+                  const partRow = (p: PartDef) => {
+                            const has = !!labels[p.key];
+                            const on = has && st[p.key];
+                            const r = rangeOf(s, p.key, st);
+                            const edited = !!st.edit?.[p.key];
+                            const ek = `${s.id}:${p.key}`;
+                            const isEditing = editing === ek;
+                            const n = has ? amountOf(s, p.key, r) : 0;
+                            const u = unitFor(s, p.key);
+                            return (
+                              <div key={p.key}>
+                                <div className="flex items-stretch gap-1">
+                                  <button
+                                    type="button"
+                                    disabled={!has}
+                                    title={labels[p.key] || "لا مطلوب"}
+                                    onClick={() => setRow(s.id, { [p.key]: !st[p.key] }, st)}
+                                    className={`min-w-0 flex-1 rounded-lg border px-2 py-1 text-start text-sm ${
+                                      !has
+                                        ? "border-cream-dark text-silver-400 line-through"
+                                        : on
+                                          ? edited
+                                            ? "border-amber-500 bg-amber-500 text-white"
+                                            : "border-plum-600 bg-plum-600 text-white"
+                                          : "border-cream-dark bg-white text-silver-600"
+                                    }`}
+                                  >
+                                    <span className="font-bold">
+                                      {p.icon} {p.label}
+                                      {has && (
+                                        <span className={`ms-1 font-normal ${on ? "text-white/85" : ""}`}>
+                                          ({u === "face" ? facesText(n) : unitText(n, u)})
+                                          {edited && " ✏️"}
+                                        </span>
+                                      )}
+                                    </span>
+                                    {has && (
+                                      <span className={`block ${on ? "text-white/85" : ""}`}>
+                                        {labels[p.key]}
+                                      </span>
+                                    )}
+                                  </button>
+                                  {has && on && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => bump(s, p.key, st, -1)}
+                                        className="w-9 rounded-lg bg-cream text-base font-bold text-plum-700"
+                                        aria-label="وجه أقل"
+                                      >
+                                        −
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => bump(s, p.key, st, +1)}
+                                        className="w-9 rounded-lg bg-cream text-base font-bold text-plum-700"
+                                        aria-label="وجه أكثر"
+                                      >
+                                        +
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditing(isEditing ? null : ek)}
+                                        className={`w-9 rounded-lg text-base ${isEditing ? "bg-plum-600 text-white" : "bg-cream text-plum-700"}`}
+                                        aria-label="تعديل آية النهاية"
+                                      >
+                                        ✏️
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                                {has && on && isEditing && r && (() => {
+                                  // البداية مقفلة (تتبع الخطة أو اللقاء السابق) — يُعدَّل طرف النهاية فقط
+                                  const toAnchored = anchorIsTo(s, p.key);
+                                  const fixed = toAnchored ? r.to : r.from;
+                                  const mov = toAnchored ? r.from : r.to;
+                                  const edge: "from" | "to" = toAnchored ? "from" : "to";
+                                  return (
+                                  <div className="mt-1 grid grid-cols-[1fr_auto_auto] items-center gap-1.5 rounded-lg bg-cream/60 px-2 py-1.5 text-sm">
+                                    <span className="font-bold text-plum-700">
+                                      {`من ${surahName(fixed.surah)} ${ar(fixed.ayah)} — إلى:`}
+                                    </span>
+                                    <select
+                                      className={`${inputCls} py-1 text-sm`}
+                                      value={surahName(mov.surah)}
+                                      onChange={(e) =>
+                                        setEdge(s, p.key, st, edge, {
+                                          surah: surahNumber(e.target.value),
+                                          ayah: Math.min(mov.ayah, ayahCount(e.target.value)),
+                                        })
+                                      }
+                                    >
+                                      {SURAHS.map((x) => (
+                                        <option key={x} value={x}>
+                                          {x}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <select
+                                      className={`${inputCls} py-1 text-sm`}
+                                      value={mov.ayah}
+                                      onChange={(e) =>
+                                        setEdge(s, p.key, st, edge, { surah: mov.surah, ayah: Number(e.target.value) })
+                                      }
+                                    >
+                                      {Array.from({ length: ayahCount(surahName(mov.surah)) }, (_, k) => k + 1).map((k) => (
+                                        <option key={k} value={k}>
+                                          {ar(k)}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  );
+                                })()}
+                              </div>
+                            );
                   };
                   return (
                     <div
@@ -732,123 +878,44 @@ export function QuickSession({
                             (p) =>
                               partOn(s.plan, RECITE_TO_PLAN[p.key]) ||
                               i.existing?.[p.key].status === "done"
-                          ).map((p) => {
-                            const has = !!labels[p.key];
-                            const on = has && st[p.key];
-                            const r = rangeOf(s, p.key, st);
-                            const edited = !!st.edit?.[p.key];
-                            const ek = `${s.id}:${p.key}`;
-                            const isEditing = editing === ek;
-                            const n = has ? amountOf(s, p.key, r) : 0;
-                            const u = unitFor(s, p.key);
-                            return (
-                              <div key={p.key}>
-                                <div className="flex items-stretch gap-1">
-                                  <button
-                                    type="button"
-                                    disabled={!has}
-                                    title={labels[p.key] || "لا مطلوب"}
-                                    onClick={() => setRow(s.id, { [p.key]: !st[p.key] }, st)}
-                                    className={`min-w-0 flex-1 rounded-lg border px-2 py-1 text-start text-sm ${
-                                      !has
-                                        ? "border-cream-dark text-silver-400 line-through"
-                                        : on
-                                          ? edited
-                                            ? "border-amber-500 bg-amber-500 text-white"
-                                            : "border-plum-600 bg-plum-600 text-white"
-                                          : "border-cream-dark bg-white text-silver-600"
-                                    }`}
-                                  >
-                                    <span className="font-bold">
-                                      {p.icon} {p.label}
-                                      {has && (
-                                        <span className={`ms-1 font-normal ${on ? "text-white/85" : ""}`}>
-                                          ({u === "face" ? facesText(n) : unitText(n, u)})
-                                          {edited && " ✏️"}
-                                        </span>
-                                      )}
-                                    </span>
-                                    {has && (
-                                      <span className={`block ${on ? "text-white/85" : ""}`}>
-                                        {labels[p.key]}
-                                      </span>
-                                    )}
-                                  </button>
-                                  {has && on && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        onClick={() => bump(s, p.key, st, -1)}
-                                        className="w-9 rounded-lg bg-cream text-base font-bold text-plum-700"
-                                        aria-label="وجه أقل"
-                                      >
-                                        −
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => bump(s, p.key, st, +1)}
-                                        className="w-9 rounded-lg bg-cream text-base font-bold text-plum-700"
-                                        aria-label="وجه أكثر"
-                                      >
-                                        +
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setEditing(isEditing ? null : ek)}
-                                        className={`w-9 rounded-lg text-base ${isEditing ? "bg-plum-600 text-white" : "bg-cream text-plum-700"}`}
-                                        aria-label="تعديل آية النهاية"
-                                      >
-                                        ✏️
-                                      </button>
-                                    </>
-                                  )}
+                          ).map((p) => partRow(p))}
+                          {/* 🔄 دورة مراجعة جديدة — زر واحد: مقطع ثانٍ من البداية في هذا اللقاء، أو من اللقاء التالي */}
+                          {partOn(s.plan, "murajaah") && st.muraja && !!labels.muraja2 && (
+                            st.cycle ? (
+                              <div className="rounded-lg border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs font-bold text-amber-900">
+                                <div className="flex flex-wrap items-center justify-between gap-1">
+                                  <span>🔄 دورة مراجعة جديدة {st.cycle === "now" ? "— تبدأ في هذا اللقاء" : "— تبدأ من اللقاء التالي"}</span>
+                                  <span className="flex gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => setRow(s.id, st.cycle === "now" ? { cycle: "next", muraja2: false } : { cycle: "now", muraja2: true }, st)}
+                                      className="rounded-md bg-white px-2 py-0.5 text-[11px] text-amber-900 ring-1 ring-amber-300"
+                                    >
+                                      {st.cycle === "now" ? "بل من اللقاء التالي" : "بل في هذا اللقاء"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setRow(s.id, { cycle: undefined, muraja2: false, edit: { ...st.edit, muraja2: undefined } }, st)}
+                                      className="rounded-md bg-white px-2 py-0.5 text-[11px] text-red-700 ring-1 ring-amber-300"
+                                      aria-label="إلغاء الدورة الجديدة"
+                                    >
+                                      ✕
+                                    </button>
+                                  </span>
                                 </div>
-                                {has && on && isEditing && r && (() => {
-                                  // البداية مقفلة (تتبع الخطة أو اللقاء السابق) — يُعدَّل طرف النهاية فقط
-                                  const toAnchored = anchorIsTo(s, p.key);
-                                  const fixed = toAnchored ? r.to : r.from;
-                                  const mov = toAnchored ? r.from : r.to;
-                                  const edge: "from" | "to" = toAnchored ? "from" : "to";
-                                  return (
-                                  <div className="mt-1 grid grid-cols-[1fr_auto_auto] items-center gap-1.5 rounded-lg bg-cream/60 px-2 py-1.5 text-sm">
-                                    <span className="font-bold text-plum-700">
-                                      {`من ${surahName(fixed.surah)} ${ar(fixed.ayah)} — إلى:`}
-                                    </span>
-                                    <select
-                                      className={`${inputCls} py-1 text-sm`}
-                                      value={surahName(mov.surah)}
-                                      onChange={(e) =>
-                                        setEdge(s, p.key, st, edge, {
-                                          surah: surahNumber(e.target.value),
-                                          ayah: Math.min(mov.ayah, ayahCount(e.target.value)),
-                                        })
-                                      }
-                                    >
-                                      {SURAHS.map((x) => (
-                                        <option key={x} value={x}>
-                                          {x}
-                                        </option>
-                                      ))}
-                                    </select>
-                                    <select
-                                      className={`${inputCls} py-1 text-sm`}
-                                      value={mov.ayah}
-                                      onChange={(e) =>
-                                        setEdge(s, p.key, st, edge, { surah: mov.surah, ayah: Number(e.target.value) })
-                                      }
-                                    >
-                                      {Array.from({ length: ayahCount(surahName(mov.surah)) }, (_, k) => k + 1).map((k) => (
-                                        <option key={k} value={k}>
-                                          {ar(k)}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                  );
-                                })()}
+                                {st.cycle === "now" && <div className="mt-1.5">{partRow(CYCLE_PART)}</div>}
                               </div>
-                            );
-                          })}
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setRow(s.id, { cycle: "now", muraja2: true }, st)}
+                                className="justify-self-start rounded-full bg-cream px-3 py-1 text-[11px] font-bold text-plum-700"
+                                title="أنهت الطالبة دورة المراجعة؟ ابدئي لها من البداية"
+                              >
+                                🔄 دورة مراجعة جديدة
+                              </button>
+                            )
+                          )}
                         </div>
                       )}
                     </div>

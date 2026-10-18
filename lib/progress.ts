@@ -408,14 +408,16 @@ export function partFaces(part?: RecitePart, desc = false, kind: "hifz" | "muraj
 /** أوجه السجلّ الثلاثة رقماً — تُحفظ مع السجلّ عند التسجيل ليُحسب السباق
     منها دون كشف المقاطع لغيرها */
 export function logFaces(
-  log: Pick<RecitationLog, "tasmi" | "tathbit" | "muraja">,
+  log: Pick<RecitationLog, "tasmi" | "tathbit" | "muraja" | "muraja2">,
   plan?: Pick<CoursePlan, "direction" | "murDirection"> | null
 ): NonNullable<RecitationLog["faces"]> {
   const d = isDesc(plan);
   return {
     tasmi: partFaces(log.tasmi, d, "hifz"),
     tathbit: partFaces(log.tathbit, d, "hifz"),
-    muraja: partFaces(log.muraja, isMurDesc(plan), "muraja"),
+    // 🔄 مجموع مقطعي المراجعة (الدورة المختومة + الجديدة) — به يُحكم ويُحسب السباق
+    muraja: partFaces(log.muraja, isMurDesc(plan), "muraja") + partFaces(log.muraja2, isMurDesc(plan), "muraja"),
+    ...(log.muraja2?.status === "done" ? { muraja2: partFaces(log.muraja2, isMurDesc(plan), "muraja") } : {}),
   };
 }
 
@@ -483,6 +485,23 @@ function unitVerdict(part: RecitePart, required: number, unit: Exclude<PlanUnit,
   return { done, required: req, diff, partialFace: false, status, unit };
 }
 
+/** 🔁 حكم المراجعة في لقاء — بمقطعيها إن بدأت فيه دورة جديدة: المُنجَز مجموعهما، والنقص/الزيادة بالفرق عن المطلوب */
+export function murajaVerdict(
+  log: Pick<RecitationLog, "muraja" | "muraja2">,
+  required: number,
+  desc = false,
+  unit: PlanUnit = "face"
+): PartVerdict | null {
+  const v1 = partVerdict(log.muraja, required, desc, "muraja", unit);
+  if (log.muraja2?.status !== "done" || !log.muraja2.fromSurah) return v1;
+  const v2 = partVerdict(log.muraja2, 0, desc, "muraja", unit);
+  if (!v1) return v2;
+  const done = v1.done + (v2?.done ?? 0);
+  const req = v1.required;
+  const diff = Math.round((done - req) * 4) / 4;
+  return { done, required: req, diff, partialFace: false, status: diff > 0 ? "exceeded" : diff === 0 ? "met" : "partial", unit };
+}
+
 /** 📌 مطلوب التثبيت في حكم اللقاء = ما حفظته فعلاً في اللقاء/اللقاءات الحاضرة السابقة (كالسباق)،
     لا خطة ذلك اللقاء — فمن نقص حفظها لا تُحسب ناقصة مرة ثانية في تثبيته.
     أول لقاء تحضره في الفصل يبقى على الجدول (لا حفظ سابق يُثبَّت). */
@@ -542,7 +561,7 @@ export function sessionVerdict(
   let exceeded = false;
   let short = false;
   for (const [part, req, d, kind, u] of pairs) {
-    const v = partVerdict(part, req, d, kind, u);
+    const v = kind === "muraja" ? murajaVerdict(log, req, d, u) : partVerdict(part, req, d, kind, u);
     if (v) any = true;
     if (v?.status === "exceeded") exceeded = true;
     // قسم مطلوب لم يُسمَّع، أو سُمّع أقل من مطلوبه ⇒ لم يكتمل
@@ -595,6 +614,8 @@ export interface Progress {
   // المراجعة مقابل خطتها (تراكمياً)
   aheadMurPages: number;
   hasMurPlan: boolean;
+  /** 🔄 رقم دورة المراجعة الحالية (١ = الأولى) */
+  murCycle: number;
   // «سباق خطة الفصل» — إتمام خطة الفصل كاملة (حفظاً ومراجعة)
   termPlan: {
     pct: number; // نسبة إنجاز الخطة كاملة
@@ -743,8 +764,20 @@ export function computeProgress(
   const nextFromPage = nh.fromPage;
   const nextToPage = nh.toPage;
 
-  // المطلوب القادم للمراجعة = من الآية التي تلي (أو تسبق) حافة المراجعة
-  const lastMuraja = furthestEnd(mine.map((r) => ({ part: r.muraja })), mMode);
+  // 🔄 دورات المراجعة: آخر لقاء بدأت فيه دورة جديدة (مقطع ثانٍ من البداية، أو «من اللقاء التالي»)
+  // — حافة المراجعة تُحسب من تلك الدورة فقط، لا من كل ما رُوجع قبلها
+  const markers = mine.filter((r) => r.attended && (r.muraja2?.status === "done" || r.newCycle));
+  const marker = markers[0]; // mine مرتّبة من الأحدث
+  const murCycle = 1 + markers.length;
+  const lastMuraja = marker
+    ? furthestEnd(
+        [
+          ...mine.filter((r) => r.date > marker.date).map((r) => ({ part: r.muraja })),
+          ...(marker.muraja2?.status === "done" ? [{ part: marker.muraja2 }] : []),
+        ],
+        mMode
+      )
+    : furthestEnd(mine.map((r) => ({ part: r.muraja })), mMode);
   const perMplan = partOn(pN, "murajaah") ? Math.max(0, Math.round((pN.murajaah || 0) * 4) / 4) : 0;
   // نازلاً بالسور: «الناس ٦» (آخر آية) تعني السورة من أوّلها، كبداية الحفظ
   const murStartPos: Pos | null = plan.murStartSurah
@@ -771,9 +804,10 @@ export function computeProgress(
         mdesc
       );
   }
+  // بعد دورة جديدة لا معنى لمقارنة موضع المراجعة بخطة الفصل (ترجع للبداية عمداً)
   const aheadMurPages =
-    lastMuraja && expectedMurPage ? ahead(lastMuraja, expectedMurPage, mdesc) : 0;
-  const hasMurPlan = Boolean(lastMuraja && expectedMurPage > 0);
+    lastMuraja && expectedMurPage && murCycle === 1 ? ahead(lastMuraja, expectedMurPage, mdesc) : 0;
+  const hasMurPlan = Boolean(lastMuraja && expectedMurPage > 0 && murCycle === 1);
 
   // «سباق خطة الفصل»: كم أُنجز من خطة الفصل كاملة، وما وصفة كل لقاء
   // متبقٍّ لإتمامها قبل نهاية الفصل
@@ -802,7 +836,11 @@ export function computeProgress(
       const mStart = murStartPos
         ? pageOf(murStartPos.surah, murStartPos.ayah)
         : 0;
-      const doneM = doneFrom(mStart, lastMuraja, totalM, mdesc);
+      // في الدورات: ما رُوجع فعلاً هذا الفصل بالأوجه (لا المسافة من البداية)
+      const termMur = mine
+        .filter((r) => r.attended && halaqa?.termStart && r.date >= halaqa.termStart)
+        .reduce((n, r) => n + (r.faces?.muraja ?? partFaces(r.muraja, mdesc, "muraja") + partFaces(r.muraja2, mdesc, "muraja")), 0);
+      const doneM = murCycle > 1 ? Math.min(totalM, termMur) : doneFrom(mStart, lastMuraja, totalM, mdesc);
       const remHifz = totalH - doneH;
       const remMur = totalM - doneM;
       const left = termSessionsLeft;
@@ -987,6 +1025,7 @@ export function computeProgress(
     termGoalSurah,
     aheadMurPages,
     hasMurPlan,
+    murCycle,
     termPlan,
     facesPerSession,
     sessionsToJuzEnd,
@@ -1012,6 +1051,7 @@ export function badgesFor(p: Progress): Badge[] {
   return [
     { key: "juz1", label: "أول جزء", icon: "🎖️", unlocked: p.completedJuz >= 1 },
     { key: "juz5", label: "٥ أجزاء", icon: "🏅", unlocked: p.completedJuz >= 5 },
+    { key: "murcycle", label: "دورة مراجعة", icon: "🔄", unlocked: p.murCycle >= 2 },
     {
       key: "half",
       label: "نصف المصحف",

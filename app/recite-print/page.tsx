@@ -11,6 +11,7 @@ import {
   isDesc,
   isMurDesc,
   recitePartLabel,
+  murajaLabel,
   TEACHER_PICK_KEY,
   useApp,
   type Halaqa,
@@ -150,8 +151,8 @@ function RecitePrint() {
     else window.location.assign(isTeacher ? "/" : "/director");
   };
 
-  const partText = (p: RecitePart | undefined, faces: number, reverse = false) => {
-    const label = recitePartLabel(p, reverse);
+  const partText = (p: RecitePart | undefined, faces: number, reverse = false, p2?: RecitePart) => {
+    const label = p2?.status === "done" ? murajaLabel({ muraja: p ?? { status: "none" }, muraja2: p2 }, reverse) : recitePartLabel(p, reverse);
     if (!label) return <span className="none">—</span>;
     return (
       <>
@@ -375,7 +376,7 @@ function RecitePrint() {
                                 <>
                                   <td>{partText(c.log.tasmi, c.hifz)}</td>
                                   <td>{partText(c.log.tathbit, c.tathbit)}</td>
-                                  <td>{partText(c.log.muraja, c.mur, isMurDesc(s.plan))}</td>
+                                  <td>{partText(c.log.muraja, c.mur, isMurDesc(s.plan), c.log.muraja2)}</td>
                                 </>
                               )}
                             </tr>

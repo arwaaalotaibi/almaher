@@ -11,6 +11,7 @@ import {
   RECITE_TO_PLAN,
   partOn,
   planAt,
+  murajaLabel,
   isDesc,
   isMurDesc,
   getState,
@@ -26,6 +27,7 @@ import {
 } from "@/lib/store";
 import {
   logFaces,
+  murajaVerdict,
   partVerdict,
   sessionVerdict,
   withActualTathbit,
@@ -312,16 +314,13 @@ export function ReciteHistory({
         const row = row0 && myPlan ? withActualTathbit(row0, mine, r.date, myPlan, termStartOf(r.date)) : row0;
         const done = RECITE_PARTS.map((p) => ({
           p,
-          label: recitePartLabel(r[p.key] as RecitePart),
+          // 🔄 المراجعة بمقطعيها إن بدأت دورة جديدة في هذا اللقاء
+          label: p.key === "muraja" ? murajaLabel(r) : recitePartLabel(r[p.key] as RecitePart),
           verdict:
             row && r.attended
-              ? partVerdict(
-                  r[p.key] as RecitePart,
-                  reqOf(row, p.key)[0],
-                  p.key === "muraja" ? mdesc : desc,
-                  p.key === "muraja" ? "muraja" : "hifz",
-                  reqOf(row, p.key)[1]
-                )
+              ? p.key === "muraja"
+                ? murajaVerdict(r, reqOf(row, p.key)[0], mdesc, reqOf(row, p.key)[1])
+                : partVerdict(r[p.key] as RecitePart, reqOf(row, p.key)[0], desc, "hifz", reqOf(row, p.key)[1])
               : null,
         })).filter((x) => x.label);
         const overall = row && r.attended ? sessionVerdict(r, row, desc, mdesc) : null;
@@ -484,6 +483,9 @@ export function ReciteLogger({
           }
         : { status: "none" };
 
+    // 🔄 عند تعديل سجلّ فيه دورة جديدة تبقى علامتها ومقطعها الثاني كما هما (يُعدَّلان من بطاقة المعلّمة)
+    const prev = editingId ? getState().recitations.find((x) => x.id === editingId) : undefined;
+    const cycleKeep = prev ? { ...(prev.muraja2 ? { muraja2: prev.muraja2 } : {}), ...(prev.newCycle ? { newCycle: true } : {}) } : {};
     let data: Omit<RecitationLog, "id" | "createdAt">;
     if (attended) {
       const t = build(parts.tasmi),
@@ -502,6 +504,7 @@ export function ReciteLogger({
         tasmi: t,
         muraja: m,
         tathbit: th,
+        ...cycleKeep,
         note: note.trim() || undefined,
         star: star && starAllowed(halaqa, date),
       };

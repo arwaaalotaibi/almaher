@@ -15,6 +15,7 @@ import {
   isDesc,
   isMurDesc,
   recitePartLabel,
+  murajaLabel,
   halaqaTitle,
   hifzStartLabel,
   PLAN_FIELDS,
@@ -54,7 +55,7 @@ import { PlanConfirmGate } from "./plan-confirm";
 import { MemorizePanel } from "./memorize-panel";
 import { ReciteLogger, SessionVerdictChip, VerdictChip } from "./recite-log";
 import { MotivationPanel } from "./motivation-panel";
-import { computeProgress, partVerdict, sessionVerdict, withActualTathbit } from "@/lib/progress";
+import { computeProgress, murajaVerdict, partVerdict, sessionVerdict, withActualTathbit } from "@/lib/progress";
 import { amountLabel, PLAN_UNITS, unitOf } from "@/lib/units";
 import { facesLabel } from "@/lib/arabic";
 
@@ -586,6 +587,7 @@ export function StudentHome() {
                     <div className="mt-2 rounded-xl bg-white p-3 text-center">
                       <p className="text-[11px] font-bold text-silver-600">
                         🔁 المراجعة (من حيث وصلتِ فعلاً)
+                        {prog.murCycle > 1 && <span className="ms-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">🔄 الدورة {ar(prog.murCycle)}</span>}
                       </p>
                       <p className="mt-0.5 font-kufi text-lg font-bold text-plum-700">
                         {prog.nextMurLabel ||
@@ -697,7 +699,7 @@ export function StudentHome() {
                   const tasmiLabel = log ? recitePartLabel(log.tasmi) : "";
                   const thLabel = log ? recitePartLabel(log.tathbit) : "";
                   const md = isMurDesc(me.plan);
-                  const murLabel = log ? recitePartLabel(log.muraja) : "";
+                  const murLabel = log ? murajaLabel(log) : "";
                   // اللقاءات القادمة: المقطع مُسقَط من الموضع الفعلي (كالبطاقة)
                   const pj = !log ? prog.projected[s.n] : undefined;
                   const hifzPlan = pj?.hifzLabel || s.hifzLabel;
@@ -709,7 +711,7 @@ export function StudentHome() {
                   // 📌 التثبيت يُحاسَب على ما حفظته فعلاً في اللقاء السابق (لا تنقص مرتين)
                   const sx = withActualTathbit(s, myRecs, dateKey(s.date), me.plan, halaqa?.termStart);
                   const vT = att && log ? partVerdict(log.tathbit, sx.hifzUnit === "face" ? sx.tathbit : sx.tathbitQty, d, "hifz", sx.hifzUnit) : null;
-                  const vM = att && log ? partVerdict(log.muraja, s.murUnit === "face" ? s.murajaah : s.murajaahQty, md, "muraja", s.murUnit) : null;
+                  const vM = att && log ? murajaVerdict(log, s.murUnit === "face" ? s.murajaah : s.murajaahQty, md, s.murUnit) : null;
                   const overall = att && log ? sessionVerdict(log, sx, d, md) : null;
                   return (
                     <div
