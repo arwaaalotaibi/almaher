@@ -28,6 +28,7 @@ import {
   logFaces,
   partVerdict,
   sessionVerdict,
+  withActualTathbit,
   type PartVerdict,
 } from "@/lib/progress";
 import { facesAcc, facesPlain } from "@/lib/arabic";
@@ -285,6 +286,11 @@ export function ReciteHistory({
     }
     return map;
   }, [terms, studentId]);
+  // بداية الفصل الذي يقع فيه تاريخ — الحالي أو المؤرشف (لأول لقاء حاضر فيه)
+  const termStartOf = (d: string): string => {
+    if (schedule?.length && d >= dateKey(schedule[0].date)) return dateKey(schedule[0].date);
+    return terms.map((t) => t.termStart).filter((x) => x && x <= d).sort().pop() ?? "";
+  };
   // صفّ الجدول الموافق لتاريخ السجلّ — من الفصل الحالي أو من الأرشيف
   const rowFor = (dateISO: string): ReqRow | undefined =>
     schedule?.find((s) => dateKey(s.date) === dateISO) ??
@@ -301,7 +307,9 @@ export function ReciteHistory({
   return (
     <div className="grid gap-2">
       {mine.map((r) => {
-        const row = rowFor(r.date);
+        // 📌 التثبيت يُحاسَب على ما حفظته فعلاً في اللقاء السابق (لا تنقص مرتين)
+        const row0 = rowFor(r.date);
+        const row = row0 && myPlan ? withActualTathbit(row0, mine, r.date, myPlan, termStartOf(r.date)) : row0;
         const done = RECITE_PARTS.map((p) => ({
           p,
           label: recitePartLabel(r[p.key] as RecitePart),

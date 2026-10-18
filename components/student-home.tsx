@@ -54,7 +54,7 @@ import { PlanConfirmGate } from "./plan-confirm";
 import { MemorizePanel } from "./memorize-panel";
 import { ReciteLogger, SessionVerdictChip, VerdictChip } from "./recite-log";
 import { MotivationPanel } from "./motivation-panel";
-import { computeProgress, partVerdict, sessionVerdict } from "@/lib/progress";
+import { computeProgress, partVerdict, sessionVerdict, withActualTathbit } from "@/lib/progress";
 import { amountLabel, PLAN_UNITS, unitOf } from "@/lib/units";
 import { facesLabel } from "@/lib/arabic";
 
@@ -216,6 +216,7 @@ export function StudentHome() {
   }
   const schedule = halaqa ? buildSchedule(halaqa, me.plan) : null;
   const prog = computeProgress(me, recitations, halaqa);
+  const myRecs = recitations.filter((r) => r.studentId === me.id);
   const logFor = (d: Date) =>
     recitations.find((r) => r.studentId === me.id && r.date === dateKey(d));
 
@@ -705,9 +706,11 @@ export function StudentHome() {
                   // حكم كل قسم: أنجزت المطلوب / زادت / ناقص
                   const d = isDesc(me.plan);
                   const vH = att && log ? partVerdict(log.tasmi, s.hifzUnit === "face" ? s.hifz : s.hifzQty, d, "hifz", s.hifzUnit) : null;
-                  const vT = att && log ? partVerdict(log.tathbit, s.hifzUnit === "face" ? s.tathbit : s.tathbitQty, d, "hifz", s.hifzUnit) : null;
+                  // 📌 التثبيت يُحاسَب على ما حفظته فعلاً في اللقاء السابق (لا تنقص مرتين)
+                  const sx = withActualTathbit(s, myRecs, dateKey(s.date), me.plan, halaqa?.termStart);
+                  const vT = att && log ? partVerdict(log.tathbit, sx.hifzUnit === "face" ? sx.tathbit : sx.tathbitQty, d, "hifz", sx.hifzUnit) : null;
                   const vM = att && log ? partVerdict(log.muraja, s.murUnit === "face" ? s.murajaah : s.murajaahQty, md, "muraja", s.murUnit) : null;
-                  const overall = att && log ? sessionVerdict(log, s, d, md) : null;
+                  const overall = att && log ? sessionVerdict(log, sx, d, md) : null;
                   return (
                     <div
                       key={s.n}

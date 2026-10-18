@@ -483,6 +483,45 @@ function unitVerdict(part: RecitePart, required: number, unit: Exclude<PlanUnit,
   return { done, required: req, diff, partialFace: false, status, unit };
 }
 
+/** 📌 مطلوب التثبيت في حكم اللقاء = ما حفظته فعلاً في اللقاء/اللقاءات الحاضرة السابقة (كالسباق)،
+    لا خطة ذلك اللقاء — فمن نقص حفظها لا تُحسب ناقصة مرة ثانية في تثبيته.
+    أول لقاء تحضره في الفصل يبقى على الجدول (لا حفظ سابق يُثبَّت). */
+export function withActualTathbit<
+  T extends { tathbit: number; tathbitQty?: number; hifzUnit?: PlanUnit }
+>(row: T, studentRecs: RecitationLog[], date: string, plan: CoursePlan, termStart = ""): T {
+  // اللقاءات الحاضرة قبل هذا التاريخ — سجلّ واحد لكل تاريخ (الأقدم = الأصلي إن تكرّر)
+  const byDate = new Map<string, RecitationLog>();
+  for (const r of studentRecs) {
+    if (!r.attended || r.date >= date) continue;
+    const c = byDate.get(r.date);
+    if (!c || (r.createdAt ?? "") < (c.createdAt ?? "")) byDate.set(r.date, r);
+  }
+  const prev = [...byDate.values()].sort((a, b) => b.date.localeCompare(a.date));
+  if (!prev.some((r) => r.date >= termStart)) return row; // أول لقاء حاضر في الفصل
+  const pd = planAt(plan, date);
+  if (!partOn(pd, "tathbit")) return row; // 🚫 التثبيت ملغى عنها — يبقى كالجدول
+  const k = tathbitSpan(pd);
+  const span = prev.slice(0, k);
+  const desc = isDesc(plan);
+  const faces = span.reduce((n, r) => n + (r.faces?.tasmi ?? partFaces(r.tasmi, desc)), 0);
+  const unit = row.hifzUnit ?? "face";
+  let qty = faces;
+  if (unit !== "face") {
+    qty = 0;
+    for (const r of span) {
+      const t = r.tasmi;
+      if (t.status !== "done" || !t.fromSurah) continue;
+      qty += measureRange(
+        { surah: surahNumber(t.fromSurah), ayah: t.fromAyah ?? 1 },
+        { surah: surahNumber(t.toSurah || t.fromSurah), ayah: t.toAyah ?? t.fromAyah ?? 1 },
+        unit,
+        desc ? "surahDesc" : "asc"
+      );
+    }
+  }
+  return { ...row, tathbit: faces, tathbitQty: qty };
+}
+
 /** حكم اللقاء كاملاً عبر الأقسام الثلاثة: الحفظ والتثبيت والمراجعة */
 export function sessionVerdict(
   log: RecitationLog,

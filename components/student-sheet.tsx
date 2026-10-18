@@ -39,6 +39,7 @@ import {
   partVerdict,
   realignTermLogs,
   sessionVerdict,
+  withActualTathbit,
 } from "@/lib/progress";
 import { amountLabel, PLAN_UNITS, unitOf } from "@/lib/units";
 import { facesLabel } from "@/lib/arabic";
@@ -96,7 +97,8 @@ export function StudentSheet({
   const termHalaqa = halaqas.find((h) => h.id === halaqaId);
   const termRows = termHalaqa ? buildSchedule(termHalaqa, EMPTY_PLAN) : null;
   const termStartKey = termHalaqa?.termStart ?? "";
-  const myLogs = recitations.filter((r) => r.studentId === student.id && (!termStartKey || r.date >= termStartKey));
+  const myLogsAll = recitations.filter((r) => r.studentId === student.id);
+  const myLogs = myLogsAll.filter((r) => !termStartKey || r.date >= termStartKey);
   const termStarted = !!termRows?.length && myLogs.length > 0;
   const lastUntil = [...(student.plan.history ?? [])].map((h) => h.until).sort().pop() ?? "";
   // لا يُعدَّل ما قبل آخر تعديل سابق — يبدأ الاختيار من لقائه (أو الثاني)
@@ -632,9 +634,11 @@ export function StudentSheet({
               // حكم كل قسم: أنجزت / زادت / ناقص — مقارنةً بمطلوب اللقاء
               const d = isDesc(plan);
               const vH = att && log ? partVerdict(log.tasmi, s.hifzUnit === "face" ? s.hifz : s.hifzQty, d, "hifz", s.hifzUnit) : null;
-              const vT = att && log ? partVerdict(log.tathbit, s.hifzUnit === "face" ? s.tathbit : s.tathbitQty, d, "hifz", s.hifzUnit) : null;
+              // 📌 التثبيت يُحاسَب على ما حفظته فعلاً في اللقاء السابق (لا تنقص مرتين)
+              const sx = withActualTathbit(s, myLogsAll, dateKey(s.date), plan, halaqa?.termStart);
+              const vT = att && log ? partVerdict(log.tathbit, sx.hifzUnit === "face" ? sx.tathbit : sx.tathbitQty, d, "hifz", sx.hifzUnit) : null;
               const vM = att && log ? partVerdict(log.muraja, s.murUnit === "face" ? s.murajaah : s.murajaahQty, md, "muraja", s.murUnit) : null;
-              const overall = att && log ? sessionVerdict(log, s, d, md) : null;
+              const overall = att && log ? sessionVerdict(log, sx, d, md) : null;
               // اللقاءات القادمة: المقطع مُسقَط من الموضع الفعلي
               const pj = !log ? prog.projected[s.n] : undefined;
               const hifzPlan = pj?.hifzLabel || s.hifzLabel;
