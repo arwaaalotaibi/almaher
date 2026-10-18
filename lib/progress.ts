@@ -764,20 +764,21 @@ export function computeProgress(
   const nextFromPage = nh.fromPage;
   const nextToPage = nh.toPage;
 
-  // 🔄 دورات المراجعة: آخر لقاء بدأت فيه دورة جديدة (مقطع ثانٍ من البداية، أو «من اللقاء التالي»)
-  // — حافة المراجعة تُحسب من تلك الدورة فقط، لا من كل ما رُوجع قبلها
+  // 🔁 حافة المراجعة = نهاية مراجعة «آخر لقاء مسجَّل» (لا أبعد موضع بلغته في كل سجلاتها):
+  // المعلّمة قد تعيد الطالبة إلى الوراء أو تصحّح، والمعتمد آخر إدخال. (قرار الإدارة ١٨ أكتوبر ٢٠٢٦)
+  // وإن تكرّر سجلّ اللقاء يُعتمد الأصلي (الأقدم إنشاءً)
+  const murLogs = mine
+    .filter((r) => r.attended && ((r.muraja.status === "done" && r.muraja.fromSurah) || r.muraja2?.status === "done" || r.newCycle))
+    .sort((a, b) => b.date.localeCompare(a.date) || (a.createdAt ?? "").localeCompare(b.createdAt ?? ""));
+  const lastMurLog = murLogs[0];
+  // 🔄 دورات المراجعة: عدد المرات التي بدأت فيها دورة جديدة
   const markers = mine.filter((r) => r.attended && (r.muraja2?.status === "done" || r.newCycle));
-  const marker = markers[0]; // mine مرتّبة من الأحدث
   const murCycle = 1 + markers.length;
-  const lastMuraja = marker
-    ? furthestEnd(
-        [
-          ...mine.filter((r) => r.date > marker.date).map((r) => ({ part: r.muraja })),
-          ...(marker.muraja2?.status === "done" ? [{ part: marker.muraja2 }] : []),
-        ],
-        mMode
-      )
-    : furthestEnd(mine.map((r) => ({ part: r.muraja })), mMode);
+  // «من اللقاء التالي» في آخر لقاء: الدورة الجديدة تبدأ من أوّل المصحف
+  const freshCycle = !!lastMurLog && lastMurLog.newCycle && lastMurLog.muraja2?.status !== "done";
+  const lastMuraja = !lastMurLog || freshCycle
+    ? null
+    : furthestEnd([{ part: lastMurLog.muraja2?.status === "done" ? lastMurLog.muraja2 : lastMurLog.muraja }], mMode);
   const perMplan = partOn(pN, "murajaah") ? Math.max(0, Math.round((pN.murajaah || 0) * 4) / 4) : 0;
   // نازلاً بالسور: «الناس ٦» (آخر آية) تعني السورة من أوّلها، كبداية الحفظ
   const murStartPos: Pos | null = plan.murStartSurah
@@ -785,7 +786,8 @@ export function computeProgress(
       ? normalizeDescStart({ surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 })
       : { surah: surahNumber(plan.murStartSurah), ayah: plan.murStartAyah || 1 }
     : null;
-  const nextMurFrom = lastMuraja ? stepPos(lastMuraja, mMode) : murStartPos;
+  const mushafMurStart: Pos = mdesc ? normalizeDescStart({ surah: 114, ayah: 6 }) : { surah: 1, ayah: 1 };
+  const nextMurFrom = lastMuraja ? stepPos(lastMuraja, mMode) : freshCycle ? mushafMurStart : murStartPos;
   const nm = nextLabel(nextMurFrom, perMplan, mMode, mU);
   const nextMurLabel = nm.label;
   // وتيرة اللقاء بالأوجه (للمقارنات والسباق): الوحدة «وجه» كما هي، وغيرها بأوجه مقطعها القادم
