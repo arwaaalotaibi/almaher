@@ -249,14 +249,13 @@ export function QuickSession({
     if (key === "muraja2") return cycleStartRange(s);
     return partRange(i?.tathbit ?? null);
   };
-  /** 🔄 مقطع الدورة الجديدة الافتراضي: من بداية المراجعة في الخطة السارية بكميتها المعتادة */
+  /** 🔄 مقطع الدورة الجديدة الافتراضي: من أوّل المصحف دائماً (الفاتحة صاعداً، الناس نازلاً) —
+      لا من بداية مراجعة هذا الفصل (قد تكون استئنافاً من وسط المصحف) — بكميتها المعتادة، وتعدّلها المعلّمة بـ✏️ */
   const cycleStartRange = (s: Student): PosRange | null => {
     const p = planAt(s.plan, date);
-    if (!p.murStartSurah || !partOn(p, "murajaah")) return null;
+    if (!partOn(p, "murajaah") || !(p.murajaah || 0)) return null;
     const md = isMurDesc(p);
-    const start = md
-      ? normalizeDescStart({ surah: surahNumber(p.murStartSurah), ayah: p.murStartAyah || 1 })
-      : { surah: surahNumber(p.murStartSurah), ayah: p.murStartAyah || 1 };
+    const start = md ? normalizeDescStart({ surah: 114, ayah: 6 }) : { surah: 1, ayah: 1 };
     const qty = Math.max(0.25, Math.round((p.murajaah || 0) * 4) / 4);
     const u = unitOf(p.murUnit);
     return u === "face" ? rangeForFaces(start, qty, murMode(p)) : rangeForUnit(start, qty, u, murMode(p));
@@ -307,6 +306,18 @@ export function QuickSession({
     const cur = rangeOf(s, key, st);
     if (!cur) return;
     setRow(s.id, { edit: { ...st.edit, [key]: { ...cur, [edge]: pos } } }, st);
+  };
+
+  /** 🔄 تعديل بداية مقطع الدورة الجديدة: تتحرك البداية وتُعاد النهاية بالكمية نفسها */
+  const moveStart = (s: Student, key: PartKey, st: RowState, pos: { surah: number; ayah: number }) => {
+    const cur = rangeOf(s, key, st);
+    if (!cur) return;
+    const u = unitFor(s, key);
+    const k = Math.max(u === "hizb" ? 0.25 : u === "face" ? 0.25 : 1, amountOf(s, key, cur));
+    const mode = modeOf(s, key);
+    const start = mode === "surahDesc" ? normalizeDescStart(pos) : pos;
+    const next = u === "face" ? rangeForFaces(start, k, mode) : rangeForUnit(start, k, u, mode);
+    if (next) setRow(s.id, { edit: { ...st.edit, [key]: next } }, st);
   };
 
   const sessionNo = termRows?.find((r) => dateKey(r.date) === date)?.n;
@@ -680,15 +691,51 @@ export function QuickSession({
                                 </div>
                                 {has && on && isEditing && r && (() => {
                                   // البداية مقفلة (تتبع الخطة أو اللقاء السابق) — يُعدَّل طرف النهاية فقط
+                                  // 🔄 إلا مقطع الدورة الجديدة: بدايته تختارها المعلّمة أيضاً
                                   const toAnchored = anchorIsTo(s, p.key);
                                   const fixed = toAnchored ? r.to : r.from;
                                   const mov = toAnchored ? r.from : r.to;
                                   const edge: "from" | "to" = toAnchored ? "from" : "to";
+                                  const startEditable = p.key === "muraja2";
+                                  // نازلاً بالسور تُعرض بداية الدورة كسورة (من أوّلها)
+                                  const startSurah = fixed.surah;
                                   return (
                                   <div className="mt-1 grid grid-cols-[1fr_auto_auto] items-center gap-1.5 rounded-lg bg-cream/60 px-2 py-1.5 text-sm">
+                                    {startEditable ? (
+                                      <>
+                                        <span className="font-bold text-plum-700">🔄 تبدأ الدورة من:</span>
+                                        <select
+                                          className={`${inputCls} py-1 text-sm`}
+                                          value={surahName(startSurah)}
+                                          aria-label="سورة بداية الدورة"
+                                          onChange={(e) => moveStart(s, p.key, st, { surah: surahNumber(e.target.value), ayah: modeOf(s, p.key) === "surahDesc" ? ayahCount(e.target.value) : 1 })}
+                                        >
+                                          {SURAHS.map((x) => (
+                                            <option key={x} value={x}>
+                                              {x}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        <select
+                                          className={`${inputCls} py-1 text-sm`}
+                                          value={modeOf(s, p.key) === "surahDesc" ? 1 : fixed.ayah}
+                                          disabled={modeOf(s, p.key) === "surahDesc"}
+                                          aria-label="آية بداية الدورة"
+                                          onChange={(e) => moveStart(s, p.key, st, { surah: fixed.surah, ayah: Number(e.target.value) })}
+                                        >
+                                          {Array.from({ length: ayahCount(surahName(fixed.surah)) }, (_, k) => k + 1).map((k) => (
+                                            <option key={k} value={k}>
+                                              {ar(k)}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        <span className="font-bold text-plum-700">إلى:</span>
+                                      </>
+                                    ) : (
                                     <span className="font-bold text-plum-700">
                                       {`من ${surahName(fixed.surah)} ${ar(fixed.ayah)} — إلى:`}
                                     </span>
+                                    )}
                                     <select
                                       className={`${inputCls} py-1 text-sm`}
                                       value={surahName(mov.surah)}
