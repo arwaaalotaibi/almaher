@@ -1387,8 +1387,8 @@ export async function pullRemote(): Promise<void> {
         .from("almaher_sessions")
         .select("id,student_id,log_date,attended,parts,note,created_at,faces")
         .order("log_date", { ascending: false })
-        // في اليوم نفسه: الأقدم أولاً — فإن تكرّر سجلّ لقاء يُعتمد الأصلي في العرض والتعديل
-        .order("created_at")
+        // في اليوم نفسه: الأحدث أولاً — فإن تكرّر سجلّ لقاء يُعتمد «آخر تسجيل» في العرض والتعديل
+        .order("created_at", { ascending: false })
         .order("id")
         .range(f, t)
     ),
@@ -2119,13 +2119,13 @@ export const actions = {
     pendingAdds.set(rec.id, new Promise<string>((r) => (settle = r)));
     run(async () => {
       // 🛡️ وإن لم يظهر السجلّ في الجهاز (بيانات ناقصة أو قديمة) نسأل القاعدة أولاً:
-      // يوجد سجلّ لهذه الطالبة في هذا اليوم ⇒ يُعدَّل الأقدم بدل إضافة نسخة ثانية
+      // يوجد سجلّ لهذه الطالبة في هذا اليوم ⇒ يُعدَّل آخر تسجيل بدل إضافة نسخة ثانية
       const found = await supabase
         .from("almaher_sessions")
         .select("id")
         .eq("student_id", rec.studentId)
         .eq("log_date", rec.date)
-        .order("created_at")
+        .order("created_at", { ascending: false })
         .limit(1);
       const existingId = (found.data?.[0] as { id?: string } | undefined)?.id;
       try {

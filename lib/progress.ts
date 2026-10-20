@@ -508,12 +508,12 @@ export function murajaVerdict(
 export function withActualTathbit<
   T extends { tathbit: number; tathbitQty?: number; hifzUnit?: PlanUnit }
 >(row: T, studentRecs: RecitationLog[], date: string, plan: CoursePlan, termStart = ""): T {
-  // اللقاءات الحاضرة قبل هذا التاريخ — سجلّ واحد لكل تاريخ (الأقدم = الأصلي إن تكرّر)
+  // اللقاءات الحاضرة قبل هذا التاريخ — سجلّ واحد لكل تاريخ (آخر تسجيل إن تكرّر)
   const byDate = new Map<string, RecitationLog>();
   for (const r of studentRecs) {
     if (!r.attended || r.date >= date) continue;
     const c = byDate.get(r.date);
-    if (!c || (r.createdAt ?? "") < (c.createdAt ?? "")) byDate.set(r.date, r);
+    if (!c || (r.createdAt ?? "") > (c.createdAt ?? "")) byDate.set(r.date, r);
   }
   const prev = [...byDate.values()].sort((a, b) => b.date.localeCompare(a.date));
   if (!prev.some((r) => r.date >= termStart)) return row; // أول لقاء حاضر في الفصل
@@ -657,10 +657,10 @@ export function computeProgress(
 
   // حافة الحفظ (آية) من سجلّ التسميع، وصفحتها
   // 📖 حافة الحفظ = نهاية حفظ «آخر لقاء مسجَّل» (لا أبعد موضع في كل السجلات) — كالمراجعة؛
-  // وإن تكرّر سجلّ اللقاء يُعتمد الأصلي (الأقدم إنشاءً)
+  // وإن تكرّر سجلّ اللقاء يُعتمد «آخر تسجيل» (الأحدث إنشاءً) — قرار الإدارة ٢٠ أكتوبر
   const lastTasmiLog = mine
     .filter((r) => r.attended && r.tasmi.status === "done" && r.tasmi.fromSurah)
-    .sort((a, b) => b.date.localeCompare(a.date) || (a.createdAt ?? "").localeCompare(b.createdAt ?? ""))[0];
+    .sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))[0];
   const lastTasmi = lastTasmiLog ? furthestEnd([{ part: lastTasmiLog.tasmi }], hMode) : null;
   const currentPage = lastTasmi ? pageOf(lastTasmi.surah, lastTasmi.ayah) : 0;
   // صفحات قُطعت من أوّل المصحف في اتجاهها (نازلاً: من ٦٠٤ هبوطاً)
@@ -771,10 +771,10 @@ export function computeProgress(
 
   // 🔁 حافة المراجعة = نهاية مراجعة «آخر لقاء مسجَّل» (لا أبعد موضع بلغته في كل سجلاتها):
   // المعلّمة قد تعيد الطالبة إلى الوراء أو تصحّح، والمعتمد آخر إدخال. (قرار الإدارة ١٨ أكتوبر ٢٠٢٦)
-  // وإن تكرّر سجلّ اللقاء يُعتمد الأصلي (الأقدم إنشاءً)
+  // وإن تكرّر سجلّ اللقاء يُعتمد «آخر تسجيل» (الأحدث إنشاءً)
   const murLogs = mine
     .filter((r) => r.attended && ((r.muraja.status === "done" && r.muraja.fromSurah) || r.muraja2?.status === "done" || r.newCycle))
-    .sort((a, b) => b.date.localeCompare(a.date) || (a.createdAt ?? "").localeCompare(b.createdAt ?? ""));
+    .sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
   const lastMurLog = murLogs[0];
   // 🔄 دورات المراجعة: عدد المرات التي بدأت فيها دورة جديدة
   const markers = mine.filter((r) => r.attended && (r.muraja2?.status === "done" || r.newCycle));
