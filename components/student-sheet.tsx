@@ -1,5 +1,6 @@
 "use client";
 
+import { TermPlanCard } from "./term-plan-card";
 import { confirmDanger } from "@/lib/confirm";
 import { useEffect, useState } from "react";
 import {
@@ -703,6 +704,9 @@ export function StudentSheet({
           حدّدي «تاريخ البداية وعدد اللقاءات» من صفحة الحلقة ليظهر الجدول
         </p>
       ) : null}
+
+      {/* 🎯 إنجاز خطة الفصل — كما تراه الطالبة في «خطتي» */}
+      {prog.termPlan && <TermPlanCard tp={prog.termPlan} voice="staff" className="border border-cream-dark" />}
 
       {/* ملخّص تقدّم الطالبة */}
       <div className="mb-3 rounded-2xl border border-cream-dark p-3">

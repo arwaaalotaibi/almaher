@@ -619,6 +619,8 @@ export interface Progress {
   // «سباق خطة الفصل» — إتمام خطة الفصل كاملة (حفظاً ومراجعة)
   termPlan: {
     pct: number; // نسبة إنجاز الخطة كاملة
+    totalHifz: number; // أوجه حفظ خطة الفصل كاملة
+    totalMur: number; // أوجه مراجعة خطة الفصل كاملة
     remHifz: number; // أوجه حفظ متبقية من الخطة
     remMur: number; // أوجه مراجعة متبقية
     meetingsLeft: number;
@@ -855,6 +857,8 @@ export function computeProgress(
       const needMur = left > 0 ? Math.ceil(remMur / left) : 0;
       termPlan = {
         pct: Math.round(((doneH + doneM) / (totalH + totalM)) * 100),
+        totalHifz: totalH,
+        totalMur: totalM,
         remHifz,
         remMur,
         meetingsLeft: left,

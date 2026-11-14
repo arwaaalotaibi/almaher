@@ -58,6 +58,7 @@ import { MotivationPanel } from "./motivation-panel";
 import { computeProgress, murajaVerdict, partVerdict, sessionVerdict, withActualTathbit } from "@/lib/progress";
 import { amountLabel, PLAN_UNITS, unitOf } from "@/lib/units";
 import { facesLabel } from "@/lib/arabic";
+import { TermPlanCard } from "./term-plan-card";
 
 /** شاشة الطالبة: تدخل برمزها فتُعرض أهدافها مباشرة (قراءة فقط) */
 // تبويبات صفحة الطالبة
@@ -689,6 +690,9 @@ export function StudentHome() {
                   ))}
                 </div>
               </div>
+
+              {/* 🎯 إنجاز خطة الفصل: كم أنجزت، ونسبته، وكم بقي لإتمامها */}
+              {prog.termPlan && <TermPlanCard tp={prog.termPlan} />}
 
               {/* جدول اللقاءات كاملاً */}
               <div className="grid gap-1.5">
