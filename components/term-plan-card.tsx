@@ -19,24 +19,36 @@ export function TermPlanCard({ tp, voice = "student", className = "card" }: { tp
     .join(" و");
   return (
     <div className={`${className} mb-3 rounded-2xl p-4`}>
-      <div className="mb-1 flex items-center justify-between text-sm font-bold">
+      <div className="flex items-center justify-between text-sm font-bold">
         <span className="text-plum-800">🎯 إنجاز خطة الفصل</span>
-        <span className={done ? "text-emerald-700" : "text-plum-700"}>{ar(tp.pct)}٪</span>
-      </div>
-      <div className="h-2.5 overflow-hidden rounded-full bg-cream-dark">
-        <div className={`h-full rounded-full ${done ? "bg-emerald-600" : "bg-plum-600"}`} style={{ width: `${Math.min(100, tp.pct)}%` }} />
+        <span className={`rounded-full px-2.5 py-0.5 text-xs ${done ? "bg-emerald-50 text-emerald-700" : "bg-cream text-plum-700"}`}>الإجمالي {ar(tp.pct)}٪</span>
       </div>
       <div className="mt-3 grid gap-2">
-        {parts.map((x) => (
-          <div key={x.l} className="flex items-center justify-between gap-2 rounded-xl bg-plum-50 px-3 py-2">
-            <span className="text-xs font-bold text-plum-800">
-              {x.i} {x.l}: {me ? "أنجزتِ" : "أنجزت"} {ar(q(x.total - x.rem))} من {ar(q(x.total))} وجهاً
-            </span>
-            <span className={`shrink-0 text-xs font-bold ${x.rem > 0 ? "text-plum-700" : "text-emerald-700"}`}>
-              {x.rem > 0 ? `باقي ${facesPlain(q(x.rem))}` : "اكتمل ✓"}
-            </span>
-          </div>
-        ))}
+        {parts.map((x) => {
+          const pct = Math.max(0, Math.min(100, Math.round(((x.total - x.rem) / x.total) * 100)));
+          const full = x.rem <= 0;
+          return (
+            <div key={x.l} className="rounded-xl bg-plum-50 px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-kufi text-sm font-bold text-plum-800">
+                  {x.i} {x.l}
+                </span>
+                <span className={`font-kufi text-xl font-bold ${full ? "text-emerald-700" : "text-plum-800"}`}>
+                  {ar(pct)}٪ <span className="text-[11px] font-bold text-silver-600">من ١٠٠</span>
+                </span>
+              </div>
+              <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-white">
+                <div className={`h-full rounded-full ${full ? "bg-emerald-600" : "bg-plum-600"}`} style={{ width: `${pct}%` }} />
+              </div>
+              <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] font-bold">
+                <span className="text-plum-700">
+                  {me ? "أنجزتِ" : "أنجزت"} {ar(q(x.total - x.rem))} من {ar(q(x.total))} وجهاً
+                </span>
+                <span className={full ? "text-emerald-700" : "text-plum-700"}>{full ? "اكتمل ✓" : `باقي ${facesPlain(q(x.rem))}`}</span>
+              </div>
+            </div>
+          );
+        })}
       </div>
       <p className={`mt-3 rounded-xl px-3 py-2 text-center text-xs font-bold ${done ? "bg-emerald-50 text-emerald-700" : "bg-cream text-plum-700"}`}>
         {done
