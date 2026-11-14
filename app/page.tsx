@@ -94,6 +94,16 @@ export default function Home() {
           <span className="text-xl">‹</span>
         </Link>
         <Link
+          href="/achievements"
+          className="col-span-2 flex items-center justify-between gap-3 rounded-2xl border border-plum-200 bg-plum-50 px-5 py-4 text-plum-800 shadow-sm transition active:scale-[0.98]"
+        >
+          <span>
+            <span className="block font-kufi text-base font-bold">📊 قوائم الإنجاز</span>
+            <span className="block text-[11px] text-plum-700">المواظبات · المتقدمات والمتأخرات عن الخطة · الأكثر حفظاً</span>
+          </span>
+          <span className="text-xl">‹</span>
+        </Link>
+        <Link
           href="/dashboard"
           className="card flex flex-col items-center gap-1.5 rounded-2xl py-4 transition active:scale-[0.97]"
         >

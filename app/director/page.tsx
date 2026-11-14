@@ -240,6 +240,10 @@ function DirectorInner() {
     <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
       <PageHeader title="📈 نبض الماهر" back="/" />
 
+      <Link href="/achievements" className="mb-3 block rounded-xl bg-plum-600 py-2.5 text-center font-kufi text-sm font-bold text-white">
+        📊 قوائم الإنجاز (المواظبات · المتقدمات · المتأخرات · الأكثر حفظاً)
+      </Link>
+
       {/* النطاق والفترة */}
       <div className="mb-2 flex flex-wrap gap-1.5">
         {[{ id: "", label: "🌍 كل الحلقات" }, ...halaqas.map((h) => ({ id: h.id, label: halaqaTitle(h) }))].map((h) => (
@@ -444,9 +448,6 @@ function DirectorInner() {
         className="mb-2 block rounded-xl bg-plum-600 py-2.5 text-center font-kufi text-sm font-bold text-white"
       >
         🖨️ طباعة سجل التسميع (لكل لقاء)
-      </Link>
-      <Link href="/achievements" className="mb-2 block rounded-xl bg-cream py-2.5 text-center font-kufi text-sm font-bold text-plum-800">
-        📊 قوائم الإنجاز (المواظبات · المتقدمات · المتأخرات · الأكثر حفظاً)
       </Link>
       <Link href="/usage" className="mb-2 block rounded-xl bg-cream py-2.5 text-center font-kufi text-sm font-bold text-plum-800">
         📱 متابعة الاستخدام (آخر دخول ومسمّعي)
