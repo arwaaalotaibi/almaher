@@ -621,6 +621,10 @@ export interface Progress {
     pct: number; // نسبة إنجاز الخطة كاملة
     totalHifz: number; // أوجه حفظ خطة الفصل كاملة
     totalMur: number; // أوجه مراجعة خطة الفصل كاملة
+    overHifz: number; // أوجه حفظ زادتها بعد إتمام حفظ الخطة
+    overMur: number;
+    perHifz: number; // وتيرة خطتها كل لقاء (بالأوجه)
+    perMur: number;
     remHifz: number; // أوجه حفظ متبقية من الخطة
     remMur: number; // أوجه مراجعة متبقية
     meetingsLeft: number;
@@ -836,12 +840,14 @@ export function computeProgress(
         if (!edge || !startPage) return 0;
         const cp = completedPageOf(edge, d ? "pageDesc" : "asc");
         const n = d ? startPage - cp + 1 : cp - startPage + 1;
-        return Math.max(0, Math.min(total, n));
+        return Math.max(0, total < 0 ? n : Math.min(total, n));
       };
-      const doneH =
+      // غير مقيَّد بمجموع الخطة — لمعرفة الزيادة بعد إتمامها
+      const rawH =
         hMode === "surahDesc"
-          ? Math.max(0, Math.min(totalH, doneHifzPages(lastTasmi)))
-          : doneFrom(hifzStartPos ? pageOf(hifzStartPos.surah, hifzStartPos.ayah) : 0, lastTasmi, totalH, desc);
+          ? Math.max(0, doneHifzPages(lastTasmi))
+          : doneFrom(hifzStartPos ? pageOf(hifzStartPos.surah, hifzStartPos.ayah) : 0, lastTasmi, -1, desc);
+      const doneH = Math.min(totalH, rawH);
       const mStart = murStartPos
         ? pageOf(murStartPos.surah, murStartPos.ayah)
         : 0;
@@ -849,7 +855,8 @@ export function computeProgress(
       const termMur = mine
         .filter((r) => r.attended && halaqa?.termStart && r.date >= halaqa.termStart)
         .reduce((n, r) => n + (r.faces?.muraja ?? partFaces(r.muraja, mdesc, "muraja") + partFaces(r.muraja2, mdesc, "muraja")), 0);
-      const doneM = murCycle > 1 ? Math.min(totalM, termMur) : doneFrom(mStart, lastMuraja, totalM, mdesc);
+      const rawM = murCycle > 1 ? termMur : doneFrom(mStart, lastMuraja, -1, mdesc);
+      const doneM = Math.min(totalM, rawM);
       const remHifz = totalH - doneH;
       const remMur = totalM - doneM;
       const left = termSessionsLeft;
@@ -859,6 +866,10 @@ export function computeProgress(
         pct: Math.round(((doneH + doneM) / (totalH + totalM)) * 100),
         totalHifz: totalH,
         totalMur: totalM,
+        overHifz: totalH > 0 ? Math.max(0, rawH - totalH) : 0,
+        overMur: totalM > 0 ? Math.max(0, rawM - totalM) : 0,
+        perHifz: perHfaces,
+        perMur: perMfaces,
         remHifz,
         remMur,
         meetingsLeft: left,

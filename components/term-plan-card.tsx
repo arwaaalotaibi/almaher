@@ -1,4 +1,4 @@
-import { facesPlain } from "@/lib/arabic";
+import { facesPlain, meetingsLabel } from "@/lib/arabic";
 import type { Progress } from "@/lib/progress";
 
 const ar = (n: number) => n.toLocaleString("ar-EG", { maximumFractionDigits: 2 });
@@ -8,15 +8,32 @@ const q = (n: number) => Math.round(n * 4) / 4;
     voice: "student" تخاطب الطالبة («أنجزتِ»)، و"staff" للمعلّمة والإدارة («أنجزت»). */
 export function TermPlanCard({ tp, voice = "student", className = "card" }: { tp: NonNullable<Progress["termPlan"]>; voice?: "student" | "staff"; className?: string }) {
   const me = voice === "student";
+  // المطلوب في كل لقاء باقٍ لإتمام القسم (مقرَّباً لربع وجه للأعلى)
+  const needOf = (rem: number) => (tp.meetingsLeft > 0 && rem > 0 ? Math.ceil((rem / tp.meetingsLeft) * 4 - 1e-9) / 4 : 0);
   const parts = [
-    { i: "📖", l: "الحفظ", as: "حفظاً", total: tp.totalHifz, rem: tp.remHifz },
-    { i: "🔁", l: "المراجعة", as: "مراجعةً", total: tp.totalMur, rem: tp.remMur },
+    { i: "📖", l: "الحفظ", as: "حفظاً", total: tp.totalHifz, rem: tp.remHifz, over: tp.overHifz, need: needOf(tp.remHifz), per: tp.perHifz },
+    { i: "🔁", l: "المراجعة", as: "مراجعةً", total: tp.totalMur, rem: tp.remMur, over: tp.overMur, need: needOf(tp.remMur), per: tp.perMur },
   ].filter((x) => x.total > 0);
   const done = tp.status === "done";
   const left = parts
     .filter((x) => x.rem > 0)
     .map((x) => `${facesPlain(q(x.rem))} ${x.as}`)
     .join(" و");
+  const over = parts
+    .filter((x) => x.rem <= 0 && q(x.over) > 0)
+    .map((x) => `${facesPlain(q(x.over))} ${x.as}`)
+    .join(" و");
+  // 👩‍🏫 للمعلّمة والإدارة: المطلوب في كل لقاء باقٍ لتلحق الخطة
+  const behind = parts.filter((x) => x.rem > 0 && x.need > x.per + 0.01);
+  const catchUp = me || done
+    ? ""
+    : tp.meetingsLeft === 0
+      ? "انتهت لقاءات الفصل ولم تكتمل الخطة"
+      : behind.length === 0
+        ? `باقي ${meetingsLabel(tp.meetingsLeft)} — على وتيرتها الحالية تُتمّ الخطة ✅`
+        : `باقي ${meetingsLabel(tp.meetingsLeft)} — لتلحق الخطة تحتاج كل لقاء: ${behind
+            .map((x) => `${facesPlain(q(x.need))} ${x.as} (خطتها ${facesPlain(q(x.per))})`)
+            .join(" و")}`;
   return (
     <div className={`${className} mb-3 rounded-2xl p-4`}>
       <div className="flex items-center justify-between text-sm font-bold">
@@ -44,7 +61,9 @@ export function TermPlanCard({ tp, voice = "student", className = "card" }: { tp
                 <span className="text-plum-700">
                   {me ? "أنجزتِ" : "أنجزت"} {ar(q(x.total - x.rem))} من {ar(q(x.total))} وجهاً
                 </span>
-                <span className={full ? "text-emerald-700" : "text-plum-700"}>{full ? "اكتمل ✓" : `باقي ${facesPlain(q(x.rem))}`}</span>
+                <span className={full ? "text-emerald-700" : "text-plum-700"}>
+                  {full ? (q(x.over) > 0 ? `اكتمل ✓ · زيادة ${facesPlain(q(x.over))} 🌟` : "اكتمل ✓") : `باقي ${facesPlain(q(x.rem))}`}
+                </span>
               </div>
             </div>
           );
@@ -53,12 +72,17 @@ export function TermPlanCard({ tp, voice = "student", className = "card" }: { tp
       <p className={`mt-3 rounded-xl px-3 py-2 text-center text-xs font-bold ${done ? "bg-emerald-50 text-emerald-700" : "bg-cream text-plum-700"}`}>
         {done
           ? me
-            ? "🎉 أتممتِ خطة الفصل كاملة — ما شاء الله تبارك الله"
-            : "🎉 أتمّت خطة الفصل كاملة"
+            ? `🎉 أتممتِ خطة الفصل كاملة${over ? ` — وزدتِ عليها ${over} 🌟` : " — ما شاء الله تبارك الله"}`
+            : `🎉 أتمّت خطة الفصل كاملة${over ? ` — وزادت عليها ${over}` : ""}`
           : me
             ? `باقي لكِ ${left} وتُتمّين خطة الفصل 🌟`
             : `باقي لها ${left} لإتمام خطة الفصل`}
       </p>
+      {catchUp && (
+        <p className={`mt-2 rounded-xl px-3 py-2 text-center text-xs font-bold ${behind.length ? "bg-amber-50 text-amber-800" : "bg-cream text-plum-700"}`}>
+          ⏱️ {catchUp}
+        </p>
+      )}
     </div>
   );
 }
