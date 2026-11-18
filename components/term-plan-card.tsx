@@ -15,6 +15,10 @@ export function TermPlanCard({ tp, voice = "student", className = "card" }: { tp
     { i: "🔁", l: "المراجعة", as: "مراجعةً", total: tp.totalMur, rem: tp.remMur, over: tp.overMur, need: needOf(tp.remMur), per: tp.perMur },
   ].filter((x) => x.total > 0);
   const done = tp.status === "done";
+  // الإجمالي يتجاوز ١٠٠ فقط بعد إتمام الخطة كاملة (زيادة قسم لا تغطّي نقص الآخر)
+  const totalPct = done
+    ? Math.round(((tp.totalHifz + tp.overHifz + tp.totalMur + tp.overMur) / (tp.totalHifz + tp.totalMur)) * 100)
+    : tp.pct;
   const left = parts
     .filter((x) => x.rem > 0)
     .map((x) => `${facesPlain(q(x.rem))} ${x.as}`)
@@ -38,11 +42,13 @@ export function TermPlanCard({ tp, voice = "student", className = "card" }: { tp
     <div className={`${className} mb-3 rounded-2xl p-4`}>
       <div className="flex items-center justify-between text-sm font-bold">
         <span className="text-plum-800">🎯 إنجاز خطة الفصل</span>
-        <span className={`rounded-full px-2.5 py-0.5 text-xs ${done ? "bg-emerald-50 text-emerald-700" : "bg-cream text-plum-700"}`}>الإجمالي {ar(tp.pct)}٪</span>
+        <span className={`rounded-full px-2.5 py-0.5 text-xs ${done ? "bg-emerald-50 text-emerald-700" : "bg-cream text-plum-700"}`}>الإجمالي {ar(totalPct)}٪</span>
       </div>
       <div className="mt-3 grid gap-2">
         {parts.map((x) => {
-          const pct = Math.max(0, Math.min(100, Math.round(((x.total - x.rem) / x.total) * 100)));
+          // 🌟 من زادت على الخطة تتجاوز نسبتها ١٠٠ (الشريط يقف عند آخره)
+          const got = x.total - x.rem + (x.rem <= 0 ? x.over : 0);
+          const pct = Math.max(0, Math.round((got / x.total) * 100));
           const full = x.rem <= 0;
           return (
             <div key={x.l} className="rounded-xl bg-plum-50 px-3 py-2.5">
@@ -55,11 +61,11 @@ export function TermPlanCard({ tp, voice = "student", className = "card" }: { tp
                 </span>
               </div>
               <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-white">
-                <div className={`h-full rounded-full ${full ? "bg-emerald-600" : "bg-plum-600"}`} style={{ width: `${pct}%` }} />
+                <div className={`h-full rounded-full ${full ? "bg-emerald-600" : "bg-plum-600"}`} style={{ width: `${Math.min(100, pct)}%` }} />
               </div>
               <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] font-bold">
                 <span className="text-plum-700">
-                  {me ? "أنجزتِ" : "أنجزت"} {ar(q(x.total - x.rem))} من {ar(q(x.total))} وجهاً
+                  {me ? "أنجزتِ" : "أنجزت"} {ar(q(got))} من {ar(q(x.total))} وجهاً
                 </span>
                 <span className={full ? "text-emerald-700" : "text-plum-700"}>
                   {full ? (q(x.over) > 0 ? `اكتمل ✓ · زيادة ${facesPlain(q(x.over))} 🌟` : "اكتمل ✓") : `باقي ${facesPlain(q(x.rem))}`}
